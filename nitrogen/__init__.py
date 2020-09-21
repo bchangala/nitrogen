@@ -5,8 +5,8 @@ NITROGEN
 A Python package for rovibronic spectroscopy and
 nuclear motion calculations of small molecules
 
-Sub-packages:
--------------
+Sub-packages
+------------
 
 1. autodiff
 
