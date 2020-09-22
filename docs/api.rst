@@ -6,6 +6,11 @@ NITROGEN API reference
    
 .. automodule:: nitrogen.dfun
    :members:
+   :show-inheritance:
+   
+.. automodule:: nitrogen.coordsys
+   :members:
+   :show-inheritance:
 
 The ``autodiff`` sub-package
 ----------------------------
