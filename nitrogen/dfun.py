@@ -117,7 +117,7 @@ class DFun:
             nd = adf.nck(deriv + nvar, min(deriv,nvar))
             out = np.ndarray((self.nf, nd, m), dtype = X.dtype)
             
-        self._feval(self,X,deriv,out,var) # Evaluate function
+        self._feval(X,deriv,out,var) # Evaluate function
         
         return out
     

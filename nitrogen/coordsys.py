@@ -152,7 +152,7 @@ class CoordSys(dfun.DFun):
             raise ValueError('deriv is larger than maxderiv')
         
         # Check the shape of input Q
-        m,n = Q.shape
+        n,m = Q.shape
         if n != self.nQ:
             raise ValueError('Q must have shape (nQ, m)')
         
@@ -171,8 +171,93 @@ class CoordSys(dfun.DFun):
             nd = adf.nck(deriv + nvar, min(deriv,nvar))
             out = np.ndarray((self.nX, nd, m), dtype = Q.dtype)
             
-        self._feval(self, Q, deriv, out, var) # Evaluate Q2X function
+        self._feval(Q, deriv, out, var) # Evaluate Q2X function
          
+        return out
+    
+    def Q2t(self, Q, out = None, vvar = None, rvar = None):
+        """
+        Calculate t-vectors (for *atomic* :class:`CoordSys` objects).
+
+        Parameters
+        ----------
+        Q : ndarray
+            An array of ``m`` input coordinate vectors.
+            Q has shape (:attr:`nQ`, ``m``).
+        out : ndarray, optional
+            Output location, an ndarray with shape ``(nt, natoms, 3, m)``
+            and the same data-type as Q. If None, this will be created.
+            The default is None.
+        vvar : list of int, optional
+            The coordinates for which vibrational t-vectors will be calculated.
+            If None, then all coordinates will be used in order. The default is None.
+        rvar : str, optional
+            The body-fixed axes for which rotational t-vectors will be calculated.
+            This is specified by a string containing 'x', 'y', and 'z', e.g.
+            'xyz' or 'zy'. '' will calculate no rotational t-vectors, and None
+            is equivalent to 'xyz'. The default is None.
+
+        Returns
+        -------
+        out : ndarray
+            The t-vector array.
+
+        """
+        
+        if not self.isatomic: 
+            raise RuntimeError('Q2t is only callable for atomic CoordSys objects')
+        
+        if vvar is None:
+            vvar = [i for i in range(self.nQ)] # Calculate all vibrational t-vectors
+            
+        if rvar is None:
+            rvar = 'xyz'
+        if not rvar in ['', 'x', 'y', 'z', 'xy', 'yx', 'xz','zx','yz','zy',
+                        'xyz','yzx','zxy','zyx','yxz','xzy']:
+            raise ValueError('Invalid rvar string')
+        
+        nv = len(vvar)
+        nr = len(rvar)
+        nt = nv + nr
+        na = self.natoms
+        _,m = Q.shape
+        
+        if nt == 0:
+            raise ValueError('At least vvar or rvar must be non-empty')
+        
+        # Calculate the Cartesian coordinates and first derivatives
+        # (only need derivatives if vvar is not empty)
+        if nv == 0:
+            X = self.Q2X(Q, deriv = 0, var = [0]) # value of `var` doesn't matter
+        else:
+            X = self.Q2X(Q, deriv = 1, var = vvar)
+        
+
+        
+        if out is None:
+            out = np.ndarray((nt, na, 3, m))
+            
+        # Copy vibrational t-vectors
+        for k in range(nv): # For each vibrational coordinate k
+            for i in range(na): # For each atom i
+                np.copyto( out[k, i, :, :], X[ (3*i):(3*i+3), k+1, :])
+          
+        # Calculate rotational t-vectors
+        ea = np.eye(3) 
+        xyz = {'x':0, 'y':1, 'z':2}
+        
+        for a in range(nr): # For each requested axis 
+            alpha = xyz[rvar[a]] # the axis index (0, 1, or 2 for x, y, or z)
+            for i in range(na): # For each atom i
+                # The rotational t-vector is the derivative
+                # of atom i with respect to an infinitesimal
+                # rotation about axis alpha. This is equal to
+                # the cross-product of the unit-vector along
+                # alpha and the position vector of atom i
+                np.copyto( out[-nr+a, i, :, :], 
+                          np.cross(ea[:,alpha], X[(3*i):(3*i+3), 0, :], axis = 0))
+                # Note the use of `axis` in np.cross !!!
+        
         return out
     
 class CS_Valence3(CoordSys):
@@ -201,7 +286,7 @@ class CS_Valence3(CoordSys):
         """
         
         super().__init__(self._csv3_q2x, nQ = 3, 
-                         nX = 1, name = name, 
+                         nX = 9, name = name, 
                          Qstr = ['r1', 'r2', 'theta'],
                          maxderiv = -1, isatomic = True)
         
