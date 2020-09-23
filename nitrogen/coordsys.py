@@ -200,7 +200,9 @@ class CoordSys(dfun.DFun):
         Returns
         -------
         out : ndarray
-            The t-vector array.
+            The t-vector array with shape ``(nt, natoms, 3, m)``. The first index
+            runs over the requested vibrational and rotational coordinates in 
+            the order given by `vvar` and `rvar`.
 
         """
         
@@ -235,7 +237,7 @@ class CoordSys(dfun.DFun):
 
         
         if out is None:
-            out = np.ndarray((nt, na, 3, m))
+            out = np.ndarray((nt, na, 3, m), Q.dtype)
             
         # Copy vibrational t-vectors
         for k in range(nv): # For each vibrational coordinate k
@@ -257,6 +259,125 @@ class CoordSys(dfun.DFun):
                 np.copyto( out[-nr+a, i, :, :], 
                           np.cross(ea[:,alpha], X[(3*i):(3*i+3), 0, :], axis = 0))
                 # Note the use of `axis` in np.cross !!!
+        
+        return out
+    
+    def Q2g(self, Q, masses = None, out = None, vvar = None, rvar = None,
+            mode = 'bodyframe'):
+        """
+        Calculate the curvilinear metric tensor g
+
+        Parameters
+        ----------
+        Q : ndarray
+            An array of ``m`` input coordinate vectors.
+            Q has shape (:attr:`nQ`, ``m``).
+        masses : array_like
+            A list of masses of length ``natoms``.
+        out : ndarray, optional
+            Output location, an ndarray with shape ``(ng, m)``
+            and the same data-type as Q. If None, this will be created.
+            The default is None.
+        vvar : list of int, optional
+            The coordinates included in the vibrational block of g.
+            If None, then all coordinates will be used in order. The default is None.
+        rvar : str, optional
+            The body-fixed axes inlcuded in the rotational block of g.
+            If None, then all axes will be used in order. The default is None.
+        mode : {'bodyframe'}
+            Calculation mode. 'bodyframe' calculates the standard g tensor
+            for a rotating molecule (CoordSys must be *atomic*).
+
+        Returns
+        -------
+        out : ndarray
+            The g matrix array with shape ``(ng, m)``.
+
+        """
+        
+        if mode == 'bodyframe':
+            if not self.isatomic:
+                raise ValueError("'bodyframe' mode is valid for atomic CoordSys only")
+            if masses is None:
+                raise ValueError("masses must be specified for 'bodyframe' mode")
+            if len(masses) != self.natoms:
+                raise ValueError("length of masses must equal natoms")
+                
+            t = self.Q2t(Q, vvar = vvar, rvar = rvar)
+            nt,_,_,m = t.shape
+            
+            ng = (nt*(nt+1))//2
+            
+            if out is None:
+                out = np.ndarray((ng,m), dtype = Q.dtype)
+            
+            self.t2g(t, masses, fixCOM = True, out = out)
+            
+        else:
+            raise ValueError('Invalid mode string')
+            
+        return out
+    
+    @staticmethod
+    def t2g(t, masses, fixCOM = True, out = None):
+        """
+        Calculate g metric tensor given atomic t-vectors
+        and masses.
+        
+        Parameters
+        ----------
+        t : ndarray 
+            Atomic t-vector array, with shape ``(nt, natoms, 3, m)``, 
+            as returned by :meth:`Q2t`.
+        masses : array_like
+            A list of masses of length ``natoms``.
+        fixCOM : bool
+            If fixCOM, then the t vectors are shifted to 
+            the center-of-mass frame before calculating the
+            g metric tensor. **This modifies `t`.** The default is True.
+        out : ndarray
+            The output location of shape ``(ng, m)``, where
+            ``ng = (nt * (nt+1)) // 2``. If None, this
+            will be created. The default is None. 
+
+        Returns
+        -------
+        out : ndarray 
+            The curvlinear metric tensor, the first-index is
+            stored in packed upper triangle column-major order.
+
+        """
+        nt,natoms,_,m = t.shape
+        ng = (nt*(nt+1)) // 2  # Number of elements for packed storage of g
+        
+        if out is None:
+            out = np.ndarray((ng,m), dtype = t.dtype)
+        out.fill(0) # Initialize result to zero
+        
+        
+        if fixCOM: # Shift t-vectors to Center-of-Mass frame
+            
+            # First, calculate t-vector of COM in original frame
+            tCOM = np.zeros((nt,3,m))
+            for a in range(natoms):
+                tCOM += masses[a] * t[:,a,:,:]
+            tCOM = tCOM / sum(masses)
+            # Now, subtract COM from t-vectors
+            for a in range(natoms):
+                    t[:,a,:,:] = t[:,a,:,:] - tCOM
+        
+        # Calculate g tensor
+        idx = 0
+        for j in range(nt):
+            tj = t[j,:,:,:]
+            
+            for i in range(j+1):
+                ti = t[i,:,:,:]
+                
+                for a in range(natoms):
+                    out[idx,:] += masses[a] * np.sum(tj[a,:,:] * ti[a,:,:], axis = 0)
+                
+                idx += 1 
         
         return out
     
