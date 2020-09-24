@@ -17,7 +17,7 @@ import nitrogen.autodiff.forward as adf
 class CoordSys(dfun.DFun):
     """
     A generic coordinate system base class, which
-    extends the dfun.DFun generical differentiable
+    extends the dfun.DFun generic differentiable
     function class.
     
     Attributes
