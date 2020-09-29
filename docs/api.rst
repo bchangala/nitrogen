@@ -15,6 +15,10 @@ NITROGEN API reference
 .. automodule:: nitrogen.dvr 
    :members:
    :show-inheritance:
+   
+.. automodule:: nitrogen.linalg 
+   :members:
+   :show-inheritance:
 
 The ``autodiff`` sub-package
 ----------------------------
