@@ -12,4 +12,11 @@ Sub-packages
 
 """
 
+# Import sub-packages into namespace
 from . import autodiff
+
+# Import modules into namespace
+from . import linalg 
+from . import dvr 
+from . import dfun 
+from . import coordsys 
