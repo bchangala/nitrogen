@@ -15,7 +15,8 @@ def nck(n,k):
     Calculate the binomical coefficient (`n` choose `k`).
     
     This function uses a simple recursive algorithm. Use of 
-    :func:`ncktab` may be significantly faster.
+    :func:`ncktab` may be significantly faster (i.e. 
+    ``ncktab(n,k)[n,k]``.)
 
     Parameters
     ----------
@@ -272,7 +273,7 @@ def idxposk(a,nck):
     
     ni = a.size
     
-    if ni == 1:
+    if ni == 0 or ni == 1:
         posk = np.uint64(0)
     else:
         k = np.sum(a)
@@ -548,15 +549,15 @@ class adarray:
     
     """
     
-    def __init__(self,shape,k,ni, nck = None, idx = None, dtype = np.float64):
+    def __init__(self,base_shape,k,ni, nck = None, idx = None, dtype = np.float64):
         """
         Create a new adarray object.
 
         Parameters
         ----------
-        shape : tuple of int
+        base_shape : tuple of int
             Shape of base array. adarray.d will have shape
-            ``(nd,) + shape``. Shape may be ().
+            ``(nd,) + base_shape``. Shape may be ().
         k : int
             Maximum derivative degree. `k` must be greater
             or equal to 0.
@@ -594,7 +595,7 @@ class adarray:
             self.idx = idx # no copy
         
         self.nd = self.nck[k + ni, min(ni,k)]
-        self.d = np.empty((self.nd,) + shape, dtype = dtype)
+        self.d = np.empty((self.nd,) + base_shape, dtype = dtype)
         # The first index is the new "derivative index"
     
     def copy(self):
@@ -982,3 +983,104 @@ def exp(x, out = None):
         df[i] = df[0]
             
     return adchain(df, x, out = out)
+    
+def reduceOrder(F, i, k, ni, idx, out = None):
+    """
+    Reduce the derivative array for F with respect to 
+    variable i. The returned derivative array is
+    that for the function :math:`\\partial_iF`.
+
+    Parameters
+    ----------
+    F : ndarray
+        The derivative for F up to degree `k`
+        in `ni` variables.
+    i : int
+        The variable index (0, ..., `ni` - 1) to
+        reduce.
+    k : int
+        The initial derivative order of F.
+    ni : int
+        The number of independent variables.
+    idx : ndarray
+        The return value of idxtab with suitable parameters.
+    out : ndarray, optional
+        Output buffer. If None, this will be
+        created. The default is None.
+
+    Returns
+    -------
+    out : ndarray
+
+    """
+
+    nd,_ = idx.shape # The number of derivatives
+    
+    if k <= 0:
+        raise ValueError("Cannot reduce a derivative array with k = 0") 
+        
+    if i < 0 or i >= ni : 
+        raise ValueError(f"Cannot reduce w.r.t variable index i = {i:d} with only ni = {ni:d} variables")
+        
+    # k and ni are now both > 0
+    #
+    # Calculate the number of derivatives for
+    # order k - 1 in ni variables. We already know
+    # that nd is the number of deriv for order k
+    # in ni variables, so we can use the simple result:
+    nd_reduced = (nd * k) // (k + ni)  # This should be an integer result always!
+    
+    if out is None:
+        out = np.ndarray( (nd_reduced,) + F.shape[1:], dtype = F.dtype)
+    G = out # reference only
+    
+    # The index table `idx` for F is already provided,
+    # so we will loop through this instead of building
+    # a new index table for the reduced derivative array
+    # The derivatives we are interested in appear
+    # in the same order in the F (unreduced) and G (reduced)
+    # derivative arrays.
+    # This is to say that if one has two multi-indices of F
+    # a = [a0 a1 a2 ... ai ...] and b = [b0 b1 b2 ... bi ...]
+    # a appears before b
+    # then the corresponding reduced indices
+    # a' = [a0 a1 a2 ... ai-1 ... ] and b' = [b0 b1 b2 ... bi-1 ...]
+    # appear in the same order: a' before b'
+    #
+    #
+    iG = 0 # running position in the reduced derivative array 
+    for iF in range(nd):
+        
+        idxF = idx[iF,:]  # The multi-index of the original function's derivatives
+        
+        if idxF[i] < 1:
+            # This derivative is not part of the reduced array
+            continue 
+        # else, idxF[i] >= 1. It contributes to the 
+        # derivative element of G corresponding to idxF[i]--
+        #
+        # Because we store the derivatives with a factor
+        # equal to the inverse of the multi-index factorial,
+        # we need to correct this in the reduced array
+        #
+        # The correct conversion factor is
+        #  idxF! / idxG! = idxF[i]! / idxG[i]!
+        #                = idxF[i]! / (idxF[i] - 1)!
+        #                = idxF[i]
+        #
+        # Now we do this:
+        # G[iG] = F[iF] * idxF[i] 
+        #
+        # Depending on the shape of G, we will split this up
+        if len(G.shape) == 1:
+            G[iG] = F[iF] * idxF[i] # Scalar multiplication
+        else:
+            np.multiply(F[iF], idxF[i], out = G[iG]) # use np.multiply to save on temp memory
+        
+        iG += 1
+        
+    # Check that nothing went wrong in the book keeping
+    assert iG == nd_reduced, "Derivative array reduction was not successful!"
+     
+    
+    return G

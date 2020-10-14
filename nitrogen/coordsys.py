@@ -142,7 +142,7 @@ class CoordSys(dfun.DFun):
         Returns
         -------
         out : ndarray
-            The result, X(Q).
+            The result, X(Q), in DFun format.
 
         """
         # Check the requested derivative order
@@ -175,22 +175,26 @@ class CoordSys(dfun.DFun):
          
         return out
     
-    def Q2t(self, Q, out = None, vvar = None, rvar = None):
+    def Q2t(self, Q, deriv = 0, out = None, vvar = None, rvar = None):
         """
-        Calculate t-vectors (for *atomic* :class:`CoordSys` objects).
+        Calculate t-vectors and their derivatives
+        (for *atomic* :class:`CoordSys` objects).
 
         Parameters
         ----------
         Q : ndarray
             An array of ``m`` input coordinate vectors.
             Q has shape (:attr:`nQ`, ``m``).
+        deriv : int
+            Derivative level. The default is 0.
         out : ndarray, optional
-            Output location, an ndarray with shape ``(nt, natoms, 3, m)``
+            Output location, an ndarray with shape ``(nt, natoms, 3, nd, m)``
             and the same data-type as Q. If None, this will be created.
             The default is None.
         vvar : list of int, optional
-            The coordinates for which vibrational t-vectors will be calculated.
-            If None, then all coordinates will be used in order. The default is None.
+            The coordinates for which vibrational t-vectors, and derivatives
+            thereof, will be calculated. If None, then all coordinates will 
+            be used in order. The default is None.
         rvar : str, optional
             The body-fixed axes for which rotational t-vectors will be calculated.
             This is specified by a string containing 'x', 'y', and 'z', e.g.
@@ -200,9 +204,12 @@ class CoordSys(dfun.DFun):
         Returns
         -------
         out : ndarray
-            The t-vector array with shape ``(nt, natoms, 3, m)``. The first index
+            The t-vector array with shape ``(nt, natoms, 3, nd, m)``. The first index
             runs over the requested vibrational and rotational coordinates in 
-            the order given by `vvar` and `rvar`.
+            the order given by `vvar` and `rvar`. The `nd` dimension runs over
+            the requested derivatives in normal DFun order for the number of
+            independent variables indicated by `vvar`.
+            
 
         """
         
@@ -218,31 +225,42 @@ class CoordSys(dfun.DFun):
                         'xyz','yzx','zxy','zyx','yxz','xzy']:
             raise ValueError('Invalid rvar string')
         
-        nv = len(vvar)
-        nr = len(rvar)
-        nt = nv + nr
-        na = self.natoms
+        nv = len(vvar)  # The number of vibrational coordinates
+        nr = len(rvar)  # The number of rotational coordinates
+        nt = nv + nr    # The total number of t-vectors
+        na = self.natoms # The number of atoms
+        nd = dfun.nderiv(deriv, nv) # The number of derivatives
         _,m = Q.shape
         
         if nt == 0:
             raise ValueError('At least vvar or rvar must be non-empty')
         
-        # Calculate the Cartesian coordinates and first derivatives
-        # (only need derivatives if vvar is not empty)
-        if nv == 0:
-            X = self.Q2X(Q, deriv = 0, var = [0]) # value of `var` doesn't matter
-        else:
-            X = self.Q2X(Q, deriv = 1, var = vvar)
-        
-
+        # Calculate the Cartesian coordinates and derivatives
+        # We need one higher order than deriv
+        X = self.Q2X(Q, deriv = deriv + 1, var = vvar)
         
         if out is None:
-            out = np.ndarray((nt, na, 3, m), Q.dtype)
+            out = np.ndarray((nt, na, 3, nd, m), Q.dtype)
+        
+        
+        # Extract vibrational t-vectors
+        if nv > 0:
+            idxtab = adf.idxtab(deriv+1, nv) # needed for order reduction
             
-        # Copy vibrational t-vectors
-        for k in range(nv): # For each vibrational coordinate k
-            for i in range(na): # For each atom i
-                np.copyto( out[k, i, :, :], X[ (3*i):(3*i+3), k+1, :])
+            for k in range(nv): # For each vibrational coordinate k
+                for i in range(na): # For each atom i
+                    for a in range(3): # For each axis a (0,1,2 = x,y,z)
+                       # 
+                       # X[3*i + a, :, :] is the derivative array
+                       # for the X_i,a Cartesian coordinate
+                       #
+                       # The k^th vibrational t-vector is the derivative of these with
+                       # respect to the vibrational coordinate k
+                       #
+                       # Extract the k^th derivative of X from its super
+                       # derivative array
+                       adf.reduceOrder(X[3*i + a, :, :], k, deriv+1, nv, idxtab, 
+                                       out = out[k, i, a, :, :])
           
         # Calculate rotational t-vectors
         ea = np.eye(3) 
@@ -256,130 +274,130 @@ class CoordSys(dfun.DFun):
                 # rotation about axis alpha. This is equal to
                 # the cross-product of the unit-vector along
                 # alpha and the position vector of atom i
-                np.copyto( out[-nr+a, i, :, :], 
-                          np.cross(ea[:,alpha], X[(3*i):(3*i+3), 0, :], axis = 0))
+                np.copyto( out[-nr+a, i, :, :, :], 
+                          np.cross(ea[:,alpha], X[(3*i):(3*i+3), 0:nd, :], axis = 0))
                 # Note the use of `axis` in np.cross !!!
         
         return out
     
-    def Q2g(self, Q, masses = None, out = None, vvar = None, rvar = None,
-            mode = 'bodyframe'):
-        """
-        Calculate the curvilinear metric tensor g
+    # def Q2g(self, Q, masses = None, out = None, vvar = None, rvar = None,
+    #         mode = 'bodyframe'):
+    #     """
+    #     Calculate the curvilinear metric tensor g
 
-        Parameters
-        ----------
-        Q : ndarray
-            An array of ``m`` input coordinate vectors.
-            Q has shape (:attr:`nQ`, ``m``).
-        masses : array_like
-            A list of masses of length ``natoms``.
-        out : ndarray, optional
-            Output location, an ndarray with shape ``(ng, m)``
-            and the same data-type as Q. If None, this will be created.
-            The default is None.
-        vvar : list of int, optional
-            The coordinates included in the vibrational block of g.
-            If None, then all coordinates will be used in order. The default is None.
-        rvar : str, optional
-            The body-fixed axes inlcuded in the rotational block of g.
-            If None, then all axes will be used in order. The default is None.
-        mode : {'bodyframe'}
-            Calculation mode. 'bodyframe' calculates the standard g tensor
-            for a rotating molecule (CoordSys must be *atomic*).
+    #     Parameters
+    #     ----------
+    #     Q : ndarray
+    #         An array of ``m`` input coordinate vectors.
+    #         Q has shape (:attr:`nQ`, ``m``).
+    #     masses : array_like
+    #         A list of masses of length ``natoms``.
+    #     out : ndarray, optional
+    #         Output location, an ndarray with shape ``(ng, m)``
+    #         and the same data-type as Q. If None, this will be created.
+    #         The default is None.
+    #     vvar : list of int, optional
+    #         The coordinates included in the vibrational block of g.
+    #         If None, then all coordinates will be used in order. The default is None.
+    #     rvar : str, optional
+    #         The body-fixed axes inlcuded in the rotational block of g.
+    #         If None, then all axes will be used in order. The default is None.
+    #     mode : {'bodyframe'}
+    #         Calculation mode. 'bodyframe' calculates the standard g tensor
+    #         for a rotating molecule (CoordSys must be *atomic*).
 
-        Returns
-        -------
-        out : ndarray
-            The g matrix array with shape ``(ng, m)``.
+    #     Returns
+    #     -------
+    #     out : ndarray
+    #         The g matrix array with shape ``(ng, m)``.
 
-        """
+    #     """
         
-        if mode == 'bodyframe':
-            if not self.isatomic:
-                raise ValueError("'bodyframe' mode is valid for atomic CoordSys only")
-            if masses is None:
-                raise ValueError("masses must be specified for 'bodyframe' mode")
-            if len(masses) != self.natoms:
-                raise ValueError("length of masses must equal natoms")
+    #     if mode == 'bodyframe':
+    #         if not self.isatomic:
+    #             raise ValueError("'bodyframe' mode is valid for atomic CoordSys only")
+    #         if masses is None:
+    #             raise ValueError("masses must be specified for 'bodyframe' mode")
+    #         if len(masses) != self.natoms:
+    #             raise ValueError("length of masses must equal natoms")
                 
-            t = self.Q2t(Q, vvar = vvar, rvar = rvar)
-            nt,_,_,m = t.shape
+    #         t = self.Q2t(Q, vvar = vvar, rvar = rvar)
+    #         nt,_,_,m = t.shape
             
-            ng = (nt*(nt+1))//2
+    #         ng = (nt*(nt+1))//2
             
-            if out is None:
-                out = np.ndarray((ng,m), dtype = Q.dtype)
+    #         if out is None:
+    #             out = np.ndarray((ng,m), dtype = Q.dtype)
             
-            self.t2g(t, masses, fixCOM = True, out = out)
+    #         self.t2g(t, masses, fixCOM = True, out = out)
             
-        else:
-            raise ValueError('Invalid mode string')
+    #     else:
+    #         raise ValueError('Invalid mode string')
             
-        return out
+    #     return out
     
-    @staticmethod
-    def t2g(t, masses, fixCOM = True, out = None):
-        """
-        Calculate g metric tensor given atomic t-vectors
-        and masses.
+    # @staticmethod
+    # def t2g(t, masses, fixCOM = True, out = None):
+    #     """
+    #     Calculate g metric tensor given atomic t-vectors
+    #     and masses.
         
-        Parameters
-        ----------
-        t : ndarray 
-            Atomic t-vector array, with shape ``(nt, natoms, 3, m)``, 
-            as returned by :meth:`Q2t`.
-        masses : array_like
-            A list of masses of length ``natoms``.
-        fixCOM : bool
-            If fixCOM, then the t vectors are shifted to 
-            the center-of-mass frame before calculating the
-            g metric tensor. **This modifies `t`.** The default is True.
-        out : ndarray
-            The output location of shape ``(ng, m)``, where
-            ``ng = (nt * (nt+1)) // 2``. If None, this
-            will be created. The default is None. 
+    #     Parameters
+    #     ----------
+    #     t : ndarray 
+    #         Atomic t-vector array, with shape ``(nt, natoms, 3, m)``, 
+    #         as returned by :meth:`Q2t`.
+    #     masses : array_like
+    #         A list of masses of length ``natoms``.
+    #     fixCOM : bool
+    #         If fixCOM, then the t vectors are shifted to 
+    #         the center-of-mass frame before calculating the
+    #         g metric tensor. **This modifies `t`.** The default is True.
+    #     out : ndarray
+    #         The output location of shape ``(ng, m)``, where
+    #         ``ng = (nt * (nt+1)) // 2``. If None, this
+    #         will be created. The default is None. 
 
-        Returns
-        -------
-        out : ndarray 
-            The curvlinear metric tensor, the first-index is
-            stored in packed upper triangle column-major order.
+    #     Returns
+    #     -------
+    #     out : ndarray 
+    #         The curvlinear metric tensor, the first-index is
+    #         stored in packed upper triangle column-major order.
 
-        """
-        nt,natoms,_,m = t.shape
-        ng = (nt*(nt+1)) // 2  # Number of elements for packed storage of g
+    #     """
+    #     nt,natoms,_,m = t.shape
+    #     ng = (nt*(nt+1)) // 2  # Number of elements for packed storage of g
         
-        if out is None:
-            out = np.ndarray((ng,m), dtype = t.dtype)
-        out.fill(0) # Initialize result to zero
+    #     if out is None:
+    #         out = np.ndarray((ng,m), dtype = t.dtype)
+    #     out.fill(0) # Initialize result to zero
         
         
-        if fixCOM: # Shift t-vectors to Center-of-Mass frame
+    #     if fixCOM: # Shift t-vectors to Center-of-Mass frame
             
-            # First, calculate t-vector of COM in original frame
-            tCOM = np.zeros((nt,3,m))
-            for a in range(natoms):
-                tCOM += masses[a] * t[:,a,:,:]
-            tCOM = tCOM / sum(masses)
-            # Now, subtract COM from t-vectors
-            for a in range(natoms):
-                    t[:,a,:,:] = t[:,a,:,:] - tCOM
+    #         # First, calculate t-vector of COM in original frame
+    #         tCOM = np.zeros((nt,3,m))
+    #         for a in range(natoms):
+    #             tCOM += masses[a] * t[:,a,:,:]
+    #         tCOM = tCOM / sum(masses)
+    #         # Now, subtract COM from t-vectors
+    #         for a in range(natoms):
+    #                 t[:,a,:,:] = t[:,a,:,:] - tCOM
         
-        # Calculate g tensor
-        idx = 0
-        for j in range(nt):
-            tj = t[j,:,:,:]
+    #     # Calculate g tensor
+    #     idx = 0
+    #     for j in range(nt):
+    #         tj = t[j,:,:,:]
             
-            for i in range(j+1):
-                ti = t[i,:,:,:]
+    #         for i in range(j+1):
+    #             ti = t[i,:,:,:]
                 
-                for a in range(natoms):
-                    out[idx,:] += masses[a] * np.sum(tj[a,:,:] * ti[a,:,:], axis = 0)
+    #             for a in range(natoms):
+    #                 out[idx,:] += masses[a] * np.sum(tj[a,:,:] * ti[a,:,:], axis = 0)
                 
-                idx += 1 
+    #             idx += 1 
         
-        return out
+    #     return out
     
 class CS_Valence3(CoordSys):
     """
@@ -438,7 +456,8 @@ class CS_Valence3(CoordSys):
         
         nvar = len(var)
         
-        nd = adf.nck(deriv + nvar, min(deriv, nvar)) # The number of derivatives
+        # nd = adf.nck(deriv + nvar, min(deriv, nvar)) # The number of derivatives
+        nd = dfun.nderiv(deriv, nvar)
         
         # Create adf symbols/constants for each coordinate
         q = [] 

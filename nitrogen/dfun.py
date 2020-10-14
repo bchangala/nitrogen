@@ -83,7 +83,7 @@ class DFun:
         Returns
         -------
         out : ndarray
-            The result array.
+            The result array in autodiff format.
         
         Notes
         -----
@@ -105,6 +105,8 @@ class DFun:
         # Check var
         if var is None:
             nvar = self.nx  # Use all variables. None will be passed to _feval.
+        elif len(var) == 0:
+            nvar = 0        # An empty list
         else:
             if np.unique(var).size != len(var):
                 raise ValueError('var cannot contain duplicate elements')
@@ -114,7 +116,7 @@ class DFun:
             
         # Create output array if no output buffer passed
         if out is None:
-            nd = adf.nck(deriv + nvar, min(deriv,nvar))
+            nd = nderiv(deriv, nvar)
             out = np.ndarray((self.nf, nd, m), dtype = X.dtype)
             
         self._feval(X,deriv,out,var) # Evaluate function
@@ -174,10 +176,34 @@ def _fzero(self, X, deriv = 0, out = None, var = None):
         nvar = len(var)
     
     if out is None:
-        nd = adf.nck(nvar + deriv, min(nvar,deriv))
+        nd = nderiv(deriv, nvar)
         _,m = X.shape
         out = np.ndarray( (self.nf, nd, m), dtype = X.dtype)
         
     out.fill(0)
     
     return out
+
+def nderiv(deriv, nvar):
+    """
+    The number of derivatives up to order `deriv`,
+    inclusively, in `nvar` variables. This equals
+    the binomial coefficient (`deriv` + `nvar`, `nvar`).
+
+    Parameters
+    ----------
+    deriv : int
+        The maximum derivative order.
+    nvar : int
+        The number of independent variables.
+
+    Returns
+    -------
+    np.uint64
+        The number of derivatives.
+
+    """
+    n = deriv + nvar 
+    k = min(deriv, nvar)
+    return adf.ncktab(n,k)[n,k]
+
