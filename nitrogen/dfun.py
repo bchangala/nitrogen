@@ -62,12 +62,12 @@ class DFun:
         Parameters
         ----------
         X : ndarray
-            An array of ``m`` input vectors. X has shape (:attr:`nx`, ``m``).
+            An array of input values. `X` has shape (:attr:`nx`, ...).
         deriv : int, optional
             All derivatives up through order `deriv` are requested. The default is 0.
         out : ndarray, optional
             The buffer to store the output. This is an ndarray
-            with shape (:attr:`nf`, `nd`, ``m``), where `nd` is the number
+            with shape (`nd`, :attr:`nf`, ...), where `nd` is the number
             of derivatives requested sorted in :mod:`~nitrogen.autodiff`
             lexical order. (See Notes.) The default is None. If None,
             then a new output ndarray is created. The data-type of `out`
@@ -83,7 +83,8 @@ class DFun:
         Returns
         -------
         out : ndarray
-            The result array in autodiff format.
+            The result array in autodiff format with shape
+            (`nd`, :attr:`nf`, ...)
         
         Notes
         -----
@@ -98,9 +99,9 @@ class DFun:
             raise ValueError('deriv is larger than maxderiv')
         
         # Check the shape of input X
-        n,m = X.shape
+        n = X.shape[0]
         if n != self.nx:
-            raise ValueError('X must have shape (nx,m)')
+            raise ValueError('X must have shape (nx,...)')
         
         # Check var
         if var is None:
@@ -117,7 +118,7 @@ class DFun:
         # Create output array if no output buffer passed
         if out is None:
             nd = nderiv(deriv, nvar)
-            out = np.ndarray((self.nf, nd, m), dtype = X.dtype)
+            out = np.ndarray((nd, self.nf) + X.shape[1:], dtype = X.dtype)
             
         self._feval(X,deriv,out,var) # Evaluate function
         
@@ -155,7 +156,7 @@ def _fzero(self, X, deriv = 0, out = None, var = None):
     Parameters
     ----------
     X : ndarray
-        Input array with shape (self.nx, m)
+        Input array with shape (self.nx, ...)
     deriv : int, optional
         Maximum derivative order. The default is 0.
     out : ndarray, optional
@@ -165,8 +166,8 @@ def _fzero(self, X, deriv = 0, out = None, var = None):
     Returns
     -------
     out : ndarray
-        The result (all zeros) with shape (self.nf, nd, m). 
-        nd equals `self.nx` + `deriv` choose `deriv`
+        The result (all zeros) with shape (nd, self.nf, ...). 
+        nd equals ``len(var)`` + `deriv` choose `deriv`
 
     """
     
@@ -177,8 +178,8 @@ def _fzero(self, X, deriv = 0, out = None, var = None):
     
     if out is None:
         nd = nderiv(deriv, nvar)
-        _,m = X.shape
-        out = np.ndarray( (self.nf, nd, m), dtype = X.dtype)
+        base_shape = X.shape[1:]
+        out = np.ndarray( (nd, self.nf) + base_shape, dtype = X.dtype)
         
     out.fill(0)
     

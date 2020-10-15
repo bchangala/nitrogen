@@ -126,8 +126,7 @@ class CoordSys(dfun.DFun):
         Parameters
         ----------
         Q : ndarray
-            An array of ``m`` input coordinate vectors.
-            Q has shape (:attr:`nQ`, ``m``).
+            An array of input coordinates with shape (:attr:`nQ`, ...).
         deriv : int, optional
             All derivatives up through order `deriv` are requested. The default is 0.
         out : ndarray, optional
@@ -152,9 +151,9 @@ class CoordSys(dfun.DFun):
             raise ValueError('deriv is larger than maxderiv')
         
         # Check the shape of input Q
-        n,m = Q.shape
+        n = Q.shape[0]
         if n != self.nQ:
-            raise ValueError('Q must have shape (nQ, m)')
+            raise ValueError('Q must have shape (nQ, ...)')
         
         # Check var
         if var is None:
@@ -169,7 +168,7 @@ class CoordSys(dfun.DFun):
         # Create output array if no output buffer passed
         if out is None:
             nd = adf.nck(deriv + nvar, min(deriv,nvar))
-            out = np.ndarray((self.nX, nd, m), dtype = Q.dtype)
+            out = np.ndarray((nd, self.nX) + Q.shape[1:], dtype = Q.dtype)
             
         self._feval(Q, deriv, out, var) # Evaluate Q2X function
          
@@ -184,11 +183,11 @@ class CoordSys(dfun.DFun):
         ----------
         Q : ndarray
             An array of ``m`` input coordinate vectors.
-            Q has shape (:attr:`nQ`, ``m``).
+            Q has shape (:attr:`nQ`, ...).
         deriv : int
             Derivative level. The default is 0.
         out : ndarray, optional
-            Output location, an ndarray with shape ``(nt, natoms, 3, nd, m)``
+            Output location, an ndarray with shape ``(nd, nt, natoms, 3, ...)``
             and the same data-type as Q. If None, this will be created.
             The default is None.
         vvar : list of int, optional
@@ -204,10 +203,10 @@ class CoordSys(dfun.DFun):
         Returns
         -------
         out : ndarray
-            The t-vector array with shape ``(nt, natoms, 3, nd, m)``. The first index
+            The t-vector array with shape ``(nd, nt, natoms, 3, ...)``. The second index
             runs over the requested vibrational and rotational coordinates in 
-            the order given by `vvar` and `rvar`. The `nd` dimension runs over
-            the requested derivatives in normal DFun order for the number of
+            the order given by `vvar` and `rvar`. The first dimension runs over
+            the `nd` requested derivatives in normal DFun order for the number of
             independent variables indicated by `vvar`.
             
 
@@ -230,7 +229,7 @@ class CoordSys(dfun.DFun):
         nt = nv + nr    # The total number of t-vectors
         na = self.natoms # The number of atoms
         nd = dfun.nderiv(deriv, nv) # The number of derivatives
-        _,m = Q.shape
+        base_shape = Q.shape[1:]
         
         if nt == 0:
             raise ValueError('At least vvar or rvar must be non-empty')
@@ -240,7 +239,7 @@ class CoordSys(dfun.DFun):
         X = self.Q2X(Q, deriv = deriv + 1, var = vvar)
         
         if out is None:
-            out = np.ndarray((nt, na, 3, nd, m), Q.dtype)
+            out = np.ndarray((nd, nt, na, 3) + base_shape, Q.dtype)
         
         
         # Extract vibrational t-vectors
@@ -249,18 +248,18 @@ class CoordSys(dfun.DFun):
             
             for k in range(nv): # For each vibrational coordinate k
                 for i in range(na): # For each atom i
-                    for a in range(3): # For each axis a (0,1,2 = x,y,z)
-                       # 
-                       # X[3*i + a, :, :] is the derivative array
-                       # for the X_i,a Cartesian coordinate
-                       #
-                       # The k^th vibrational t-vector is the derivative of these with
-                       # respect to the vibrational coordinate k
-                       #
-                       # Extract the k^th derivative of X from its super
-                       # derivative array
-                       adf.reduceOrder(X[3*i + a, :, :], k, deriv+1, nv, idxtab, 
-                                       out = out[k, i, a, :, :])
+                    # 
+                    # X[:, 3*i:(3*i+3), ...] is the derivative array
+                    # for the i^th atom's Cartesian position
+                    #
+                    # The k^th vibrational t-vector is the derivative of this with
+                    # respect to the vibrational coordinate k
+                    #
+                    # Extract the k^th derivative of X from its super
+                    # derivative array
+                    adf.reduceOrder(X[:, 3*i:(3*i+3)], k, deriv+1, nv, idxtab, 
+                                    out = out[:, k, i, :])
+                    # (note that the base_shape is implicitly handled)
           
         # Calculate rotational t-vectors
         ea = np.eye(3) 
@@ -274,9 +273,12 @@ class CoordSys(dfun.DFun):
                 # rotation about axis alpha. This is equal to
                 # the cross-product of the unit-vector along
                 # alpha and the position vector of atom i
-                np.copyto( out[-nr+a, i, :, :, :], 
-                          np.cross(ea[:,alpha], X[(3*i):(3*i+3), 0:nd, :], axis = 0))
+                # 
+                np.copyto( out[:,-nr+a, i, :], 
+                          np.cross(ea[:,alpha], X[0:nd, (3*i):(3*i+3)], 
+                                   axisa = 0,axisb = 1, axisc = 1))
                 # Note the use of `axis` in np.cross !!!
+                # (the base_shape is implicitly handled)
         
         return out
     
@@ -336,68 +338,93 @@ class CoordSys(dfun.DFun):
             
     #     return out
     
-    # @staticmethod
-    # def t2g(t, masses, fixCOM = True, out = None):
-    #     """
-    #     Calculate g metric tensor given atomic t-vectors
-    #     and masses.
+    @staticmethod
+    def t2g(t, masses, deriv, nv, fixCOM = True, out = None):
+        """
+        Calculate g metric tensor given atomic t-vectors
+        and masses.
         
-    #     Parameters
-    #     ----------
-    #     t : ndarray 
-    #         Atomic t-vector array, with shape ``(nt, natoms, 3, m)``, 
-    #         as returned by :meth:`Q2t`.
-    #     masses : array_like
-    #         A list of masses of length ``natoms``.
-    #     fixCOM : bool
-    #         If fixCOM, then the t vectors are shifted to 
-    #         the center-of-mass frame before calculating the
-    #         g metric tensor. **This modifies `t`.** The default is True.
-    #     out : ndarray
-    #         The output location of shape ``(ng, m)``, where
-    #         ``ng = (nt * (nt+1)) // 2``. If None, this
-    #         will be created. The default is None. 
+        Parameters
+        ----------
+        t : ndarray 
+            Atomic t-vector array, with shape ``(nd, nt, natoms, 3, ...)``, 
+            as returned by :meth:`Q2t`.
+        masses : array_like
+            A list of masses of length ``natoms``.
+        deriv : int
+            The derivative order of the t-vector derivative arrays
+        nv : int
+            The number of variables w.r.t which the derivative arrays were 
+            calculated.
+        fixCOM : bool
+            If fixCOM, then the t vectors are shifted to 
+            the center-of-mass frame before calculating the
+            g metric tensor. **This modifies `t`.** The default is True.
+        out : ndarray
+            The output location with shape ``(nd, ng, ...)``, where
+            ``ng = (nt * (nt+1)) // 2``. If None, this
+            will be created. The default is None. 
 
-    #     Returns
-    #     -------
-    #     out : ndarray 
-    #         The curvlinear metric tensor, the first-index is
-    #         stored in packed upper triangle column-major order.
+        Returns
+        -------
+        out : ndarray 
+            The curvlinear metric tensor in derivative array format.
+            The second-index is in packed upper triangle column-major order.
 
-    #     """
-    #     nt,natoms,_,m = t.shape
-    #     ng = (nt*(nt+1)) // 2  # Number of elements for packed storage of g
+        """
+        nd = t.shape[0]
+        nt = t.shape[1]
+        natoms = t.shape[2]
+        base_shape = t.shape[4:]
         
-    #     if out is None:
-    #         out = np.ndarray((ng,m), dtype = t.dtype)
-    #     out.fill(0) # Initialize result to zero
+        if nd != dfun.nderiv(deriv, nv):
+            raise ValueError("Inconsistent deriv or nv value")
+
+        ng = (nt*(nt+1)) // 2  # Number of elements for packed storage of g
+        
+        if out is None:
+            out = np.ndarray((nd,ng) + base_shape, dtype = t.dtype)
+        out.fill(0) # Initialize result to zero
         
         
-    #     if fixCOM: # Shift t-vectors to Center-of-Mass frame
+        if fixCOM: # Shift t-vectors to Center-of-Mass frame
             
-    #         # First, calculate t-vector of COM in original frame
-    #         tCOM = np.zeros((nt,3,m))
-    #         for a in range(natoms):
-    #             tCOM += masses[a] * t[:,a,:,:]
-    #         tCOM = tCOM / sum(masses)
-    #         # Now, subtract COM from t-vectors
-    #         for a in range(natoms):
-    #                 t[:,a,:,:] = t[:,a,:,:] - tCOM
+            # First, calculate t-vector of COM in original frame
+            tCOM = np.zeros((nd,nt,3)+base_shape)
+            for a in range(natoms):
+                tCOM += masses[a] * t[:,:,a,:]
+            tCOM = tCOM / sum(masses)
+            # Now, subtract COM from t-vectors
+            for a in range(natoms):
+                    t[:,:,a,:] = t[:,:,a,:] - tCOM
         
-    #     # Calculate g tensor
-    #     idx = 0
-    #     for j in range(nt):
-    #         tj = t[j,:,:,:]
-            
-    #         for i in range(j+1):
-    #             ti = t[i,:,:,:]
-                
-    #             for a in range(natoms):
-    #                 out[idx,:] += masses[a] * np.sum(tj[a,:,:] * ti[a,:,:], axis = 0)
-                
-    #             idx += 1 
+        #
+        # Calculate g tensor
+        #
+        # This contains (dot) products of t-vectors, so 
+        # we will use the generalized Leibniz routine to
+        # compute the products of the derivative arrays for each
+        # t-vector and then sum along the x/y/z dimension
+        #
+        idxtab = adf.idxtab(deriv, nv)
+        ncktab = adf.ncktab(deriv+nv, min(nv,deriv))
+        tt_val = np.ndarray((nd,3)+base_shape)
         
-    #     return out
+        idx = 0
+        for j in range(nt):
+            for i in range(j+1):
+                for a in range(natoms):
+                    tj = t[:,j,a,:] # 
+                    ti = t[:,i,a,:] # shape = (nd, 3) + base_shape
+                    
+                    # Compute temp_val <-- tj * ti
+                    adf.mvleibniz(tj, ti, deriv, nv, ncktab, idxtab, out=tt_val)
+                    # Sum over the x/y/z/ axis dimension
+                    out[:, idx] += masses[a] * np.sum(tt_val, axis = 1)
+                
+                idx += 1 
+        
+        return out
     
 class CS_Valence3(CoordSys):
     """
@@ -437,19 +464,19 @@ class CS_Valence3(CoordSys):
         Parameters
         ----------
         Q : ndarray
-            Shape (self.nQ, m)
+            Shape (self.nQ, ...)
         deriv, out, var :
             See :meth:`CoordSys.Q2X` for details.
         
         Returns
         -------
         out : ndarray
-            Shape (self.nX, nd, m)
+            Shape (nd, self.nX, ...)
 
         """
         
         natoms = 3 
-        _,m = Q.shape 
+        base_shape =  Q.shape[1:]
         
         if var is None:
             var = [0, 1, 2] # Calculate derivatives for all Q
@@ -469,13 +496,13 @@ class CS_Valence3(CoordSys):
         # q = r1, r2, theta
         
         if out is None:
-            out = np.ndarray( (3*natoms, nd, m), dtype = Q.dtype)
+            out = np.ndarray( (nd, 3*natoms) + base_shape, dtype = Q.dtype)
         out.fill(0) # Initialize out to 0
         
         # Calculate Cartesian coordinates
-        np.copyto(out[2], (-q[0]).d ) # -r1
-        np.copyto(out[7], (q[1] * adf.sin(q[2])).d ) #  r2 * sin(theta)
-        np.copyto(out[8], (-q[1] * adf.cos(q[2])).d ) # -r2 * cos(theta)
+        np.copyto(out[:,2], (-q[0]).d ) # -r1
+        np.copyto(out[:,7], (q[1] * adf.sin(q[2])).d ) #  r2 * sin(theta)
+        np.copyto(out[:,8], (-q[1] * adf.cos(q[2])).d ) # -r2 * cos(theta)
         
         return out
         
