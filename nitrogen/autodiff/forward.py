@@ -140,6 +140,7 @@ class adarray:
         """ z = other + self """
         return self.__add__(other)
     
+    # MULTIPLICATION
     def __mul__(self,other):
         """ z = self * other """
         if np.isscalar(other):
@@ -151,16 +152,36 @@ class adarray:
                 # Try to convert other to a constant adarray
                 other = const(other,self.k,self.ni,self.nck,self.idx)
             
-            z = empty_like(self)
+            # z = empty_like(self)
             # Use multi-variate Leibniz product rule, z <-- self * other
-            mvleibniz(self.d,other.d,self.k,self.ni,self.nck,self.idx, out = z.d)
+            # mvleibniz(self.d,other.d,self.k,self.ni,self.nck,self.idx, out = z.d)
+            z = mul(self, other)
         return z
-    
     def __rmul__(self,other):
         """ z = other * self """
         return self.__mul__(other)
     
-    ### SUBTRACTION
+    # DIVISION
+    def __div__(self, other):
+        """ z = self / other """
+        if np.isscalar(other):
+            # Division by a scalar constant
+            z = self.copy()
+            z.d /= other
+        else:
+            if type(other) != type(self):
+                # Try to convert other to a constant adarray
+                other = const(other, self.k, self.ni, self.nck, self.idx)
+            
+            z = div(self, other)
+        
+        return z
+    def __rdiv__(self, other):
+        """ z = other / self """
+        # z = (self**-1.0) * other
+        return (powf(self,-1.0)).__mul__(other)
+    
+    # SUBTRACTION
     def __sub__(self,other):
         """ z = self - other """
         if np.isscalar(other):
@@ -809,7 +830,7 @@ def sym(value,i,k,ni,nck = None, idx = None):
             
     return x
 
-def empty_like(x):
+def empty_like(x, dtype = None):
     """
     Create an *uninitialized* adarray with the same properties as `x`,
     including base array data-type.
@@ -818,6 +839,9 @@ def empty_like(x):
     ----------
     x : adarray
         Prototype object
+        
+    dtype : dtype
+        Base data-type. If None, then `x.d.dtype` is used
 
     Returns
     -------
@@ -828,8 +852,10 @@ def empty_like(x):
     (6, 2)
 
     """
-    
-    return adarray(x.d.shape[1:], x.k, x.ni, x.nck, x.idx, x.d.dtype)
+    if dtype is None:
+        dtype = x.d.dtype
+        
+    return adarray(x.d.shape[1:], x.k, x.ni, x.nck, x.idx, dtype)
 
 def adchain(df,x, out=None):
     
@@ -1004,7 +1030,13 @@ def powf(x, p, out = None):
     -------
     adarray
         Result.
-
+        
+    Examples
+    --------
+    >>> x = sym(1.5, 0, 3, 1)
+    >>> powf(x, -2.5).d
+    array([ 0.36288737, -0.60481228,  0.70561433, -0.70561433])
+    
     """
     
     if np.result_type(x.d.dtype, p) != np.result_type(x.d.dtype):
@@ -1020,6 +1052,89 @@ def powf(x, p, out = None):
         coeff *= (p-i)
     
     return adchain(df, x, out = out)
+
+def sqrt(x, out = None):
+    """
+    sqrt(x)
+    
+    This uses adf.powf(x, 0.5)
+
+    Parameters
+    ----------
+    x : adarray 
+        Input argument
+    out : adarray, optional
+        Output buffer. If None, this will be created.
+        The default is None.
+
+    Returns
+    -------
+    adarray
+        Result.
+
+    """
+    return powf(x, 0.5, out = out)
+
+def mul(x, y, out = None):
+    """
+    Multiply x * y
+    
+    Parameters
+    ----------
+    x,y : adarray
+        Input argument
+    out : adarray, optional
+        Output buffer. If None, this will be created.
+        The default is None.
+
+    Returns
+    -------
+    adarray
+        Result.
+
+    """
+    
+    res_type = np.result_type(x.d, y.d)
+    if out is None:
+        out = empty_like(x, dtype = res_type)
+        
+    if res_type != out.d.dtype:
+        raise TypeError("output data-type incompatible with x * y")
+
+    mvleibniz(x.d,y.d,x.k,x.ni,x.nck,x.idx, out = out.d)
+    
+    return out
+
+def div(x, y, out = None):
+    """
+    Divide x / y
+
+    Parameters
+    ----------
+    x,y : adarray
+        Input argument
+    out : adarray, optional
+        Output buffer. If None, this will be created.
+        The default is None.
+
+    Returns
+    -------
+    adarray
+        Result.
+
+    """
+    
+    res_type = np.result_type(x.d, y.d)
+    if out is None:
+        out = empty_like(x, dtype = res_type)
+        
+    if res_type != out.d.dtype:
+        raise TypeError("output data-type incompatible with x / y")
+
+    # Calculate 1 / y
+    iy = powf(y, -1.0)
+    # Multiply x * (1/y)
+    return mul(x,iy, out = out)
     
 def reduceOrder(F, i, k, ni, idx, out = None):
     """
@@ -1122,68 +1237,81 @@ def reduceOrder(F, i, k, ni, idx, out = None):
     
     return G
 
-# def chol_dpp(H, out = None):
-#     """
-#     Cholesky decomposition of a symmetric matrix.
+def chol_dpp(H, out = None):
+    """
+    Cholesky decomposition of a symmetric matrix.
 
-#     Parameters
-#     ----------
-#     H : ndarray of adarray
-#         H is stored in 1D packed format (see :mod:`nitrogen.linalg.packed`)
+    Parameters
+    ----------
+    H : ndarray of adarray
+        H is stored in 1D packed format (see :mod:`nitrogen.linalg.packed`)
+    out : ndarray of adarray
+        Output buffer. If None, this will be created. 
+        If out = H, then in-place decomposition is performed
 
-#     Returns
-#     -------
-#     out : ndarray of adarray
-#         The Cholesky decomposition in packed storage
-#     """
+    Returns
+    -------
+    out : ndarray of adarray
+        The lower triangle Cholesky decomposition L in packed storage.
+        H = L @ L.T
+    """
     
-#     if H.ndim != 1:
-#         raise ValueError('H must be 1-dimensional')
-#     if np.iscomplex(H[0].d):
-#         raise TypeError('H must have a real adarray')
+    if H.ndim != 1:
+        raise ValueError('H must be 1-dimensional')
     
-#     if out is None:
-#         out = np.ndarray(H.size, dtype = adarray)
-#         for i in range(H.size):
-#             out[i] = adarray(H[0].d.shape[1:], H[0].k, H[0].ni, 
-#                              H[0].nck, H[0].idx, dtype = H[0].d.dtype)
+    if out is None:
+        out = np.ndarray(H.size, dtype = adarray)
+        for i in range(H.size):
+            out[i] = adarray(H[0].d.shape[1:], H[0].k, H[0].ni, 
+                              H[0].nck, H[0].idx, dtype = H[0].d.dtype)
     
-#     _chol_dpp_unblocked(H,out)
-    
-#     return out
-    
-# def _chol_dpp_unblocked(H, out):
-#     """ An unblocked implementation of chol_dpp
-#     """
-    
-#     # !!! !!!
-#     raise NotImplementedError()
-    
-#     # H is a 1d ndarray of adarray objects
-#     n = H.size
-#     N = packed.n2N(n)
-    
-#     L = np.ndarray((N,N), dtype = adarray)
-#     # Copy references to adarrays to a 
-#     # full symmetric matrix
-#     for i in range(N):
-#         for j in range(N):
-#             L[i,j] = H[packed.IJ2k(i,j)]
-    
-    
-#     # Compute the Cholesky decomposition
-#     # with a simple unblocked algorithm
-    
-#     for j in range(N):
-#         r = L[j,:j]         # The j^th row below the diagonal
-#         d = L[j,j]          # The j^th diagonal element
-#         B = L[j+1:,:j]      # The block between r and c
-#         c = L[j+1:,j]       # The j^th colum below the diagonal
+    # Copy H to out for in-place routine
+    if out is not H:
+        for i in range(H.size):
+            np.copyto(out[i].d, H[i].d)
         
-#         #L[j,j] = sqrt(d - r @ r.T)
-#         #L[j+1:,j] = (c - B @ r.T) / L[j,j] 
+    _chol_dpp_unblocked(out)
     
-#     return L
+    return out
+    
+def _chol_dpp_unblocked(H):
+    """ An unblocked, in-place implementation of chol_dpp
+    """
+
+
+    # H is a 1d ndarray of adarray objects
+    # in packed format
+    n = H.size
+    N = packed.n2N(n)
+
+    L = np.ndarray((N,N), dtype = adarray)
+    # Copy references to adarrays to the lower 
+    # triangle of a full "reference" matrix
+    k = 0
+    for i in range(N):
+        for j in range(i+1):
+            L[i,j] = H[k]
+            k += 1
+    
+    # Compute the Cholesky decomposition
+    # with a simple unblocked algorithm
+
+    for j in range(N):
+        r = L[j,:j]         # The j^th row below the diagonal
+    
+        # L[j,j] <-- sqrt(d - r @ r.T)
+        sqrt(L[j,j] - r @ r.T, out = L[j,j])
+        
+        #B = L[j+1:,:j]      # The block between r and c
+        #c = L[j+1:,j]       # The j^th column below the diagonal
+        for i in range(j+1,N):
+            Bi = L[i,:j]    # An ndarray
+            ci = L[i, j]    # An adarray 
+            #L[j+1:,j] = (c - B @ r.T) / L[j,j]
+            div(ci - Bi @ r.T, L[j,j], out = L[i,j] )
+        
+
+    return H
     
     
     
