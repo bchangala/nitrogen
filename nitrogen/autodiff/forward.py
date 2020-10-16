@@ -162,7 +162,7 @@ class adarray:
         return self.__mul__(other)
     
     # DIVISION
-    def __div__(self, other):
+    def __truediv__(self, other):
         """ z = self / other """
         if np.isscalar(other):
             # Division by a scalar constant
@@ -176,7 +176,7 @@ class adarray:
             z = div(self, other)
         
         return z
-    def __rdiv__(self, other):
+    def __rtruediv__(self, other):
         """ z = other / self """
         # z = (self**-1.0) * other
         return (powf(self,-1.0)).__mul__(other)
