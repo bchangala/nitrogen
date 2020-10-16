@@ -9,7 +9,201 @@ is the ``adarray`` class.
 """
 
 import numpy as np
+import nitrogen.linalg.packed as packed
 
+class adarray:
+    
+    """
+    Forward-type automatic differentiation object.
+    
+    Attributes
+    ----------
+    k : int
+        The maximum derivative order.
+    ni : int 
+        The number of independent variables.
+    nck : ndarray
+        A binomial coefficient table.
+    idx : ndarray
+        The multi-index table for derivatives of
+        `ni` variables to order `k`.
+    nd : int
+        The number of unique derivatives.
+    d : ndarray
+        The derivative array, whose first index is the
+        generalized derivative index. (See Notes.)
+        
+        
+    Notes
+    -----
+    The derivative information is stored in the :attr:`d` attribute,
+    an ndarray whose first index is a generalized derivative
+    index. ``d[0]`` is the the value of the base array and ``d[i]``
+    with ``i`` > 0 are the derivatives stored in *lexical* order. 
+    This ordering sorts derivatives first by their total degree: zeroth
+    derivatives (the value), then first derivatives, then second 
+    derivatives, and so on. Within a group of derivatives of a given 
+    order, they are sorted by the derivative order with respect to the
+    first independent variable, then by the order of the second, and 
+    so on. This ordering is the same as that of :attr:idx
+    
+    The value of higher-order derivatives is stored by convention
+    with a factor equal to the inverse of its multi-index factorial, i.e.
+    a derivative with multi-index [2, 0, 1, 3] would be stored as the 
+    corresponding derivative divided by 2! * 0! * 1! * 3!
+    
+    """
+    
+    def __init__(self,base_shape,k,ni, nck = None, idx = None, dtype = np.float64):
+        """
+        Create a new adarray object.
+
+        Parameters
+        ----------
+        base_shape : tuple of int
+            Shape of base array. adarray.d will have shape
+            ``(nd,) + base_shape``. Shape may be ().
+        k : int
+            Maximum derivative degree. `k` must be greater
+            or equal to 0.
+        ni : int
+            Number of independent variables. `n` must be
+            greater than or equal to 1.
+        nck : ndarray, optional
+            Return value of ncktab(nmax,kmax) with
+            ``nmax >= k + ni`` and ``kmax >= min(k, ni)``. 
+            If None, this will be calculated.
+        idx : ndarray, optional
+            Return value of ``idxtab(k,ni)``.
+            If None, this will be calculated.
+        dtype : data-type, optional
+            Data-type of initialized derivative array
+        
+        See Also
+        --------
+        ncktab : Binomial coefficient table
+        idxtab : Multi-index table
+
+        """
+        
+        self.k = k
+        self.ni = ni
+        
+        if nck is None:
+            self.nck = ncktab(k + ni, min(k,ni))
+        else:
+            self.nck = nck # no copy
+        
+        if idx is None:
+            self.idx = idxtab(k,ni)
+        else:
+            self.idx = idx # no copy
+        
+        self.nd = self.nck[k + ni, min(ni,k)]
+        self.d = np.empty((self.nd,) + base_shape, dtype = dtype)
+        # The first index is the new "derivative index"
+    
+    def copy(self):
+        """
+        Copy an adarray object.
+
+        Returns
+        -------
+        adarray
+            A new adarray object, with ``d`` attribute
+            copied via ``d.copy()``.
+
+        """
+        z = adarray(self.d.shape[1:],self.k,self.ni,
+                    self.nck,self.idx,self.d.dtype)
+        np.copyto(z.d,self.d)
+        return z
+        
+    # Define binary operators: +, -, ...
+    # ADDITION
+    def __add__(self,other):
+        """ z = self + other """
+        
+        if np.isscalar(other):
+            # Addition of scalar constant
+            z = self.copy()
+            z.d[0] += other  # Add scalar constant only to value (zeroth derivative)
+        else:
+            if type(other) != type(self):
+                # Try to convert `other` to a constant adarray
+                other = const(other,self.k,self.ni,self.nck,self.idx)
+            
+            z = empty_like(self)
+            np.add(self.d,other.d, out = z.d) # z <-- self + other
+        return z
+    def __radd__(self,other):
+        """ z = other + self """
+        return self.__add__(other)
+    
+    def __mul__(self,other):
+        """ z = self * other """
+        if np.isscalar(other):
+            # Multiplication by scalar constant
+            z = self.copy()
+            z.d *= other # Multiply all derivatives by a scalar constant
+        else:
+            if type(other) != type(self):
+                # Try to convert other to a constant adarray
+                other = const(other,self.k,self.ni,self.nck,self.idx)
+            
+            z = empty_like(self)
+            # Use multi-variate Leibniz product rule, z <-- self * other
+            mvleibniz(self.d,other.d,self.k,self.ni,self.nck,self.idx, out = z.d)
+        return z
+    
+    def __rmul__(self,other):
+        """ z = other * self """
+        return self.__mul__(other)
+    
+    ### SUBTRACTION
+    def __sub__(self,other):
+        """ z = self - other """
+        if np.isscalar(other):
+            # Subtraction of scalar constant
+            z = self.copy()
+            z.d[0] -= other
+        else:
+            if type(other) != type(self):
+                # Try to convert other to a constant adarray
+                other = const(other,self.k,self.ni,self.nck,self.idx)
+            
+            z = empty_like(self)
+            np.subtract(self.d,other.d, out = z.d) # z = self - other
+        return z
+    
+    def __rsub__(self,other):
+        """ z = other - self """
+        if np.isscalar(other):
+            # Subtraction from a scalar constant
+            z = -self # adarray negate makes a copy
+            z.d[0] += other
+        else:
+            if type(other) != type(self):
+                # Try to convert other to a constant adarray
+                other = const(other,self.k,self.ni,self.nck,self.idx)
+            
+            z = empty_like(self)
+            np.subtract(other.d,self.d, out = z.d) # z = other - self
+        return z
+    
+    ### UNARY OPERATIONS
+    def __neg__(self):
+        """ z = -self """
+        z = self.copy()
+        np.negative(z.d, out = z.d) #z.d = -z.d
+        return z
+    
+    def __pos__(self):
+        """ z = +self"""
+        z = self.copy()
+        return z
+    
+    
 def nck(n,k):
     """
     Calculate the binomical coefficient (`n` choose `k`).
@@ -506,198 +700,7 @@ def mvchain(df,X,k,ni,nck,idx, out = None):
     
     return Z
 
-class adarray:
-    
-    """
-    Forward-type automatic differentiation object.
-    
-    Attributes
-    ----------
-    k : int
-        The maximum derivative order.
-    ni : int 
-        The number of independent variables.
-    nck : ndarray
-        A binomial coefficient table.
-    idx : ndarray
-        The multi-index table for derivatives of
-        `ni` variables to order `k`.
-    nd : int
-        The number of unique derivatives.
-    d : ndarray
-        The derivative array, whose first index is the
-        generalized derivative index. (See Notes.)
-        
-        
-    Notes
-    -----
-    The derivative information is stored in the :attr:`d` attribute,
-    an ndarray whose first index is a generalized derivative
-    index. ``d[0]`` is the the value of the base array and ``d[i]``
-    with ``i`` > 0 are the derivatives stored in *lexical* order. 
-    This ordering sorts derivatives first by their total degree: zeroth
-    derivatives (the value), then first derivatives, then second 
-    derivatives, and so on. Within a group of derivatives of a given 
-    order, they are sorted by the derivative order with respect to the
-    first independent variable, then by the order of the second, and 
-    so on. This ordering is the same as that of :attr:idx
-    
-    The value of higher-order derivatives is stored by convention
-    with a factor equal to the inverse of its multi-index factorial, i.e.
-    a derivative with multi-index [2, 0, 1, 3] would be stored as the 
-    corresponding derivative divided by 2! * 0! * 1! * 3!
-    
-    """
-    
-    def __init__(self,base_shape,k,ni, nck = None, idx = None, dtype = np.float64):
-        """
-        Create a new adarray object.
 
-        Parameters
-        ----------
-        base_shape : tuple of int
-            Shape of base array. adarray.d will have shape
-            ``(nd,) + base_shape``. Shape may be ().
-        k : int
-            Maximum derivative degree. `k` must be greater
-            or equal to 0.
-        ni : int
-            Number of independent variables. `n` must be
-            greater than or equal to 1.
-        nck : ndarray, optional
-            Return value of ncktab(nmax,kmax) with
-            ``nmax >= k + ni`` and ``kmax >= min(k, ni)``. 
-            If None, this will be calculated.
-        idx : ndarray, optional
-            Return value of ``idxtab(k,ni)``.
-            If None, this will be calculated.
-        dtype : data-type, optional
-            Data-type of initialized derivative array
-        
-        See Also
-        --------
-        ncktab : Binomial coefficient table
-        idxtab : Multi-index table
-
-        """
-        
-        self.k = k
-        self.ni = ni
-        
-        if nck is None:
-            self.nck = ncktab(k + ni, min(k,ni))
-        else:
-            self.nck = nck # no copy
-        
-        if idx is None:
-            self.idx = idxtab(k,ni)
-        else:
-            self.idx = idx # no copy
-        
-        self.nd = self.nck[k + ni, min(ni,k)]
-        self.d = np.empty((self.nd,) + base_shape, dtype = dtype)
-        # The first index is the new "derivative index"
-    
-    def copy(self):
-        """
-        Copy an adarray object.
-
-        Returns
-        -------
-        adarray
-            A new adarray object, with ``d`` attribute
-            copied via ``d.copy()``.
-
-        """
-        z = adarray(self.d.shape[1:],self.k,self.ni,
-                    self.nck,self.idx,self.d.dtype)
-        np.copyto(z.d,self.d)
-        return z
-        
-    # Define binary operators: +, -, ...
-    # ADDITION
-    def __add__(self,other):
-        """ z = self + other """
-        
-        if np.isscalar(other):
-            # Addition of scalar constant
-            z = self.copy()
-            z.d[0] += other  # Add scalar constant only to value (zeroth derivative)
-        else:
-            if type(other) != type(self):
-                # Try to convert `other` to a constant adarray
-                other = const(other,self.k,self.ni,self.nck,self.idx)
-            
-            z = empty_like(self)
-            np.add(self.d,other.d, out = z.d) # z <-- self + other
-        return z
-    def __radd__(self,other):
-        """ z = other + self """
-        return self.__add__(other)
-    
-    def __mul__(self,other):
-        """ z = self * other """
-        if np.isscalar(other):
-            # Multiplication by scalar constant
-            z = self.copy()
-            z.d *= other # Multiply all derivatives by a scalar constant
-        else:
-            if type(other) != type(self):
-                # Try to convert other to a constant adarray
-                other = const(other,self.k,self.ni,self.nck,self.idx)
-            
-            z = empty_like(self)
-            # Use multi-variate Leibniz product rule, z <-- self * other
-            mvleibniz(self.d,other.d,self.k,self.ni,self.nck,self.idx, out = z.d)
-        return z
-    
-    def __rmul__(self,other):
-        """ z = other * self """
-        return self.__mul__(other)
-    
-    ### SUBTRACTION
-    def __sub__(self,other):
-        """ z = self - other """
-        if np.isscalar(other):
-            # Subtraction of scalar constant
-            z = self.copy()
-            z.d[0] -= other
-        else:
-            if type(other) != type(self):
-                # Try to convert other to a constant adarray
-                other = const(other,self.k,self.ni,self.nck,self.idx)
-            
-            z = empty_like(self)
-            np.subtract(self.d,other.d, out = z.d) # z = self - other
-        return z
-    
-    def __rsub__(self,other):
-        """ z = other - self """
-        if np.isscalar(other):
-            # Subtraction from a scalar constant
-            z = -self # adarray negate makes a copy
-            z.d[0] += other
-        else:
-            if type(other) != type(self):
-                # Try to convert other to a constant adarray
-                other = const(other,self.k,self.ni,self.nck,self.idx)
-            
-            z = empty_like(self)
-            np.subtract(other.d,self.d, out = z.d) # z = other - self
-        return z
-    
-    ### UNARY OPERATIONS
-    def __neg__(self):
-        """ z = -self """
-        z = self.copy()
-        np.negative(z.d, out = z.d) #z.d = -z.d
-        return z
-    
-    def __pos__(self):
-        """ z = +self"""
-        z = self.copy()
-        return z
-    
 def const(value,k,ni,nck = None, idx = None):
     """
     Create an :class:`adarray` object for a constant scalar or array.
@@ -983,6 +986,40 @@ def exp(x, out = None):
         df[i] = df[0]
             
     return adchain(df, x, out = out)
+
+def powf(x, p, out = None):
+    """
+    x**p for general p
+
+    Parameters
+    ----------
+    x : adarray
+        Input argument
+    p : float or complex
+        Power. 
+    out : adarray, optional
+        Output location of result.
+
+    Returns
+    -------
+    adarray
+        Result.
+
+    """
+    
+    if np.result_type(x.d.dtype, p) != np.result_type(x.d.dtype):
+        raise TypeError("Invalid type combination")
+    
+    xval = x.d[0] # Value array of x
+    k = x.k 
+    
+    df = np.ndarray( (k+1,) + x.d.shape[1:], dtype = xval.dtype)
+    coeff = 1.0
+    for i in range(k+1):
+        df[i] = coeff * np.float_power(xval, p-i)
+        coeff *= (p-i)
+    
+    return adchain(df, x, out = out)
     
 def reduceOrder(F, i, k, ni, idx, out = None):
     """
@@ -993,7 +1030,7 @@ def reduceOrder(F, i, k, ni, idx, out = None):
     Parameters
     ----------
     F : ndarray
-        The derivative for F up to degree `k`
+        The derivative array up to degree `k`
         in `ni` variables.
     i : int
         The variable index (0, ..., `ni` - 1) to
@@ -1084,3 +1121,70 @@ def reduceOrder(F, i, k, ni, idx, out = None):
      
     
     return G
+
+# def chol_dpp(H, out = None):
+#     """
+#     Cholesky decomposition of a symmetric matrix.
+
+#     Parameters
+#     ----------
+#     H : ndarray of adarray
+#         H is stored in 1D packed format (see :mod:`nitrogen.linalg.packed`)
+
+#     Returns
+#     -------
+#     out : ndarray of adarray
+#         The Cholesky decomposition in packed storage
+#     """
+    
+#     if H.ndim != 1:
+#         raise ValueError('H must be 1-dimensional')
+#     if np.iscomplex(H[0].d):
+#         raise TypeError('H must have a real adarray')
+    
+#     if out is None:
+#         out = np.ndarray(H.size, dtype = adarray)
+#         for i in range(H.size):
+#             out[i] = adarray(H[0].d.shape[1:], H[0].k, H[0].ni, 
+#                              H[0].nck, H[0].idx, dtype = H[0].d.dtype)
+    
+#     _chol_dpp_unblocked(H,out)
+    
+#     return out
+    
+# def _chol_dpp_unblocked(H, out):
+#     """ An unblocked implementation of chol_dpp
+#     """
+    
+#     # !!! !!!
+#     raise NotImplementedError()
+    
+#     # H is a 1d ndarray of adarray objects
+#     n = H.size
+#     N = packed.n2N(n)
+    
+#     L = np.ndarray((N,N), dtype = adarray)
+#     # Copy references to adarrays to a 
+#     # full symmetric matrix
+#     for i in range(N):
+#         for j in range(N):
+#             L[i,j] = H[packed.IJ2k(i,j)]
+    
+    
+#     # Compute the Cholesky decomposition
+#     # with a simple unblocked algorithm
+    
+#     for j in range(N):
+#         r = L[j,:j]         # The j^th row below the diagonal
+#         d = L[j,j]          # The j^th diagonal element
+#         B = L[j+1:,:j]      # The block between r and c
+#         c = L[j+1:,j]       # The j^th colum below the diagonal
+        
+#         #L[j,j] = sqrt(d - r @ r.T)
+#         #L[j+1:,j] = (c - B @ r.T) / L[j,j] 
+    
+#     return L
+    
+    
+    
+    

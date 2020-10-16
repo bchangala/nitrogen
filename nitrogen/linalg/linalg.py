@@ -211,3 +211,6 @@ def eigstrp(H, k = 5, pad = 10, tol = 1e-10, maxiter = None, v0 = None,
     v = L[:, 0:k].copy()
     
     return w,v
+
+
+

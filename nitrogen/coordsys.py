@@ -282,61 +282,74 @@ class CoordSys(dfun.DFun):
         
         return out
     
-    # def Q2g(self, Q, masses = None, out = None, vvar = None, rvar = None,
-    #         mode = 'bodyframe'):
-    #     """
-    #     Calculate the curvilinear metric tensor g
+    def Q2g(self, Q, masses = None, deriv = 0, out = None, vvar = None, rvar = None,
+            mode = 'bodyframe'):
+        """
+        Calculate the curvilinear metric tensor g
 
-    #     Parameters
-    #     ----------
-    #     Q : ndarray
-    #         An array of ``m`` input coordinate vectors.
-    #         Q has shape (:attr:`nQ`, ``m``).
-    #     masses : array_like
-    #         A list of masses of length ``natoms``.
-    #     out : ndarray, optional
-    #         Output location, an ndarray with shape ``(ng, m)``
-    #         and the same data-type as Q. If None, this will be created.
-    #         The default is None.
-    #     vvar : list of int, optional
-    #         The coordinates included in the vibrational block of g.
-    #         If None, then all coordinates will be used in order. The default is None.
-    #     rvar : str, optional
-    #         The body-fixed axes inlcuded in the rotational block of g.
-    #         If None, then all axes will be used in order. The default is None.
-    #     mode : {'bodyframe'}
-    #         Calculation mode. 'bodyframe' calculates the standard g tensor
-    #         for a rotating molecule (CoordSys must be *atomic*).
+        Parameters
+        ----------
+        Q : ndarray
+            An array of input coordinates.
+            Q has shape (:attr:`nQ`, ...).
+        masses : array_like
+            A list of masses of length ``natoms``.
+        deriv : int
+            The requested derivative order. Derivatives are calculated 
+            for all vibrational coordinates indicated by `vvar`. The default is 0.
+        out : ndarray, optional
+            Output location, an ndarray with shape ``(nd, ng, ...)``
+            and the same data-type as Q. If None, this will be created.
+            The default is None.
+        vvar : list of int, optional
+            The coordinates included in the vibrational block of g.
+            If None, then all coordinates will be used in order. The default is None.
+        rvar : str, optional
+            The body-fixed axes inlcuded in the rotational block of g.
+            If None, then all axes will be used in order. The default is None.
+        mode : {'bodyframe'}
+            Calculation mode. 'bodyframe' calculates the standard g tensor
+            for a rotating molecule (CoordSys must be *atomic*).
 
-    #     Returns
-    #     -------
-    #     out : ndarray
-    #         The g matrix array with shape ``(ng, m)``.
+        Returns
+        -------
+        out : ndarray
+            The g tensor derivative array with shape ``(nd, ng, ...)`` 
+            stored in packed upper triangle column-major order.
 
-    #     """
+        """
         
-    #     if mode == 'bodyframe':
-    #         if not self.isatomic:
-    #             raise ValueError("'bodyframe' mode is valid for atomic CoordSys only")
-    #         if masses is None:
-    #             raise ValueError("masses must be specified for 'bodyframe' mode")
-    #         if len(masses) != self.natoms:
-    #             raise ValueError("length of masses must equal natoms")
-                
-    #         t = self.Q2t(Q, vvar = vvar, rvar = rvar)
-    #         nt,_,_,m = t.shape
+        if mode == 'bodyframe':
+            if not self.isatomic:
+                raise ValueError("'bodyframe' mode is valid for atomic CoordSys only")
+            if masses is None:
+                raise ValueError("masses must be specified for 'bodyframe' mode")
+            if len(masses) != self.natoms:
+                raise ValueError("length of masses must equal natoms")
             
-    #         ng = (nt*(nt+1))//2
+            # Determine the number of vibrational coordinates
+            if vvar is None:
+                nv = self.nQ 
+            else:
+                nv = len(vvar)
+            # Calculate the t-vectors
+            t = self.Q2t(Q, deriv=deriv, vvar = vvar, rvar = rvar)
             
-    #         if out is None:
-    #             out = np.ndarray((ng,m), dtype = Q.dtype)
+            nd = t.shape[0]
+            nt = t.shape[1]
+            base_shape = Q.shape[1:]
             
-    #         self.t2g(t, masses, fixCOM = True, out = out)
+            ng = (nt*(nt+1))//2
             
-    #     else:
-    #         raise ValueError('Invalid mode string')
+            if out is None:
+                out = np.ndarray((nd,ng)+base_shape, dtype = Q.dtype)
+            # Calculate the g metric
+            self.t2g(t, masses, deriv, nv, fixCOM=True, out = out)
             
-    #     return out
+        else:
+            raise ValueError('Invalid mode string')
+            
+        return out
     
     @staticmethod
     def t2g(t, masses, deriv, nv, fixCOM = True, out = None):
@@ -505,5 +518,4 @@ class CS_Valence3(CoordSys):
         np.copyto(out[:,8], (-q[1] * adf.cos(q[2])).d ) # -r2 * cos(theta)
         
         return out
-        
-        
+
