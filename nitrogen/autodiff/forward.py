@@ -10,6 +10,7 @@ is the ``adarray`` class.
 
 import numpy as np
 import nitrogen.linalg.packed as packed
+import warnings
 
 class adarray:
     
@@ -54,7 +55,8 @@ class adarray:
     
     """
     
-    def __init__(self,base_shape,k,ni, nck = None, idx = None, dtype = np.float64):
+    def __init__(self,base_shape,k,ni, nck = None, idx = None, dtype = np.float64,
+                 d = None):
         """
         Create a new adarray object.
 
@@ -78,6 +80,10 @@ class adarray:
             If None, this will be calculated.
         dtype : data-type, optional
             Data-type of initialized derivative array
+        d : ndarray, optional
+            A pre-allocated derivative array. If provided,
+            `dtype` will be ignored and `d` must have 
+            a shape equal to ``(nd,) + base_shape``
         
         See Also
         --------
@@ -100,7 +106,14 @@ class adarray:
             self.idx = idx # no copy
         
         self.nd = self.nck[k + ni, min(ni,k)]
-        self.d = np.empty((self.nd,) + base_shape, dtype = dtype)
+        
+        if d is None:
+            self.d = np.empty((self.nd,) + base_shape, dtype = dtype)
+        else:
+            if d.shape != (self.nd,) + base_shape:
+                raise ValueError("d does not have the correct shape")
+            self.d = d 
+            
         # The first index is the new "derivative index"
     
     def copy(self):
@@ -115,8 +128,7 @@ class adarray:
 
         """
         z = adarray(self.d.shape[1:],self.k,self.ni,
-                    self.nck,self.idx,self.d.dtype)
-        np.copyto(z.d,self.d)
+                    self.nck,self.idx,self.d.dtype,self.d.copy())
         return z
         
     # Define binary operators: +, -, ...
@@ -212,7 +224,7 @@ class adarray:
             np.subtract(other.d,self.d, out = z.d) # z = other - self
         return z
     
-    ### UNARY OPERATIONS
+    # UNARY OPERATIONS
     def __neg__(self):
         """ z = -self """
         z = self.copy()
@@ -223,8 +235,72 @@ class adarray:
         """ z = +self"""
         z = self.copy()
         return z
+
+def array(d,k,ni,copyd = False):
+    """
+    Create an adarray object from a raw derivative array.
+
+    Parameters
+    ----------
+    d : ndarray
+        The derivative array with shape (nd,...)
+    k : int
+        The maximum derivative order.
+    ni : int
+        The number of independent variables.
+    copyd : boolean
+        If True, a copy of `d` will be made for returned
+        adarray. If False, the adarray will use 
+        the same reference. The default is False.
+
+    Returns
+    -------
+    adarray
+
+    """   
     
+    if type(d) != np.ndarray:
+        raise TypeError("d must be an ndarray")
+        
+    base_shape = d.shape[1:]
     
+    if copyd:
+        dinit = d.copy()
+    else:
+        dinit = d # use reference
+        
+    return adarray(base_shape, k, ni, None, None, d.dtype, dinit)
+    
+def ndize1(x):
+    """
+    Create a 1D ndarray of adarray objects from a 
+    single adarray by promoting the first index
+    of the base shape.
+
+    Parameters
+    ----------
+    x : adarray
+        The original adarray.
+
+    Returns
+    -------
+    ndarray
+        The !D array of adarrays.
+
+    """
+    
+    if np.ndim(x.d) < 2:
+        raise ValueError("The base shape must have at least 1 dimension")
+    
+    n = x.d.shape[1]    # the size of the ndarray
+    
+    X = np.ndarray((n,), dtype = adarray)
+    for i in range(n):
+        X[i] = array(x.d[:,i], x.k, x.ni, copyd = False) # keep references
+    
+    return X    
+        
+
 def nck(n,k):
     """
     Calculate the binomical coefficient (`n` choose `k`).
@@ -1031,6 +1107,12 @@ def powf(x, p, out = None):
     adarray
         Result.
         
+    Notes
+    -----
+    powf uses the NumPy :func:`~numpy.float_power` function to 
+    compute the value array. It inherits the branch-cut convention
+    of this function.
+    
     Examples
     --------
     >>> x = sym(1.5, 0, 3, 1)
@@ -1046,9 +1128,11 @@ def powf(x, p, out = None):
     k = x.k 
     
     df = np.ndarray( (k+1,) + x.d.shape[1:], dtype = xval.dtype)
-    coeff = 1.0
+    
+    df[0] = np.float_power(xval, p)
+    coeff = p
     for i in range(k+1):
-        df[i] = coeff * np.float_power(xval, p-i)
+        df[i] = coeff * (df[i-1] / xval)
         coeff *= (p-i)
     
     return adchain(df, x, out = out)
@@ -1056,8 +1140,6 @@ def powf(x, p, out = None):
 def sqrt(x, out = None):
     """
     sqrt(x)
-    
-    This uses adf.powf(x, 0.5)
 
     Parameters
     ----------
@@ -1071,9 +1153,26 @@ def sqrt(x, out = None):
     -------
     adarray
         Result.
+        
+    Notes
+    -----
+    The adarray sqrt function uses the NumPy :func:`~numpy.sqrt` function
+    as its underlying routine. The branch-cut convention there is inherited.
 
     """
-    return powf(x, 0.5, out = out)
+    
+    xval = x.d[0] # Value array of x
+    k = x.k 
+    
+    df = np.ndarray( (k+1,) + x.d.shape[1:], dtype = xval.dtype)
+    
+    df[0] = np.sqrt(xval) # Uses numpy branch cut
+    coeff = +0.5
+    for i in range(1, k+1):
+        df[i] = coeff * (df[i-1] / xval)
+        coeff *= (+0.5 - i)
+    
+    return adchain(df, x, out = out)
 
 def mul(x, y, out = None):
     """
@@ -1237,9 +1336,9 @@ def reduceOrder(F, i, k, ni, idx, out = None):
     
     return G
 
-def chol_dpp(H, out = None):
+def chol_pp(H, out = None):
     """
-    Cholesky decomposition of a symmetric matrix.
+    Cholesky decomposition of a symmetric matrix in packed format.
 
     Parameters
     ----------
@@ -1270,12 +1369,35 @@ def chol_dpp(H, out = None):
         for i in range(H.size):
             np.copyto(out[i].d, H[i].d)
         
-    _chol_dpp_unblocked(out)
+    _chol_pp_unblocked(out)
     
     return out
     
-def _chol_dpp_unblocked(H):
-    """ An unblocked, in-place implementation of chol_dpp
+def _chol_pp_unblocked(H):
+    """
+    An unblocked, in-place implementation of Cholesky
+    decomposition for symmetric matrices H.
+
+    Parameters
+    ----------
+    H : ndarray of adarray
+        H is a symmetric matrix in 1D packed storage.
+
+    Returns
+    -------
+    H : ndarray of adarray 
+        The lower triangular Cholesky decomposition in
+        1D packed storage.
+        
+    Notes
+    -----
+    This routine uses a standard Cholesky algorithm
+    for *real* symmetric matrices. It can be applied
+    to complex *symmetric* matrices (*not* complex 
+    Hermitian) and return a valid result as long
+    as the diagonals remain sufficiently large
+    in magnitude. 
+
     """
 
 
@@ -1295,15 +1417,25 @@ def _chol_dpp_unblocked(H):
     
     # Compute the Cholesky decomposition
     # with a simple unblocked algorithm
-
+    tol = 1e-10
+    pivmax = np.abs( np.sqrt(L[0,0].d[:1]) ) # for pivot threshold checking
+    
     for j in range(N):
-        r = L[j,:j]         # The j^th row below the diagonal
+        r = L[j,:j]         # The j^th row, left of the diagonal
     
         # L[j,j] <-- sqrt(d - r @ r.T)
         sqrt(L[j,j] - r @ r.T, out = L[j,j])
         
+        # Check that the pivot is sufficiently large
+        if (np.abs(L[j,j].d[:1]) / pivmax < tol).any() :
+            warnings.warn(f"Small diagonal (less than rel. tol. = {tol:.4E}\
+                          encountered in Cholesky decomposition")
+        
+        # Store the new maximum pivot
+        pivmax = np.maximum(pivmax, np.abs(L[j,j].d[:1]))
+        
         #B = L[j+1:,:j]      # The block between r and c
-        #c = L[j+1:,j]       # The j^th column below the diagonal
+        #c = L[j+1:,j]       # The j^th column, below the diagonal
         for i in range(j+1,N):
             Bi = L[i,:j]    # An ndarray
             ci = L[i, j]    # An adarray 

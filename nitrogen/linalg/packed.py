@@ -71,3 +71,69 @@ def n2N(n):
     
     return N
 
+def symfull(P):
+    """
+    Return the full array for a symmetric array 
+    in packed storage
+
+    Parameters
+    ----------
+    P : ndarray
+        The lower triangle of a symmetric array in packed storage.
+
+    Returns
+    -------
+    ndarray
+        The full symmetric matrix
+
+    """
+    
+    n = P.shape[0]
+    base = P.shape[1:]
+    N = n2N(n)
+    
+    full = np.ndarray((N,N)+base, dtype = P.dtype)
+    full.fill(0)
+    
+    k = 0
+    for i in range(N):
+        for j in range(i+1):
+            full[i,j] += P[k]
+            if i != j: 
+                full[j,i] += P[k]
+            k += 1
+    
+    return full 
+    
+def trilfull(L):
+    """
+    Return the full array for a lower triangle array.
+    in packed storage
+
+    Parameters
+    ----------
+    L : ndarray
+        The lower triangle in packed storage
+
+    Returns
+    -------
+    ndarray
+        The full lower triangle array.
+
+    """
+    
+    n = L.shape[0]
+    base = L.shape[1:]
+    N = n2N(n)
+    
+    full = np.ndarray((N,N)+base, dtype = L.dtype)
+    full.fill(0)
+    
+    k = 0
+    for i in range(N):
+        for j in range(i+1):
+            full[i,j] += L[k]  # lower triangle element
+            
+            k += 1
+    
+    return full
