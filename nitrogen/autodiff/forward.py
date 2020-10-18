@@ -116,20 +116,31 @@ class adarray:
             
         # The first index is the new "derivative index"
     
-    def copy(self):
+    def copy(self, out = None):
         """
         Copy an adarray object.
-
+        
+        Parameters
+        ----------
+        out : adarray
+            Output location. If None, this will be created
+            if None. The default is None.
+            
         Returns
         -------
         adarray
-            A new adarray object, with ``d`` attribute
+            An adarray object, with ``d`` attribute
             copied via ``d.copy()``.
 
         """
-        z = adarray(self.d.shape[1:],self.k,self.ni,
+        if out is None:
+            out = adarray(self.d.shape[1:],self.k,self.ni,
                     self.nck,self.idx,self.d.dtype,self.d.copy())
-        return z
+        else:
+            # We assume out has the right shape, data-type, etc.
+            np.copyto(out.d, self.d)
+            
+        return out
         
     # Define binary operators: +, -, ...
     # ADDITION
@@ -1371,7 +1382,7 @@ def chol_sp(H, out = None):
     # Copy H to out for in-place routine
     if out is not H:
         for i in range(H.size):
-            np.copyto(out[i].d, H[i].d)
+            H[i].copy(out = out[i])
         
     _chol_sp_unblocked(out)
     
@@ -1409,7 +1420,7 @@ def _chol_sp_unblocked(H):
     L = np.ndarray((N,N), dtype = adarray)
     # Copy references to adarrays to the lower 
     # triangle of a full "reference" matrix
-    # References about the diagonal are undefined.
+    # References above the diagonal are undefined.
     k = 0
     for i in range(N):
         for j in range(i+1):
@@ -1478,7 +1489,8 @@ def inv_tp(L, out = None):
     # Copy L to out for in-place routine
     if out is not L:
         for i in range(L.size):
-            np.copyto(out[i].d, L[i].d)
+            L[i].copy(out = out[i])
+            
     # Now perform in-place on `out`
     _inv_tp_unblocked(out)
     
@@ -1535,4 +1547,216 @@ def _inv_tp_unblocked(L):
       
     return L
 
+def llt_tp(L, out = None):
+    """
+    L @ L.T of a lower triangular matrix.
+
+    Parameters
+    ----------
+    L : ndarray of adarray
+        Lower triangular matrix in packed storage.
+    out : ndarray of adarray
+        Output buffer. If None, this will be created. 
+        If out = L, then in-place decomposition is performed
+
+    Returns
+    -------
+    out : ndarray of adarray
+        The result in packed storage.
     
+    """
+    
+    if L.ndim != 1:
+        raise ValueError('L must be 1-dimensional')
+    
+    if out is None:
+        out = np.ndarray(L.size, dtype = adarray)
+        for i in range(L.size):
+            out[i] = adarray(L[0].d.shape[1:], L[0].k, L[0].ni, 
+                              L[0].nck, L[0].idx, dtype = L[0].d.dtype)
+    
+    # Copy L to out for in-place routine
+    if out is not L:
+        for i in range(L.size):
+            L[i].copy(out = out[i])
+        
+    # Perform in-place L @ L.T
+    _llt_tp_unblocked(out)
+    
+    return out
+
+def _llt_tp_unblocked(L):
+    """
+    An unblocked, in-place routine for multiplying
+    L @ L.T where L is a lower triangular matrix
+    in packed row-order storage.
+    
+    This is equivalent to U.T @ U where U is in
+    upper triangular packed column-order storage.
+    
+    The resulting symmetric matrix is returned in
+    packed storage.
+
+    Parameters
+    ----------
+    L : ndarray of adarray
+        A lower triangular matrix in 1D packed 
+        row-order storage.
+
+    Returns
+    -------
+    ndarray of adarray 
+        The in-place result.
+        
+
+    """
+
+    # Calculate matrix dimensions
+    n = L.size
+    N = packed.n2N(n)
+    one = np.uint64(1)
+
+    A = np.ndarray((N,N), dtype = adarray)
+    # Copy references to adarrays to the lower 
+    # triangle of a full "reference" matrix
+    # References above the diagonal are undefined.
+    k = 0
+    for i in range(N):
+        for j in range(i+1):
+            A[i,j] = L[k]
+            k += 1
+    
+    # This is similar to a "reverse Cholesky decomposition"
+    # so we will work in the opposite direction as that
+    
+    for j in range(N-one, -1, -1):
+        
+        r = A[j,:j]         # The j^th row, left of the diagonal
+        
+        for i in range(N-one, j, -1):
+            Bi = A[i,:j]    # An ndarray
+            ci = A[i, j]    # An adarray 
+            
+            # ci <-- Ljj * ci + Bi @ r.T
+            ( A[j,j] * ci + Bi @ r.T ).copy(out = A[i,j])
+        
+        (A[j,j]*A[j,j] + r @ r.T).copy(out = A[j,j])        
+
+    return L
+
+def ltl_tp(L, out = None):
+    """
+    L.T @ L with a lower triangular matrix.
+
+    Parameters
+    ----------
+    L : ndarray of adarray
+        Lower triangular matrix in packed storage.
+    out : ndarray of adarray
+        Output buffer. If None, this will be created. 
+        If out = L, then in-place decomposition is performed
+
+    Returns
+    -------
+    out : ndarray of adarray
+        The symmetric result in packed storage.
+    
+    """
+    
+    if L.ndim != 1:
+        raise ValueError('L must be 1-dimensional')
+    
+    if out is None:
+        out = np.ndarray(L.size, dtype = adarray)
+        for i in range(L.size):
+            out[i] = adarray(L[0].d.shape[1:], L[0].k, L[0].ni, 
+                              L[0].nck, L[0].idx, dtype = L[0].d.dtype)
+    
+    # Copy L to out for in-place routine
+    if out is not L:
+        for i in range(L.size):
+            L[i].copy(out = out[i])
+        
+    # Perform in-place L @ L.T
+    _ltl_tp_unblocked(out)
+    
+    return out
+
+def _ltl_tp_unblocked(L):
+    """
+    An unblocked, in-place routine for multiplying
+    L.T @ L where L is a lower triangular matrix
+    in packed row-order storage.
+    
+    This is equivalent to U @ U.T where U is in
+    upper triangular packed column-order storage.
+    
+    The resulting symmetric matrix is returned in
+    packed storage.
+
+    Parameters
+    ----------
+    L : ndarray of adarray
+        A lower triangular matrix in 1D packed 
+        row-order storage.
+
+    Returns
+    -------
+    ndarray of adarray 
+        The in-place result.
+        
+
+    """
+
+    # Calculate matrix dimensions
+    n = L.size
+    N = packed.n2N(n)
+
+    A = np.ndarray((N,N), dtype = adarray)
+    # Copy references to adarrays to the lower 
+    # triangle of a full "reference" matrix
+    # References above the diagonal are undefined.
+    k = 0
+    for i in range(N):
+        for j in range(i+1):
+            A[i,j] = L[k]
+            k += 1
+    
+    # This is the "converse" of the llt routine
+    # for L @ L.T
+    for i in range(N):
+        for j in range(i+1):
+            # Compute A[i,j]
+            # This is the dot product of the
+            # i^th row of L.T and the
+            # j^th column of L
+            # 
+            # The i^th row of L.T is zero until
+            # its i^th element
+            # 
+            # The j^th column of L is zero until
+            # its j^th element
+            #
+            # So the dot product need only begin
+            # at the max(i,j)^th element
+            # 
+            # By the loop ranges, j is always <= i
+            # so max(i,j) = i, and we can begin
+            # the dot product with the i^th element
+            
+            # The first factor is the
+            # i^th row of L.T beginning at its i^th element
+            # This is the transpose of the i^th column of 
+            # L beginning at its i^th element, which is in
+            # the lower triangle, so A's reference is OK
+            F1 = (A[i:,i]).T
+            # The second factor is the j^th column
+            # of L beginning at its i^th element, which is
+            # also in the lower triangle, so OK
+            F2 = A[i:,j]
+            
+            (F1 @ F2).copy(out = A[i,j])
+        
+               
+
+    return L
