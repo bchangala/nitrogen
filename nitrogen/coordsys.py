@@ -403,7 +403,7 @@ class CoordSys(dfun.DFun):
         if fixCOM: # Shift t-vectors to Center-of-Mass frame
             
             # First, calculate t-vector of COM in original frame
-            tCOM = np.zeros((nd,nt,3)+base_shape)
+            tCOM = np.zeros((nd,nt,3)+base_shape, dtype = t.dtype)
             for a in range(natoms):
                 tCOM += masses[a] * t[:,:,a,:]
             tCOM = tCOM / sum(masses)
@@ -421,7 +421,7 @@ class CoordSys(dfun.DFun):
         #
         idxtab = adf.idxtab(deriv, nv)
         ncktab = adf.ncktab(deriv+nv, min(nv,deriv))
-        tt_val = np.ndarray((nd,3)+base_shape)
+        tt_val = np.ndarray((nd,3)+base_shape, dtype = t.dtype)
         
         idx = 0
         for j in range(nt):

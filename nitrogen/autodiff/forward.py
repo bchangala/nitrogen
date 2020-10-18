@@ -656,7 +656,7 @@ def mvleibniz(X, Y, k, ni, nck, idx, out=None):
         Multi-index table, as returned by ``idxtab(k, ni)``
     out : ndarray, optional
         Output location. If None, a new ndarray is created with the 
-        same data-type as X.
+        result type of X and Y's data-types
 
     Returns
     -------
@@ -680,7 +680,7 @@ def mvleibniz(X, Y, k, ni, nck, idx, out=None):
     
     # Initialize result Z to zero
     if out is None:
-        out = np.zeros(X.shape, dtype = X.dtype)
+        out = np.zeros(X.shape, dtype = np.result_type(X.dtype,Y.dtype))
     else:
         out.fill(0)
     
@@ -1130,8 +1130,8 @@ def powf(x, p, out = None):
     df = np.ndarray( (k+1,) + x.d.shape[1:], dtype = xval.dtype)
     
     df[0] = np.float_power(xval, p)
-    coeff = p
-    for i in range(k+1):
+    coeff = 1.0*p
+    for i in range(1, k+1):
         df[i] = coeff * (df[i-1] / xval)
         coeff *= (p-i)
     
@@ -1336,9 +1336,12 @@ def reduceOrder(F, i, k, ni, idx, out = None):
     
     return G
 
-def chol_pp(H, out = None):
+def chol_sp(H, out = None):
     """
     Cholesky decomposition of a symmetric matrix in packed format.
+    If real symmetric, then H should be positive definite.
+    If complex symmetric (*not* Hermitian), then H should have
+    non-zero pivots.
 
     Parameters
     ----------
@@ -1353,6 +1356,7 @@ def chol_pp(H, out = None):
     out : ndarray of adarray
         The lower triangle Cholesky decomposition L in packed storage.
         H = L @ L.T
+    
     """
     
     if H.ndim != 1:
@@ -1369,11 +1373,11 @@ def chol_pp(H, out = None):
         for i in range(H.size):
             np.copyto(out[i].d, H[i].d)
         
-    _chol_pp_unblocked(out)
+    _chol_sp_unblocked(out)
     
     return out
     
-def _chol_pp_unblocked(H):
+def _chol_sp_unblocked(H):
     """
     An unblocked, in-place implementation of Cholesky
     decomposition for symmetric matrices H.
@@ -1382,21 +1386,17 @@ def _chol_pp_unblocked(H):
     ----------
     H : ndarray of adarray
         H is a symmetric matrix in 1D packed storage.
+        (Lower triangle row-packed)
 
     Returns
     -------
-    H : ndarray of adarray 
-        The lower triangular Cholesky decomposition in
-        1D packed storage.
+    ndarray of adarray 
+        The in-place result.
         
     Notes
     -----
     This routine uses a standard Cholesky algorithm
-    for *real* symmetric matrices. It can be applied
-    to complex *symmetric* matrices (*not* complex 
-    Hermitian) and return a valid result as long
-    as the diagonals remain sufficiently large
-    in magnitude. 
+    for *real* symmetric matrices.
 
     """
 
@@ -1409,6 +1409,7 @@ def _chol_pp_unblocked(H):
     L = np.ndarray((N,N), dtype = adarray)
     # Copy references to adarrays to the lower 
     # triangle of a full "reference" matrix
+    # References about the diagonal are undefined.
     k = 0
     for i in range(N):
         for j in range(i+1):
@@ -1424,27 +1425,114 @@ def _chol_pp_unblocked(H):
         r = L[j,:j]         # The j^th row, left of the diagonal
     
         # L[j,j] <-- sqrt(d - r @ r.T)
-        sqrt(L[j,j] - r @ r.T, out = L[j,j])
+        sqrt( (L[j,j] - r @ r.T).copy(), out = L[j,j])
         
         # Check that the pivot is sufficiently large
         if (np.abs(L[j,j].d[:1]) / pivmax < tol).any() :
-            warnings.warn(f"Small diagonal (less than rel. tol. = {tol:.4E}\
-                          encountered in Cholesky decomposition")
+            warnings.warn("Small diagonal (less than rel. tol. = {:.4E} encountered in Cholesky decomposition".format(tol))
         
         # Store the new maximum pivot
         pivmax = np.maximum(pivmax, np.abs(L[j,j].d[:1]))
         
+        # Calculate the column below the diagonal element j
         #B = L[j+1:,:j]      # The block between r and c
         #c = L[j+1:,j]       # The j^th column, below the diagonal
         for i in range(j+1,N):
             Bi = L[i,:j]    # An ndarray
             ci = L[i, j]    # An adarray 
             #L[j+1:,j] = (c - B @ r.T) / L[j,j]
-            div(ci - Bi @ r.T, L[j,j], out = L[i,j] )
+            div( (ci - Bi @ r.T).copy(), L[j,j], out = L[i,j] )
         
 
     return H
     
+def inv_tp(L, out = None):
+    """
+    Invert a triangular matrix in lower row-packed (or upper column-packed)
+    storage.
+
+    Parameters
+    ----------
+    L : ndarray of adarray
+        L is stored in 1D packed format (see :mod:`nitrogen.linalg.packed`)
+    out : ndarray of adarray
+        Output buffer. If None, this will be created. 
+        If out = L, then in-place decomposition is performed
+
+    Returns
+    -------
+    out : ndarray of adarray
+        The inverse of the triangular matrix in packed storage.
     
+    """
     
+    if L.ndim != 1:
+        raise ValueError('L must be 1-dimensional')
+    
+    if out is None:
+        out = np.ndarray(L.size, dtype = adarray)
+        for i in range(L.size):
+            out[i] = adarray(L[0].d.shape[1:], L[0].k, L[0].ni, 
+                              L[0].nck, L[0].idx, dtype = L[0].d.dtype)
+    
+    # Copy L to out for in-place routine
+    if out is not L:
+        for i in range(L.size):
+            np.copyto(out[i].d, L[i].d)
+    # Now perform in-place on `out`
+    _inv_tp_unblocked(out)
+    
+    return out
+    
+def _inv_tp_unblocked(L):
+    """
+    Invert a lower triangular matrix in row-packed storage.
+
+    Parameters
+    ----------
+    L : ndarray of adarray
+        L is a triangular matrix in 1D packed storage.
+        (Row-packed for lower, column-packed for upper)
+
+    Returns
+    -------
+    ndarray of adarray 
+        The in-place result.
+
+    """
+
+    n = L.size
+    N = packed.n2N(n)
+    one = np.uint64(1)
+    
+    X = np.ndarray((N,N), dtype = adarray)
+    # Copy references to adarrays to the lower 
+    # triangle of a full "reference" matrix
+    # Elements above the diagonal are not defined!
+    k = 0
+    for i in range(N):
+        for j in range(i+1):
+            X[i,j] = L[k]
+            k += 1
+    
+    # Compute the triangular inverse
+    # with a simple in-place element by element algorithm
+    abstol = 1e-15 
+    # In-place lower triangle inversion
+    for j in range(N - one, -1,-1):
+        
+        # Compute j^th diagonal element
+        if (np.abs(X[j,j].d[:1]) < abstol).any():
+            warnings.warn(f"Small diagonal (less than abs. tol. = {abstol:.4E})" \
+                          "encounted in triangle inversion")
+        
+        #X[j,j] = 1.0/X[j,j]
+        powf(X[j,j].copy(), -1.0, out = X[j,j])
+        
+        # Compute j^th column, below diagonal
+        for i in range(N - one, j, -1):
+            mul( -X[j,j], X[i, j+1:i+1] @ X[j+1:i+1, j], out = X[i,j])
+      
+    return L
+
     
