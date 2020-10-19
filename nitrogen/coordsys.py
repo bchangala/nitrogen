@@ -439,6 +439,7 @@ class CoordSys(dfun.DFun):
         
         return out
     
+    
 class CS_Valence3(CoordSys):
     """
     A triatomic valence coordinate system.

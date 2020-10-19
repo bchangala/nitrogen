@@ -208,3 +208,86 @@ def nderiv(deriv, nvar):
     k = min(deriv, nvar)
     return adf.ncktab(n,k)[n,k]
 
+def sym2invdet(S, deriv, nvar):
+    """
+    Calculate the inverse and ln(determinant)
+    of a symmetric matrix. If S is real,
+    then it must be positive definite. If S
+    is complex, it must be invertible.
+    
+    S will be overwritten with the inverse
+    in packed storage.
+
+    Parameters
+    ----------
+    S : ndarray
+        The derivative array of a symmetric matrix
+        in packed (lower triangle, row-order) storage.
+        `S` has a shape of (nd, nS, ...).
+        The second dimension is the packed dimension.
+    deriv : int
+        The maximum derivative order.
+    nvar : int
+        The number of independent variables.
+
+    Returns
+    -------
+    ndarray
+        The derivative array for ln(det), with 
+        shape (nd, ...)
+
+    """
+    
+    if np.ndim(S) < 2 :
+        raise ValueError("S must have at least 2 dimensions")
+    
+    nd = S.shape[0]
+    if nd != nderiv(deriv,nvar):
+        raise ValueError("The first dimension of S is inconsistent with deriv and nvar")
+    
+    nS = S.shape[1]
+    if nS < 1:
+        raise ValueError("S must have a second dimension of at least 1")
+    N = adf.n2N(nS) # The rank of the matrix S
+    
+    # We will carry out the computation using 
+    # adarrays / forward ad
+    
+    # Create an adarray using S
+    # This will have new, copied data
+    Sad = adf.array(S, deriv, nvar, copyd = True)
+    
+    # Promote the matrix dimension
+    Spacked = adf.ndize1(Sad)
+    
+    # 1) Compute the Cholesky decomposition
+    #    Stored in Spacked
+    adf.chol_sp(Spacked, out = Spacked)
+    
+    # 2) Compute the logarithm of the determinant
+    #    This is the sum of the 2 * log of the diagonal
+    #    entries of L
+    lndet = 0*Spacked[0] # initialize lndet to zero
+    k = 0
+    for i in range(N):
+        lndet = lndet + adf.log(Spacked[k])
+        k = k + (i+2)
+    lndet = 2 * lndet
+    # lndet now equals the log of the determinant of S
+    
+    # 3) Compute the inverse of the Cholesky decomposition
+    #    This overwrites Spacked
+    adf.inv_tp(Spacked, out = Spacked)
+    # 4) Compute the inverse of the original matrix
+    #    This overwrites Spacked
+    adf.ltl_tp(Spacked, out = Spacked)
+    # 5) Copy this data back to the original derivative array
+    for i in range(N):
+        # S[:, i, ...] <-- Spacked[i].d
+        np.copyto(S[:,i], Spacked[i].d)
+    
+    # S now contains the inverse of the original matrix
+    # 
+    # finally, return the ln(det) derivative array
+    #
+    return lndet.d.copy()

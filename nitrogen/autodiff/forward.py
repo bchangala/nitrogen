@@ -1272,14 +1272,56 @@ def exp(x, out = None):
 
     """
     
-    xval = x.d[0] # Value array of x
+    xval = x.d[:1] # Value array of x
     k = x.k
     
     df = np.ndarray( (k+1,)+x.d.shape[1:], dtype = xval.dtype)
     
-    df[0] = np.exp(xval)
+    np.exp(xval, out = df[:1])
     for i in range(1,k+1):
-        df[i] = df[0]
+        np.copyto(df[i:(i+1)], df[:1])
+            
+    return adchain(df, x, out = out)
+
+def log(x, out = None):
+    """
+    Natural logarithm for :class:`adarray` objects.
+
+    Parameters
+    ----------
+    x : adarray
+        Input argument.
+
+    out : adarray, optional
+        Output location of result. `out` must have the same
+        properties as x. If None, a new adarray is allocated and
+        returned.
+
+    Returns
+    -------
+    adarray
+        Result.
+
+    """
+    
+    xval = x.d[:1] # Value array of x
+    k = x.k
+    
+    df = np.ndarray( (k+1,)+x.d.shape[1:], dtype = xval.dtype)
+    
+    # Value of f: ln(x)
+    np.log(xval, out = df[:1])
+    
+    # First derivative of f:
+    # 1/x
+    if k > 0:
+        np.copyto(df[1:2], 1.0/xval)
+        
+    for i in range(2,k+1):
+        # i^th derivative of f:
+        # (1/x)**i = 1/x * (1/x)**(i-1)
+        #
+        np.multiply(df[1:2], df[(i-1):i], out = df[i:(i+1)])
             
     return adchain(df, x, out = out)
 
@@ -1612,7 +1654,7 @@ def inv_tp(L, out = None):
         L is stored in 1D packed format (see :mod:`nitrogen.linalg.packed`)
     out : ndarray of adarray
         Output buffer. If None, this will be created. 
-        If out = L, then in-place decomposition is performed
+        If out = L, then in-place inversion is performed
 
     Returns
     -------
@@ -1700,7 +1742,7 @@ def llt_tp(L, out = None):
         Lower triangular matrix in packed storage.
     out : ndarray of adarray
         Output buffer. If None, this will be created. 
-        If out = L, then in-place decomposition is performed
+        If out = L, then in-place multiplication is performed
 
     Returns
     -------
@@ -1796,7 +1838,7 @@ def ltl_tp(L, out = None):
         Lower triangular matrix in packed storage.
     out : ndarray of adarray
         Output buffer. If None, this will be created. 
-        If out = L, then in-place decomposition is performed
+        If out = L, then in-place multiplication is performed
 
     Returns
     -------
