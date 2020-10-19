@@ -114,7 +114,7 @@ class adarray:
                 raise ValueError("d does not have the correct shape")
             self.d = d 
             
-        # The first index is the new "derivative index"
+        # The first index is the "derivative index"
     
     def copy(self, out = None):
         """
