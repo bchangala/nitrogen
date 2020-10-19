@@ -33,6 +33,9 @@ class adarray:
     d : ndarray
         The derivative array, whose first index is the
         generalized derivative index. (See Notes.)
+    zlevel : int
+        The highest non-zero derivative order. If -1,
+        then this adarray is identically zero.
         
         
     Notes
@@ -56,7 +59,7 @@ class adarray:
     """
     
     def __init__(self,base_shape,k,ni, nck = None, idx = None, dtype = np.float64,
-                 d = None):
+                 d = None, zlevel = None):
         """
         Create a new adarray object.
 
@@ -84,6 +87,9 @@ class adarray:
             A pre-allocated derivative array. If provided,
             `dtype` will be ignored and `d` must have 
             a shape equal to ``(nd,) + base_shape``
+        zlevel : int, optional
+            The zero level indicator. If None, this
+            will be set to `k`. The default is None.
         
         See Also
         --------
@@ -114,7 +120,10 @@ class adarray:
                 raise ValueError("d does not have the correct shape")
             self.d = d 
             
-        # The first index is the "derivative index"
+        if zlevel is None:
+            self.zlevel = k 
+        else:
+            self.zlevel = zlevel 
     
     def copy(self, out = None):
         """
@@ -139,25 +148,20 @@ class adarray:
         else:
             # We assume out has the right shape, data-type, etc.
             np.copyto(out.d, self.d)
+            out.zlevel = self.zlevel 
             
         return out
         
     # Define binary operators: +, -, ...
     # ADDITION
     def __add__(self,other):
-        """ z = self + other """
-        
-        if np.isscalar(other):
-            # Addition of scalar constant
-            z = self.copy()
-            z.d[0] += other  # Add scalar constant only to value (zeroth derivative)
+        """ z = self + other """ 
+        if type(other) == type(self):
+            z = add(self, other) # adarray add
         else:
-            if type(other) != type(self):
-                # Try to convert `other` to a constant adarray
-                other = const(other,self.k,self.ni,self.nck,self.idx)
-            
-            z = empty_like(self)
-            np.add(self.d,other.d, out = z.d) # z <-- self + other
+            z = self.copy()
+            z.d[0] += other # Attempt ndarray iadd
+            z.zlevel = max(z.zlevel, 0) # Assume other is non-zero
         return z
     def __radd__(self,other):
         """ z = other + self """
@@ -165,20 +169,20 @@ class adarray:
     
     # MULTIPLICATION
     def __mul__(self,other):
-        """ z = self * other """
-        if np.isscalar(other):
-            # Multiplication by scalar constant
-            z = self.copy()
-            z.d *= other # Multiply all derivatives by a scalar constant
-        else:
-            if type(other) != type(self):
-                # Try to convert other to a constant adarray
-                other = const(other,self.k,self.ni,self.nck,self.idx)
-            
-            # z = empty_like(self)
-            # Use multi-variate Leibniz product rule, z <-- self * other
-            # mvleibniz(self.d,other.d,self.k,self.ni,self.nck,self.idx, out = z.d)
+        """ z = self * other """    
+        if type(other) == type(self):
             z = mul(self, other)
+        else:
+            z = self.copy()
+            z.d *= other # Attempt ndarray imul
+            # assuming other to be constant.
+            # NumPy broadcasting is important here.
+            # If other is a scalar, then everything is multiplied
+            # by it. If other is an ndarray of the same base_shape
+            # as z, then it will be broadcast over each
+            # derivative, as desired.
+            #
+            # zlevel is unchanged by constant multiplication
         return z
     def __rmul__(self,other):
         """ z = other * self """
@@ -187,17 +191,12 @@ class adarray:
     # DIVISION
     def __truediv__(self, other):
         """ z = self / other """
-        if np.isscalar(other):
-            # Division by a scalar constant
-            z = self.copy()
-            z.d /= other
+        if type(other) == type(self):
+            z = div(self,other)
         else:
-            if type(other) != type(self):
-                # Try to convert other to a constant adarray
-                other = const(other, self.k, self.ni, self.nck, self.idx)
-            
-            z = div(self, other)
-        
+            z = self.copy()
+            z.d /= other # ndarray idiv, using broadcasting
+            # zlevel is unchanged by constant division
         return z
     def __rtruediv__(self, other):
         """ z = other / self """
@@ -206,48 +205,24 @@ class adarray:
     
     # SUBTRACTION
     def __sub__(self,other):
-        """ z = self - other """
-        if np.isscalar(other):
-            # Subtraction of scalar constant
-            z = self.copy()
-            z.d[0] -= other
-        else:
-            if type(other) != type(self):
-                # Try to convert other to a constant adarray
-                other = const(other,self.k,self.ni,self.nck,self.idx)
-            
-            z = empty_like(self)
-            np.subtract(self.d,other.d, out = z.d) # z = self - other
-        return z
-    
+        """ z = self - other """        
+        return self.__add__(-other)
     def __rsub__(self,other):
         """ z = other - self """
-        if np.isscalar(other):
-            # Subtraction from a scalar constant
-            z = -self # adarray negate makes a copy
-            z.d[0] += other
-        else:
-            if type(other) != type(self):
-                # Try to convert other to a constant adarray
-                other = const(other,self.k,self.ni,self.nck,self.idx)
-            
-            z = empty_like(self)
-            np.subtract(other.d,self.d, out = z.d) # z = other - self
-        return z
+        return (-self).__add__(other)
     
     # UNARY OPERATIONS
     def __neg__(self):
         """ z = -self """
         z = self.copy()
         np.negative(z.d, out = z.d) #z.d = -z.d
+        # zlevel is unchanged by negation
         return z
-    
     def __pos__(self):
         """ z = +self"""
-        z = self.copy()
-        return z
+        return self.copy()
 
-def array(d,k,ni,copyd = False):
+def array(d,k,ni,copyd = False,zlevel = None):
     """
     Create an adarray object from a raw derivative array.
 
@@ -259,10 +234,13 @@ def array(d,k,ni,copyd = False):
         The maximum derivative order.
     ni : int
         The number of independent variables.
-    copyd : boolean
+    copyd : boolean, optional
         If True, a copy of `d` will be made for returned
         adarray. If False, the adarray will use 
         the same reference. The default is False.
+    zlevel : int, optional
+        The zero-level of `d`. If None, this
+        will be set safely to `k`. The default is None.
 
     Returns
     -------
@@ -280,7 +258,18 @@ def array(d,k,ni,copyd = False):
     else:
         dinit = d # use reference
         
-    return adarray(base_shape, k, ni, None, None, d.dtype, dinit)
+    # Check the length of the first dimension
+    if np.ndim(d) < 1:
+        return ValueError("d must have at least 1 dimension")
+    
+    nck = ncktab(k + ni, min(k,ni))
+    if d.shape[0] != nck[k+ni,min(k,ni)]:
+        return ValueError("The first dimension of d has an incorrect length")
+    
+    if zlevel is None:    
+        zlevel = k
+    
+    return adarray(base_shape, k, ni, nck, None, d.dtype, dinit, zlevel)
     
 def ndize1(x):
     """
@@ -296,18 +285,24 @@ def ndize1(x):
     Returns
     -------
     ndarray
-        The !D array of adarrays.
+        The 1D array of adarrays.
+        
+    Notes
+    -----
+    The derivative arrays of the new adarray objects
+    are views of `x.d`.
 
     """
     
     if np.ndim(x.d) < 2:
         raise ValueError("The base shape must have at least 1 dimension")
     
-    n = x.d.shape[1]    # the size of the ndarray
+    n = x.d.shape[1]    # the size of the new ndarray
     
     X = np.ndarray((n,), dtype = adarray)
     for i in range(n):
-        X[i] = array(x.d[:,i], x.k, x.ni, copyd = False) # keep references
+        X[i] = array(x.d[:,i], x.k, x.ni, 
+                     copyd = False, zlevel = x.zlevel) # keep references
     
     return X    
         
@@ -646,7 +641,7 @@ def idxpos(a,nck):
                                  # the block of multi-indices of the same degree k
         return offset + posk
 
-def mvleibniz(X, Y, k, ni, nck, idx, out=None):
+def mvleibniz(X, Y, k, ni, nck, idx, out=None, Xzlevel = None, Yzlevel = None):
     """
     Multivariate Leibniz formula for derivative arrays.
 
@@ -668,6 +663,9 @@ def mvleibniz(X, Y, k, ni, nck, idx, out=None):
     out : ndarray, optional
         Output location. If None, a new ndarray is created with the 
         result type of X and Y's data-types
+    Xzlevel, Yzlevel : int, optional
+        Zero-level for input. If None, this is assumed to be `k`.
+        The default is None.
 
     Returns
     -------
@@ -690,10 +688,18 @@ def mvleibniz(X, Y, k, ni, nck, idx, out=None):
     """
     
     # Initialize result Z to zero
+    res_type = np.result_type(X.dtype, Y.dtype)
     if out is None:
-        out = np.zeros(X.shape, dtype = np.result_type(X.dtype,Y.dtype))
+        out = np.zeros(X.shape, dtype = res_type)
     else:
+        if out.dtype != res_type:
+            raise TypeError("out data-type is incompatible with X * Y")
         out.fill(0)
+        
+    if Xzlevel is None:
+        Xzlevel = k 
+    if Yzlevel is None: 
+        Yzlevel = k 
     
     Z = out # Reference only
    
@@ -702,10 +708,14 @@ def mvleibniz(X, Y, k, ni, nck, idx, out=None):
     for iX in range(nd):
         idxX = idx[iX,:]
         kX = np.sum(idxX)
+        if kX > Xzlevel:
+            break # Skip remaining X derivatives. They are zero.
         
         for iY in range(nd):
             idxY = idx[iY,:]
             kY = np.sum(idxY)
+            if kY > Yzlevel:
+                break # Skip remaining Y derivatives. They are zero.
             
             kZ = kX + kY
             if kZ > k: # Total degree of this term is too high
@@ -730,7 +740,7 @@ def mvleibniz(X, Y, k, ni, nck, idx, out=None):
             
     return Z
 
-def mvchain(df,X,k,ni,nck,idx, out = None):
+def mvchain(df,X,k,ni,nck,idx, out = None, Xzlevel = None):
     """
     Multivariate chain rule Z = f(X) via Taylor series.
 
@@ -755,6 +765,9 @@ def mvchain(df,X,k,ni,nck,idx, out = None):
     out : ndarray, optional
         Output location. If None, a new ndarray is created with the 
         same data-type as X.        
+    Xzlevel : int, optional
+        The zlevel of the X derivative array. If None, this is
+        assumed to be `k`.
 
     Returns
     -------
@@ -777,34 +790,54 @@ def mvchain(df,X,k,ni,nck,idx, out = None):
     :class:`adarray` objects.
     """
     
-    X0 = X[0].copy() # Value of X
-    X[0] = 0  # X now equals "X-X0"
+    X0 = X[:1].copy() # Value of X 
+    X[:1].fill(0) # X now equals "X-X0"
+    if Xzlevel is None:
+        Xzlevel = k
     
     # Initialize result to zero (and create if necessary)
+    res_type = np.result_type(df, X)
     if out is None:
-        out = np.zeros(X.shape, dtype = X.dtype)
-    else:
-        out.fill(0)
+        out = np.ndarray(X.shape, dtype = res_type)
+    
+    if out.dtype != res_type:
+        raise TypeError("out data-type is incompatible with f(X)")
+        
+    # Initalize result to zero
+    out.fill(0)
+        
     Z = out # Reference only
     
     for i in range(k+1):
         
         if i == 0:
-            # Initialize Xi to 1 (constant)
+            # Initialize Xi = X**i = X**0 to 1 (constant)
             Xi = np.zeros(X.shape,dtype = X.dtype)
-            Xi[0] = 1.0
-            fact = 1.0 # Initialize factoral to 1
+            #Xi[0] = 1.0
+            Xi[:1].fill(1.0)
+            Xizlevel = 0 # the zero-level is 0 (constant)
+            fact = 1.0 # Initialize factorial to 1
         else:
             Xi = mvleibniz(Xi,X,k,ni,nck,idx) # Xi <-- Xi * (X-X0)
             # The call to mvleibniz needs to create a new output buffer
             # because we cannot overwrite Xi while mvleibniz is operating
             # (this probably could be done more efficiently -- revisit)
+            
+            # Determine the zlevel of Xi
+            if Xizlevel < 0 or Xzlevel < 0:
+                Xizlevel = -1 
+            else:
+                Xizlevel = min(Xizlevel + Xzlevel, k)
+            
             fact = fact * i 
             
-        if (df[i] != 0 ).any():
+        if (df[i] != 0 ).any() and Xizlevel >= 0:
+            # If both df is non-zero and
+            # Xi is non-zero
             Z += (df[i] / fact) * Xi
     
-    X[0] = X0  # Restore the value of X
+    #X[0] = X0  # Restore the value of X
+    np.copyto(X[:1], X0)
     
     return Z
 
@@ -850,15 +883,22 @@ def const(value,k,ni,nck = None, idx = None):
     if type(value) != np.ndarray:
         value = np.array(value)
     
-    c = adarray(value.shape,k,ni,nck,idx,value.dtype)
+    base_shape = value.shape
+    nck = ncktab(k + ni, min(k,ni))
+    nd = nck[k + ni, min(k,ni)]
     
-    if np.ndim(c.d) == 1:
-        c.d[0] = value
-        c.d[1:] = 0
+    d = np.zeros((nd,)+base_shape, dtype = value.dtype)
+    
+    # Copy value to d[:1]
+    np.copyto(d[:1], value)
+    
+    # Determine the zlevel
+    if (value == 0).all():
+        zlevel = -1 # Identically zero
     else:
-        np.copyto(c.d[0], value)
-        c.d[1:].fill(0)
-
+        zlevel = 0 # A non-zero constant
+    
+    c = array(d, k, ni, copyd = False, zlevel = zlevel)
         
     return c
 
@@ -902,25 +942,28 @@ def sym(value,i,k,ni,nck = None, idx = None):
 
     """
     
+    if k < 0:
+        raise ValueError("k be >= 0")
+    if ni < 1:
+        raise ValueError("ni must be >= 1 to construct symbol")
+    
     if i > ni+1 or i < 0 :
         raise ValueError('Symbol index i must be 0, ..., ni-1')
     
     x = const(value, k, ni, nck, idx)
+    # const returns x with zlevel = -1 or 0 depending on value
     
     if k > 0 :
-        if np.ndim(x.d) == 1:
-            x.d[1:] = 0
-            x.d[i+1] = 1
-        else:
-            x.d[1:].fill(0) 
-            x.d[i+1].fill(1)
-            
+        x.d[(i+1):(i+2)].fill(1)
+        x.zlevel = 1 
+    # If k == 0, then the zlevel from const can be kept
+    
     return x
 
 def empty_like(x, dtype = None):
     """
     Create an *uninitialized* adarray with the same properties as `x`,
-    including base array data-type.
+    including base array data-type. The zlevel will be maximum.
 
     Parameters
     ----------
@@ -943,6 +986,137 @@ def empty_like(x, dtype = None):
         dtype = x.d.dtype
         
     return adarray(x.d.shape[1:], x.k, x.ni, x.nck, x.idx, dtype)
+
+def add(x, y, out = None):
+    """
+    Add x + y
+
+    Parameters
+    ----------
+    x,y : adarray
+        Input argument
+    out : adarray, optional
+        Output location. If None, this 
+        will be created. The default is None.
+
+    Returns
+    -------
+    adarray
+        Result.
+
+    """
+    
+    res_type = np.result_type(x.d, y.d)
+    if out is None:
+        out = empty_like(x, dtype = res_type)
+    
+    if res_type != out.d.dtype:
+        raise TypeError("output data-type incompatible with x + y")
+    
+    np.add(x.d, y.d, out = out.d)
+    out.zlevel = max(x.zlevel, y.zlevel)
+    
+    return out
+
+def subtract(x, y, out = None):
+    """
+    Subtract x - y
+
+    Parameters
+    ----------
+    x,y : adarray
+        Input argument
+    out : adarray, optional
+        Output location. If None, this 
+        will be created. The default is None.
+
+    Returns
+    -------
+    adarray
+        Result.
+
+    """
+    
+    res_type = np.result_type(x.d, y.d)
+    if out is None:
+        out = empty_like(x, dtype = res_type)
+    
+    if res_type != out.d.dtype:
+        raise TypeError("output data-type incompatible with x - y")
+    
+    np.subtract(x.d, y.d, out = out.d)
+    out.zlevel = max(x.zlevel, y.zlevel)
+    
+    return out
+
+def mul(x, y, out = None):
+    """
+    Multiply x * y
+    
+    Parameters
+    ----------
+    x,y : adarray
+        Input argument
+    out : adarray, optional
+        Output buffer. If None, this will be created.
+        The default is None.
+
+    Returns
+    -------
+    adarray
+        Result.
+
+    """
+    
+    res_type = np.result_type(x.d, y.d)
+    if out is None:
+        out = empty_like(x, dtype = res_type)
+        
+    if res_type != out.d.dtype:
+        raise TypeError("output data-type incompatible with x * y")
+
+    mvleibniz(x.d,y.d,x.k,x.ni,x.nck,x.idx, out = out.d)
+    
+    if x.zlevel < 0 or y.zlevel < 0 :
+        # Either of the factors is identically zero
+        # So is the result.
+        out.zlevel = -1
+    else:
+        # Both zlevels are >= 0
+        out.zlevel = min(x.zlevel + y.zlevel, x.k)
+    
+    return out
+
+def div(x, y, out = None):
+    """
+    Divide x / y
+
+    Parameters
+    ----------
+    x,y : adarray
+        Input argument
+    out : adarray, optional
+        Output buffer. If None, this will be created.
+        The default is None.
+
+    Returns
+    -------
+    adarray
+        Result.
+
+    """
+    
+    res_type = np.result_type(x.d, y.d)
+    if out is None:
+        out = empty_like(x, dtype = res_type)
+        
+    if res_type != out.d.dtype:
+        raise TypeError("output data-type incompatible with x / y")
+
+    # Calculate 1 / y
+    iy = powf(y, -1.0)
+    # Multiply x * (1/y)
+    return mul(x,iy, out = out)
 
 def adchain(df,x, out=None):
     
@@ -974,6 +1148,16 @@ def adchain(df,x, out=None):
         out = empty_like(x)
     
     mvchain(df, x.d, x.k, x.ni, x.nck, x.idx, out = out.d)
+    
+    # Determine the zlevel of the result
+    # We assume, safely, that df has a maximum zlevel
+    if x.zlevel <= 0:
+        # x is identically zero or constant
+        # The result is also constant
+        out.zlevel = 0
+    else:
+        # x has a zlevel >= 1
+        out.zlevel = x.k
     
     return out
 
@@ -1185,66 +1369,7 @@ def sqrt(x, out = None):
     
     return adchain(df, x, out = out)
 
-def mul(x, y, out = None):
-    """
-    Multiply x * y
-    
-    Parameters
-    ----------
-    x,y : adarray
-        Input argument
-    out : adarray, optional
-        Output buffer. If None, this will be created.
-        The default is None.
 
-    Returns
-    -------
-    adarray
-        Result.
-
-    """
-    
-    res_type = np.result_type(x.d, y.d)
-    if out is None:
-        out = empty_like(x, dtype = res_type)
-        
-    if res_type != out.d.dtype:
-        raise TypeError("output data-type incompatible with x * y")
-
-    mvleibniz(x.d,y.d,x.k,x.ni,x.nck,x.idx, out = out.d)
-    
-    return out
-
-def div(x, y, out = None):
-    """
-    Divide x / y
-
-    Parameters
-    ----------
-    x,y : adarray
-        Input argument
-    out : adarray, optional
-        Output buffer. If None, this will be created.
-        The default is None.
-
-    Returns
-    -------
-    adarray
-        Result.
-
-    """
-    
-    res_type = np.result_type(x.d, y.d)
-    if out is None:
-        out = empty_like(x, dtype = res_type)
-        
-    if res_type != out.d.dtype:
-        raise TypeError("output data-type incompatible with x / y")
-
-    # Calculate 1 / y
-    iy = powf(y, -1.0)
-    # Multiply x * (1/y)
-    return mul(x,iy, out = out)
     
 def reduceOrder(F, i, k, ni, idx, out = None):
     """
@@ -1376,8 +1501,7 @@ def chol_sp(H, out = None):
     if out is None:
         out = np.ndarray(H.size, dtype = adarray)
         for i in range(H.size):
-            out[i] = adarray(H[0].d.shape[1:], H[0].k, H[0].ni, 
-                              H[0].nck, H[0].idx, dtype = H[0].d.dtype)
+            out[i] = empty_like(H[i])
     
     # Copy H to out for in-place routine
     if out is not H:
@@ -1483,8 +1607,7 @@ def inv_tp(L, out = None):
     if out is None:
         out = np.ndarray(L.size, dtype = adarray)
         for i in range(L.size):
-            out[i] = adarray(L[0].d.shape[1:], L[0].k, L[0].ni, 
-                              L[0].nck, L[0].idx, dtype = L[0].d.dtype)
+            out[i] = empty_like(L[i])
     
     # Copy L to out for in-place routine
     if out is not L:
@@ -1572,8 +1695,7 @@ def llt_tp(L, out = None):
     if out is None:
         out = np.ndarray(L.size, dtype = adarray)
         for i in range(L.size):
-            out[i] = adarray(L[0].d.shape[1:], L[0].k, L[0].ni, 
-                              L[0].nck, L[0].idx, dtype = L[0].d.dtype)
+            out[i] = empty_like(L[i])
     
     # Copy L to out for in-place routine
     if out is not L:
@@ -1669,8 +1791,7 @@ def ltl_tp(L, out = None):
     if out is None:
         out = np.ndarray(L.size, dtype = adarray)
         for i in range(L.size):
-            out[i] = adarray(L[0].d.shape[1:], L[0].k, L[0].ni, 
-                              L[0].nck, L[0].idx, dtype = L[0].d.dtype)
+            out[i] = empty_like(L[i])
     
     # Copy L to out for in-place routine
     if out is not L:
