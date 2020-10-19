@@ -210,13 +210,10 @@ def nderiv(deriv, nvar):
 
 def sym2invdet(S, deriv, nvar):
     """
-    Calculate the inverse and ln(determinant)
+    Calculate the inverse and determinant
     of a symmetric matrix. If S is real,
     then it must be positive definite. If S
     is complex, it must be invertible.
-    
-    S will be overwritten with the inverse
-    in packed storage.
 
     Parameters
     ----------
@@ -232,8 +229,11 @@ def sym2invdet(S, deriv, nvar):
 
     Returns
     -------
-    ndarray
-        The derivative array for ln(det), with 
+    iS : ndarray
+        The derivative array of the matrix inverse of S
+        in packed storage with shape (nd, nS, ...)
+    det : ndarray
+        The derivative array for det(S), with 
         shape (nd, ...)
 
     """
@@ -264,16 +264,17 @@ def sym2invdet(S, deriv, nvar):
     #    Stored in Spacked
     adf.chol_sp(Spacked, out = Spacked)
     
-    # 2) Compute the logarithm of the determinant
-    #    This is the sum of the 2 * log of the diagonal
-    #    entries of L
-    lndet = 0*Spacked[0] # initialize lndet to zero
+    # 2) Compute the determinant
+    #    This is the product of the squares of the diagonal entries
     k = 0
     for i in range(N):
-        lndet = lndet + adf.log(Spacked[k])
+        if i == 0:
+            det = Spacked[k] 
+        else:
+            det = det * Spacked[k]
         k = k + (i+2)
-    lndet = 2 * lndet
-    # lndet now equals the log of the determinant of S
+    det = det * det
+    # det now equals the determinant of S
     
     # 3) Compute the inverse of the Cholesky decomposition
     #    This overwrites Spacked
@@ -281,13 +282,15 @@ def sym2invdet(S, deriv, nvar):
     # 4) Compute the inverse of the original matrix
     #    This overwrites Spacked
     adf.ltl_tp(Spacked, out = Spacked)
-    # 5) Copy this data back to the original derivative array
-    for i in range(N):
+    
+    # 5) Copy this data to the output array
+    iS = np.empty(S.shape, dtype = S.dtype)
+    for i in range(nS):
         # S[:, i, ...] <-- Spacked[i].d
-        np.copyto(S[:,i], Spacked[i].d)
+        np.copyto(iS[:,i], Spacked[i].d)
     
     # S now contains the inverse of the original matrix
     # 
     # finally, return the ln(det) derivative array
     #
-    return lndet.d.copy()
+    return iS, det.d.copy()
