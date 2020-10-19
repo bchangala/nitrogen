@@ -9,7 +9,6 @@ is the ``adarray`` class.
 """
 
 import numpy as np
-import nitrogen.linalg.packed as packed
 import warnings
 
 class adarray:
@@ -1472,6 +1471,27 @@ def reduceOrder(F, i, k, ni, idx, out = None):
     
     return G
 
+def n2N(n):
+    """
+    Calculate the square matrix rank N
+    for a packed storage size n
+
+    Parameters
+    ----------
+    n : int
+        The packed length.
+
+    Returns
+    -------
+    N : np.uint64
+        The matrix rank.
+
+    """
+    
+    N = np.uint64((np.sqrt(8*n+1)-1)/2)
+    
+    return N
+
 def chol_sp(H, out = None):
     """
     Cholesky decomposition of a symmetric matrix in packed format.
@@ -1539,7 +1559,7 @@ def _chol_sp_unblocked(H):
     # H is a 1d ndarray of adarray objects
     # in packed format
     n = H.size
-    N = packed.n2N(n)
+    N = n2N(n)
 
     L = np.ndarray((N,N), dtype = adarray)
     # Copy references to adarrays to the lower 
@@ -1637,7 +1657,7 @@ def _inv_tp_unblocked(L):
     """
 
     n = L.size
-    N = packed.n2N(n)
+    N = n2N(n)
     one = np.uint64(1)
     
     X = np.ndarray((N,N), dtype = adarray)
@@ -1735,7 +1755,7 @@ def _llt_tp_unblocked(L):
 
     # Calculate matrix dimensions
     n = L.size
-    N = packed.n2N(n)
+    N = n2N(n)
     one = np.uint64(1)
 
     A = np.ndarray((N,N), dtype = adarray)
@@ -1831,7 +1851,7 @@ def _ltl_tp_unblocked(L):
 
     # Calculate matrix dimensions
     n = L.size
-    N = packed.n2N(n)
+    N = n2N(n)
 
     A = np.ndarray((N,N), dtype = adarray)
     # Copy references to adarrays to the lower 
