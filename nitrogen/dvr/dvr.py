@@ -1,18 +1,10 @@
-"""
-nitrogen.dvr
-------------
-
-This module provides support for discrete-variable 
-representation (DVR) basis functions. The main object
-is the :class:`DVR` class.
-
-"""
-
 
 from .legDVR import _legDVR, _legDVRwfs
 from .fourDVR import _fourDVR, _fourDVRwfs
 from .hoDVR import _hoDVR,_hoDVRwfs
 from .sincDVR import _sincDVR,_sincDVRwfs
+
+__all__ = ['DVR']
 
 class DVR:
     """

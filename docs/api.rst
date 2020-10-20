@@ -12,7 +12,7 @@ NITROGEN API reference
    :members:
    :show-inheritance:
    
-.. automodule:: nitrogen.dvr 
+.. automodule:: nitrogen.dvr
    :members:
    :show-inheritance:
    

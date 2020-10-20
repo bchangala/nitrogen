@@ -1,15 +1,7 @@
-"""
-nitrogen.linalg
----------------
-
-Implementations of various linear algebra algorithsm, including iterative eigensolvers.
-This module uses the SciPy :class:`~scipy.sparse.linalg.LinearOperator` class
-to represent matrix-vector product routines.
-
-"""
-
 import numpy as np
 from scipy.sparse.linalg import LinearOperator
+
+__all__ = ['eigstrp']
 
 def eigstrp(H, k = 5, pad = 10, tol = 1e-10, maxiter = None, v0 = None,
             rper = 20, P = None, pper = 1):

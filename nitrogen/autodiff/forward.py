@@ -48,12 +48,12 @@ class adarray:
     derivatives, and so on. Within a group of derivatives of a given 
     order, they are sorted by the derivative order with respect to the
     first independent variable, then by the order of the second, and 
-    so on. This ordering is the same as that of :attr:idx
+    so on. This ordering is the same as that of :attr:`idx`
     
-    The value of higher-order derivatives is stored by convention
-    with a factor equal to the inverse of its multi-index factorial, i.e.
-    a derivative with multi-index [2, 0, 1, 3] would be stored as the 
-    corresponding derivative divided by 2! * 0! * 1! * 3!
+    The values of higher-order derivatives are stored by convention
+    with a factor equal to the inverse of the multi-index factorial, i.e.
+    a derivative with multi-index ``[2, 0, 1, 3]`` would be stored as the 
+    corresponding derivative divided by :math:`2!\\times 0!\\times 1!\\times 3!`
     
     """
     
