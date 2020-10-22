@@ -13,7 +13,6 @@ import nitrogen.dfun as dfun
 import nitrogen.autodiff.forward as adf
 
 
-
 class CoordSys(dfun.DFun):
     """
     A generic coordinate system base class, which

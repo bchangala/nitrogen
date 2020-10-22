@@ -5,8 +5,8 @@ nitrogen.linalg.packed
 Packed-storage matrices and routines.
 The lower triangle is stored in row-major order.
 (For symmetric matrices, this is equivalent to upper triangle
- column-major order. For Hermitian matrices, this is
- the conjugate of the upper triangle in column-major order.)
+column-major order. For Hermitian matrices, this is
+the conjugate of the upper triangle in column-major order.)
 
 """
 

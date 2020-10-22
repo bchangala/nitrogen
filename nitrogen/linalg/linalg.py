@@ -52,7 +52,7 @@ def eigstrp(H, k = 5, pad = 10, tol = 1e-10, maxiter = None, v0 = None,
        https://doi.org/10.1137/S0895479898334605
     """
     
-    if type(H) is not LinearOperator:
+    if not isinstance(H,LinearOperator):
         raise TypeError("H must be a LinearOperator")
         
     n,m = H.shape
