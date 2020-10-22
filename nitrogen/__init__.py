@@ -16,3 +16,4 @@ from . import dvr
 from . import dfun 
 from . import coordsys 
 from . import ham
+from . import constants
