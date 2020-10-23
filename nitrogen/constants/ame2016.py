@@ -3,6 +3,8 @@ ame2016.py
 
 The AME2016 atomic mass evaluation [1,2]_
 
+See https://www-nds.iaea.org/amdc/ame2016/mass16.txt
+
 References
 ----------
 .. [1]  "The Ame2016 atomic mass evaluation (I)"
@@ -19,7 +21,7 @@ References
 # the values are a tuple with format
 # (atomic mass, unc, spin multiplicity)
 #
-masses = {
+_masses = {
     "X":    (0, 0, 1),  # dummy atom
     
     "H":    (1007825.03224e-6, 0.00009e-6, 2),

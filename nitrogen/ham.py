@@ -10,6 +10,7 @@ from nitrogen.dvr import DVR
 import nitrogen.dvr.ops as dvrops
 from nitrogen.dfun import sym2invdet
 import nitrogen.angmom as angmom
+import nitrogen.constants
 
 from scipy.sparse.linalg import LinearOperator
 
@@ -99,7 +100,7 @@ def hdpdvr_bfJ(dvrs, cs, pes, masses, Jlist = 0, pesinput = 'Q'):
     gi2 = np.sqrt(detg[0])      # |g|^1/2
     gim4 = 1.0/(np.sqrt(gi2))   # |g|^-1/4
     Gkl = G[0]                  # G inverse metric
-    hbar = 5.806484171          # hbar in [A, u, cm^-1] units
+    hbar = nitrogen.constants.hbar    # hbar in [A, u, cm^-1] units
     # Calculate the PES grid
     if pesinput == 'Q':
         V = pes(Q)
