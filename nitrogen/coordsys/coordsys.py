@@ -1,17 +1,8 @@
-"""
-nitrogen.coordsys
------------------
-
-This module implements the CoordSys base class,
-which is extended for all NITROGEN coordinate
-systems.
-
-"""
-
 import numpy as np
 import nitrogen.dfun as dfun
 import nitrogen.autodiff.forward as adf
 
+__all__ = ["CoordSys"]
 
 class CoordSys(dfun.DFun):
     """
@@ -439,83 +430,3 @@ class CoordSys(dfun.DFun):
         return out
     
     
-class CS_Valence3(CoordSys):
-    """
-    A triatomic valence coordinate system.
-    
-    The coordinates are :math:`r_1`, :math:`r_2`, and :math:`\\theta`.
-    
-    
-    The first atom is at :math:`(0, 0, -r_1)`.
-    The second atom is at the origin.
-    The third atom is at :math:`(0, r_2 \sin\\theta, -r_2 \cos\\theta )`.
-    
-    """
-    
-    def __init__(self, name = 'Triatomic valence'):
-        
-        """
-        Create a new CS_Valence3 object.
-        
-        Parameters
-        ----------
-        name : str, optional
-            The coordinate system name. The default is 'Triatomic valence'.
-        
-        """
-        
-        super().__init__(self._csv3_q2x, nQ = 3, 
-                         nX = 9, name = name, 
-                         Qstr = ['r1', 'r2', 'theta'],
-                         maxderiv = -1, isatomic = True)
-        
-    def _csv3_q2x(self, Q, deriv = 0, out = None, var = None):
-        """
-        Triatomic valence coordinate system Q2X instance method.
-        See :meth:`CoordSys.Q2X` for details.
-        
-        Parameters
-        ----------
-        Q : ndarray
-            Shape (self.nQ, ...)
-        deriv, out, var :
-            See :meth:`CoordSys.Q2X` for details.
-        
-        Returns
-        -------
-        out : ndarray
-            Shape (nd, self.nX, ...)
-
-        """
-        
-        natoms = 3 
-        base_shape =  Q.shape[1:]
-        
-        if var is None:
-            var = [0, 1, 2] # Calculate derivatives for all Q
-        
-        nvar = len(var)
-        
-        # nd = adf.nck(deriv + nvar, min(deriv, nvar)) # The number of derivatives
-        nd = dfun.nderiv(deriv, nvar)
-        
-        # Create adf symbols/constants for each coordinate
-        q = [] 
-        for i in range(self.nQ):
-            if i in var: # Derivatives requested for this variable
-                q.append(adf.sym(Q[i], var.index(i), deriv, nvar))
-            else: # Derivatives not requested, treat as constant
-                q.append(adf.const(Q[i], deriv, nvar))
-        # q = r1, r2, theta
-        
-        if out is None:
-            out = np.ndarray( (nd, 3*natoms) + base_shape, dtype = Q.dtype)
-        out.fill(0) # Initialize out to 0
-        
-        # Calculate Cartesian coordinates
-        np.copyto(out[:,2], (-q[0]).d ) # -r1
-        np.copyto(out[:,7], (q[1] * adf.sin(q[2])).d ) #  r2 * sin(theta)
-        np.copyto(out[:,8], (-q[1] * adf.cos(q[2])).d ) # -r2 * cos(theta)
-        
-        return out
-
