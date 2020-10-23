@@ -114,38 +114,38 @@ class CartesianN(CoordSys):
                          Qstr = Qstr, Xstr = Xstr,
                          maxderiv = -1, isatomic = False)
         
-        def _csCartN_q2x(self, Q, deriv = 0, out = None, var = None):
-            """
-            Q : ndarray
-                Shape (self.nQ, ...)
-            """
-            
-            base_shape =  Q.shape[1:]
-            N = self.nQ # = self.nX
-            
-            if var is None:
-                var = [i for i in range(N)] # Calculate derivatives for all Q
+    def _csCartN_q2x(self, Q, deriv = 0, out = None, var = None):
+        """
+        Q : ndarray
+            Shape (self.nQ, ...)
+        """
         
-            nvar = len(var)
-            nd = dfun.nderiv(deriv, nvar)
+        base_shape =  Q.shape[1:]
+        N = self.nQ # = self.nX
+        
+        if var is None:
+            var = [i for i in range(N)] # Calculate derivatives for all Q
+    
+        nvar = len(var)
+        nd = dfun.nderiv(deriv, nvar)
+        
+        if out is None:
+            out = np.ndarray( (nd, N) + base_shape, dtype = Q.dtype)
+        
+        out.fill(0) # Initialize derivative array to 0
+        
+        # 0th derivatives
+        # All X values are equal to input Q values
+        np.copyto(out[0], Q)
+        
+        # 1st derivatives
+        # All requested `var` have a derivative of 1 w.r.t its output
+        for i in range(len(var)):
+            out[1+i, var[i]:(var[i]+1)].fill(1.0)
             
-            if out is None:
-                out = np.ndarray( (nd, N) + base_shape, dtype = Q.dtype)
-            
-            out.fill(0) # Initialize derivative array to 0
-            
-            # 0th derivatives
-            # All X values are equal to input Q values
-            np.copyto(out[0], Q)
-            
-            # 1st derivatives
-            # All requested `var` have a derivative of 1 w.r.t its output
-            for i in range(len(var)):
-                out[1+i, var[i]:(var[i]+1)].fill(1.0)
-                
-            # All higher derivatives are zero
-            
-            return out
+        # All higher derivatives are zero
+        
+        return out
             
             
             
