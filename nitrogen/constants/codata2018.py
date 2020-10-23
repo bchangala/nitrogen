@@ -51,6 +51,8 @@ _eh_nit = 2.1947463136320e5
 _c_nit = 299792458.0 * 1e10 * _t_SI
 _c_nit_unc = _c_nit * _u_runc * 0.5
 
+_Coulomb = 1/(1.602176634e-19) # 1 Coulomb in e, exact
+
 _constants = {
     # 
     # kb in Hz/K is exact
@@ -78,5 +80,11 @@ _constants = {
     "Eh" : (_eh_nit, _eh_nit * 1.9e-12),
     
     # speed of light, inexact
-    "c" : (_c_nit, _c_nit_unc)
+    "c" : (_c_nit, _c_nit_unc),
+    
+    # m_e, electron mass (in u)
+    "me" : (5.48579909065e-4, 0.16e-13),
+    
+    # Debye, exact (in e * Angstrom)
+    "debye" : (1e-11 /(299792458.0 * 1.602176634e-19), 0)
     }

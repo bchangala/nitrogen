@@ -22,7 +22,8 @@ second  = _constants["second"][0]
 eV      = _constants["eV"][0]
 Eh      = _constants["Eh"][0]
 c       = _constants["c"][0]
-
+me      = _constants["me"][0]
+debye   = _constants["debye"][0]
 
 #############################
 # Define retrieval functions
