@@ -1,5 +1,6 @@
 """
 nitrogen.ham
+------------
 
 Hamiltonian construction routines.
 
@@ -34,7 +35,7 @@ def hdpdvr_bfJ(dvrs, cs, pes, masses, Jlist = 0, pesinput = 'Q'):
         Masses.
     Jlist : int or array_like
         Total angular momentum value(s).
-    pesinput = {'Q', 'X'}
+    pesinput : {'Q', 'X'}
         Coordinate input mode for PES function. The default is 'Q'.
     
     Returns

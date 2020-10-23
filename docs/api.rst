@@ -4,6 +4,9 @@ NITROGEN API reference
 .. automodule:: nitrogen
    :members:
    
+.. automodule:: nitrogen.constants
+   :members:
+   
 .. automodule:: nitrogen.dfun
    :members:
    :show-inheritance:
@@ -19,6 +22,12 @@ NITROGEN API reference
 .. automodule:: nitrogen.dvr.ops
    :members:
    :show-inheritance:
+   
+.. automodule:: nitrogen.ham
+   :members:
+
+.. automodule:: nitrogen.angmom
+   :members:
    
 .. automodule:: nitrogen.linalg 
    :members:

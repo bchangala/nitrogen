@@ -26,7 +26,7 @@ References
 # 1 time unit = sqrt( u * A**2 / (hc*cm^-1) )
 # In seconds, this is inexact because of the uncertainty in 1 u
 #             
-#             =  9.142946585331758e-13 s, inexact
+#             =  9.14294658533175854862e-13 s, inexact
 # The relative uncertainty is one-half that of u/kg.
 #
 
@@ -35,6 +35,9 @@ _c_SI   = 299792458.0 # c in m/s, exact
 _h_SI   = 6.62607015e-34 # h in J*s, exact
 _u_SI   = 1.66053906660e-27 # u in kg, inexact
 _u_runc = 3.0e-10 # relative uncertainty of u in SI
+
+_joule = 1/(_h_SI * _c_SI * 100.0)  # 1 joule in hc*cm^-1, exact
+_NA = 6.02214076e23                 # Avogadro constant, exact
 
 _t_SI   = 9.142946585331758e-13 # the Time Unit in s
 _t_unc = _u_runc * 0.5 * _t_SI  # uncertainty of Time Unit in s
@@ -46,12 +49,15 @@ twopi = 6.2831853071795864769   # 2 * pi
 _a0_nit = 0.529177210903
 _a0_rel = 1.5e-10
 
-_eh_nit = 2.1947463136320e5
+_eh_nit = 2.1947463136319697e5
 
 _c_nit = 299792458.0 * 1e10 * _t_SI
 _c_nit_unc = _c_nit * _u_runc * 0.5
 
 _Coulomb = 1/(1.602176634e-19) # 1 Coulomb in e, exact
+
+_t_au = 2.645628850622830216331e-5
+_t_runc = 1.50012e-10 # rel uncertainty in t_au, dominated by 0.5 * unc(u)
 
 _constants = {
     # 
@@ -61,7 +67,7 @@ _constants = {
     #
     # joule, exact
     # Use inverse of exact definition of hc*cm^-1 above
-    "joule" : (1/(_h_SI * _c_SI * 100.0), 0),
+    "joule" : (_joule, 0),
     #
     # Use inverse of expression for time unit in s above
     "second" : ( 1/_t_SI,  _u_runc * 0.5 / _t_SI),
@@ -86,5 +92,21 @@ _constants = {
     "me" : (5.48579909065e-4, 0.16e-13),
     
     # Debye, exact (in e * Angstrom)
-    "debye" : (1e-11 /(299792458.0 * 1.602176634e-19), 0)
+    "debye" : (1e-11 /(299792458.0 * 1.602176634e-19), 0),
+    
+    # Avogadro constant, exact
+    "NA" : (6.02214076e23, 0),
+    
+    # kilojoule / mol, exact
+    "kJ" : (1000.0 * _joule/_NA, 0),
+    
+    # kilocalorie / mol, exact
+    "kcal": (4184.0 * _joule/_NA, 0),
+    
+    # atomic unit of time, inexact
+    "t_au" : (_t_au, _t_au * _t_runc),
+    
+    # Frequency-energy equivalent (exact)
+    "hHz" : (1e-6/29979.2458, 0),
+    
     }

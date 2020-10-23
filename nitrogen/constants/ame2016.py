@@ -19,7 +19,7 @@ References
 
 # the atomic isotope dictionary
 # the values are a tuple with format
-# (atomic mass, unc, spin multiplicity)
+# (atomic mass, uncertainty, spin multiplicity)
 #
 _masses = {
     "X":    (0, 0, 1),  # dummy atom

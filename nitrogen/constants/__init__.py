@@ -1,36 +1,107 @@
 """
 nitrogen.constants
+------------------
 
 Physical constants and reference data.
+
+NITROGEN generally uses an Å/u/cm\ :sup:`-1`
+unit system, defined as follows
+
+.. list-table::
+   :widths: 20 20
+   :header-rows: 1
+   
+   * - Dimension
+     - Unit
+   * - [length]
+     - :math:`\\text{Å}`
+   * - [mass]
+     - :math:`\\text{u}`
+   * - [energy]
+     - :math:`hc\\times\\text{cm}^{-1}`
+   * - [temperature]
+     - :math:`K`
+   * - [electric charge]
+     - :math:`e`
+
+All constants in the :mod:`nitrogen.constants` module
+are reported in these units, which are convenient for
+nuclear motion calculations. As of CODATA 2018, the units of length
+and energy have exact relationships to their SI counterparts.
+The unit of mass (u, unified atomic mass unit, i.e. one-twelth the
+mass of a carbon atom), however, does not have an exact SI value. 
+The atomic unit of mass (the electron mass) has a similar status.
+
+Physical constants
+==================
+
+===========================  =================================================================
+``kb``                       Boltzmann constant :math:`k_B`
+``h``                        Planck constant :math:`h`
+``hbar``                     reduced Planck constant :math:`\hbar = h/(2\pi)`
+``a0``                       Bohr radius :math:`a_0`
+``c``                        speed of light
+``me``                       electron mass
+``NA``                       Avogadro constant :math:`N_A`
+===========================  =================================================================
+
+Unit conversions
+================
+
+===========================  =================================================================
+``joule``                    joule, J
+``kJ``                       kilojoule per mole, kJ/mol
+``kcal``                     kilocalorie per mole, kcal/mol
+``eV``                       electron-volt, eV
+``Eh``                       hartree, :math:`E_h`
+``hHz``                      energy equivalent of hertz, :math:`h \\times \\text{Hz}`
+``second``                   second, s
+``t_au``                     atomic unit of time, :math:`\hbar/E_h`
+``debye``                    debye, D
+===========================  =================================================================
 
 """
 
 from .ame2016 import _masses
 from .codata2018 import _constants
 
-mass_version = "ame2016"
-constants_version = "codata2018"
+#
+# Common physical constants:
+# All values are in [A,u,hc*cm^-1] unit system
+#
+kb      = _constants["kb"][0]       # Boltzman constant
+joule   = _constants["joule"][0]    # 1 Joule
+h       = _constants["h"][0]        # Planck constant
+hbar    = _constants["hbar"][0]     # Reduced Planck constant
+a0      = _constants["a0"][0]       # Bohr radius
+second  = _constants["second"][0]   # 1 second
+eV      = _constants["eV"][0]       # 1 eV
+Eh      = _constants["Eh"][0]       # 1 Hartree
+c       = _constants["c"][0]        # Speed of light
+me      = _constants["me"][0]       # Electron mass
+debye   = _constants["debye"][0]    # 1 Debye
+NA      = _constants["NA"][0]       # Avogadro constant
+kJ      = _constants["kJ"][0]       # kJ/mol
+kcal    = _constants["kcal"][0]     # kcal/mol
+t_au    = _constants["t_au"][0]     # atomic unit of time (hbar/Eh)
+hHz     = _constants["hHz"][0]      # h * Hz
 
 
-
-kb      = _constants["kb"][0]
-joule   = _constants["joule"][0]
-h       = _constants["h"][0]
-hbar    = _constants["hbar"][0]
-a0      = _constants["a0"][0]
-second  = _constants["second"][0]
-eV      = _constants["eV"][0]
-Eh      = _constants["Eh"][0]
-c       = _constants["c"][0]
-me      = _constants["me"][0]
-debye   = _constants["debye"][0]
+#############################
+# Define version functions
+def mass_version():
+    """ Version information for atomic mass data """
+    return "ame2016"
+def constants_version():
+    """ Version information for physical constants data """
+    return "codata2018"
 
 #############################
 # Define retrieval functions
 #
 def constant_val(name):
     """
-    Retrieve value from constant dictionary
+    Retrieve a physical constant's value
 
     Parameters
     ----------
@@ -52,7 +123,7 @@ def constant_val(name):
 
 def constant_unc(name):
     """
-    Retrieve a constant's uncertainty from constant dictionary.
+    Retrieve a physical constant's uncertainty.
     The uncertainty value does *not* reflect errors from 
     finite precision numerical arithmetic.
 
@@ -76,7 +147,7 @@ def constant_unc(name):
 
 def mass(label):
     """
-    Fetch atomic mass data (using AME2016)
+    Retrieve atomic mass data.
 
     Parameters
     ----------
@@ -87,6 +158,11 @@ def mass(label):
     -------
     float or list of float
         The atomic mass in u.
+        
+    Notes
+    -----
+    Literal float values can be passed as `label`. They will be
+    returned as is.
 
     """
     
