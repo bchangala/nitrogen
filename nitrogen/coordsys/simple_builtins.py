@@ -83,6 +83,11 @@ class Valence3(CoordSys):
         
         return out
 
+    def __repr__(self):
+        return f"Valence3({self.name!r})"
+    
+    
+    
 class CartesianN(CoordSys):
     """
     Cartesian coordinates in N-D space.
@@ -146,6 +151,9 @@ class CartesianN(CoordSys):
         # All higher derivatives are zero
         
         return out
+    
+    def __repr__(self):
+        return f'CartesianN({self.nQ!r}, {self.name!r})'
             
             
             
