@@ -10,10 +10,13 @@ systems.
 
 from . import coordsys 
 from . import simple_builtins
+from . import zmat
 
 from .coordsys import *
 from .simple_builtins import *
+from .zmat import *
 
 __all__ = []
 __all__ += coordsys.__all__
 __all__ += simple_builtins.__all__
+__all__ += zmat.__all__

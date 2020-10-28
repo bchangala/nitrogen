@@ -404,6 +404,29 @@ def ncktab(nmax,kmax=None):
                 
     return tab
 
+def nderiv(deriv, nvar):
+    """
+    The number of derivatives up to order `deriv`,
+    inclusively, in `nvar` variables. This equals
+    the binomial coefficient (`deriv` + `nvar`, `nvar`).
+
+    Parameters
+    ----------
+    deriv : int
+        The maximum derivative order.
+    nvar : int
+        The number of independent variables.
+
+    Returns
+    -------
+    np.uint64
+        The number of derivatives.
+
+    """
+    n = deriv + nvar 
+    k = min(deriv, nvar)
+    return ncktab(n,k)[n,k]
+
 def nckmulti(a,b,nck):
     """
     Calculate multi-index binomial coefficient (`a`, `b`)

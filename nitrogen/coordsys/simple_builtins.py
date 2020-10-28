@@ -31,7 +31,8 @@ class Valence3(CoordSys):
         super().__init__(self._csv3_q2x, nQ = 3, 
                          nX = 9, name = name, 
                          Qstr = ['r1', 'r2', 'theta'],
-                         maxderiv = -1, isatomic = True)
+                         maxderiv = None, isatomic = True,
+                         zlevel = None)
         
     def _csv3_q2x(self, Q, deriv = 0, out = None, var = None):
         """
@@ -86,15 +87,29 @@ class Valence3(CoordSys):
     def __repr__(self):
         return f"Valence3({self.name!r})"
     
-    
+    def diagram(self):
+        # using U+250X box and U+219X arrows
+        diag = ""
+        
+        diag += "     │↓              ↑│        \n"
+        diag += "     │Q [3]      [9] X│        \n"
+        diag += "   ╔═╪════════════════╪═╗      \n"
+        diag += "   ║ │ ┌────────────┐ │ ║      \n"
+        diag += "   ║ ╰─┤ 3-atom val ├─╯ ║      \n"
+        diag += "   ║   └────────────┘   ║      \n"
+        diag += "   ╚════════════════════╝      \n"
+        
+        return diag
     
 class CartesianN(CoordSys):
     """
     Cartesian coordinates in N-D space.
     
+    :math:`X_i = Q_i`
+    
     """
     
-    def __init__(self, N, name = None):
+    def __init__(self, N):
         
         """
         Create a new CartesianN coordinate system object.
@@ -103,21 +118,18 @@ class CartesianN(CoordSys):
         ----------
         N : int
             The number of Cartesian coordinates.
-        name : str, optional
-            The coordinate system name. If None, this will be
-            automatically created. The default is None.
         
         """
         
-        if name is None:
-            name = f"{N:d}-D Cartesian"
+        name = f"{N:d}-D Cartesian"
         Qstr = [f"X{i:d}" for i in range(N)]
         Xstr = [f"X{i:d}" for i in range(N)]
         
         super().__init__(self._csCartN_q2x, nQ = N, 
                          nX = N, name = name, 
                          Qstr = Qstr, Xstr = Xstr,
-                         maxderiv = -1, isatomic = False)
+                         maxderiv = None, isatomic = False,
+                         zlevel = 1) # zlevel = 1 -- linear function
         
     def _csCartN_q2x(self, Q, deriv = 0, out = None, var = None):
         """
@@ -154,6 +166,25 @@ class CartesianN(CoordSys):
     
     def __repr__(self):
         return f'CartesianN({self.nQ!r}, {self.name!r})'
+    
+    def diagram(self):
+        
+        if len(self.name) > 15:
+            name = self.name[:12] + "..."
+        else:
+            name = self.name
+        
+        # using U+250X box and U+219X arrows
+        diag = ""
+        
+        diag += "     │↓              ↑│        \n"
+        diag += "     │Q              X│        \n"
+        diag += "   ╔═╪════════════════╪═╗      \n"
+        diag += "   ║ ╰────────────────╯ ║      \n"
+        diag += "   ║   {:15s}  ║      \n".format(name)
+        diag += "   ╚════════════════════╝      \n"
+        
+        return diag
             
             
             

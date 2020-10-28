@@ -26,18 +26,22 @@ class DFun:
         The number of input variables.
     maxderiv : int
         The maximum supported derivative order. A value
-        of -1 indicates arbitrary derivatives are supported.
+        of None indicates arbitrary derivatives are supported.
+    zlevel : int
+        The zero-level of the function. All derivatives with
+        total order greater than `zlevel` are zero. A value
+        of None indicates all derivatves may be non-zero.
     
     """
     
-    def __init__(self, fx, nf = 1, nx = 1, maxderiv = -1):
+    def __init__(self, fx, nf = 1, nx = 1, maxderiv = None, zlevel = None):
         """
         Create a new DFun object.
 
         Parameters
         ----------
         fx : function
-            An instance method implementing the differential
+            An instance method implementing the differentiable
             function with signature ``fx(self, X, deriv = 0, out = None, var = None)``.
             See :meth:`DFun.f` for more details.
         nf : int, optional
@@ -46,14 +50,20 @@ class DFun:
             The number of input variables of fx. The default is 1.
         maxderiv : int, optional
             The maximum supported derivative of fx(). 
-            `maxderiv` = -1 indicates that arbitrary order
-            derivatives are supported. The default is -1.
+            `maxderiv` = None indicates that arbitrary order
+            derivatives are supported. The default is None.
+        zlevel : int, optional
+            The zero-level of the differentiable function. All derivatives
+            with total order greater than `zlevel` are zero. A value
+            of None indicates all derivatives may be non-zero. The default is
+            None
 
         """
         self._feval = fx
         self.nf = nf
         self.nx = nx
         self.maxderiv = maxderiv
+        self.zlevel = zlevel
         
     def f(self, X, deriv = 0, out = None, var = None):
         """
@@ -95,7 +105,7 @@ class DFun:
         # Check the requested derivative order
         if deriv < 0:
             raise ValueError('deriv must be non-negative')
-        if deriv > self.maxderiv and self.maxderiv != -1:
+        if self.maxderiv is not None and deriv > self.maxderiv:
             raise ValueError('deriv is larger than maxderiv')
         
         # Check the shape of input X
@@ -144,7 +154,7 @@ class DFun:
             of `nx` variables returning `nf` values.
 
         """
-        return cls(_fzero, nf=nf, nx=nx, maxderiv = -1)
+        return cls(_fzero, nf=nf, nx=nx, maxderiv = None, zlevel = None)
     
     
 def _fzero(self, X, deriv = 0, out = None, var = None):

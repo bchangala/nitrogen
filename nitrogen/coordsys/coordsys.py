@@ -23,7 +23,7 @@ class CoordSys(dfun.DFun):
     Xstr : list of st
         The labels of the output coordinates.
     maxderiv : int
-        The maximum supported derivative order. :attr:`maxderiv` = -1 if 
+        The maximum supported derivative order. :attr:`maxderiv` = None if 
         arbitrarily high-order derivatives are supported.
     isatomic : bool
         If :attr:`isatomic` == True, the coordinate system is *atomic*.
@@ -34,7 +34,8 @@ class CoordSys(dfun.DFun):
     """
     
     def __init__(self, Q2Xfun, nQ = 1, nX = 1, name = '(unnamed coordinate system)',
-                 Qstr = None, Xstr = None, maxderiv = -1, isatomic = False):
+                 Qstr = None, Xstr = None, maxderiv = None, isatomic = False,
+                 zlevel = None):
         """
         Create a new CoordSys object.
 
@@ -58,17 +59,20 @@ class CoordSys(dfun.DFun):
             Labels for each of the `nX` output coordinates. If None, these will be 
             automatically numbered.
         maxderiv : int, optional
-            The maximum supported derviative order. The default is -1, indicating
+            The maximum supported derviative order. The default is None, indicating
             arbitrarily high derivatives are supported.
         isatomic : bool, optional
             If `isatomic` == True, then `nX` must be a multiple of 3, and the
             Cartesian-like output coordinates X should be ordered as
             :math:`(x_0, y_0, z_0, x_1, y_1, z_1,...)`. The default is False.
+        zlevel : int, optional
+            The zero-level of the differentiable Q2Xfun function. The default
+            is None.
 
         """
         
         # Call DFun constructor
-        super().__init__(Q2Xfun, nf = nX, nx = nQ, maxderiv = maxderiv)
+        super().__init__(Q2Xfun, nf = nX, nx = nQ, maxderiv = maxderiv, zlevel = zlevel)
         self.nQ = nQ
         self.nX = nX 
         self.name = name 
@@ -82,7 +86,7 @@ class CoordSys(dfun.DFun):
         if Qstr is None:
             self.Qstr = ['Q%d' % i for i in range(self.nQ)]
         elif len(Qstr) != self.nQ :
-            raise ValueError('Length of Qstr list must equal nQ')
+            raise ValueError('Length of Qstr list ({:d}) must equal nQ ({:d})'.format(len(Qstr),self.nQ))
         else:
             self.Qstr = Qstr
             
@@ -137,7 +141,7 @@ class CoordSys(dfun.DFun):
         # Check the requested derivative order
         if deriv < 0:
             raise ValueError('deriv must be non-negative')
-        if deriv > self.maxderiv and self.maxderiv != -1:
+        if self.maxderiv is not None and deriv > self.maxderiv:
             raise ValueError('deriv is larger than maxderiv')
         
         # Check the shape of input Q
@@ -430,3 +434,61 @@ class CoordSys(dfun.DFun):
         return out
     
     
+class CoordTrans(dfun.DFun):
+    """
+    A base class for coordinate transformations.
+    
+    """
+    
+    def __init__(self, dfunction, nQp = 1, nQ = 1, 
+                 name = '(unnamed coordinate transformation)',
+                 Qpstr = None, Qstr = None, maxderiv = None, zlevel = None):
+        """
+
+        Parameters
+        ----------
+        dfunction : DFun or function
+            A differentiable function defining the coordinate
+            transformation Q(Q')
+        nQp : int, optional
+            The number of new (input) coordinates. Ignored if
+            dfunction is a DFun. The default is 1.
+        nQ : int, optional
+            The number of old (output) coordinates. Ignored if
+            dfunction is a DFun. The default is 1.
+        name : str, optional
+            Transformation name.
+        Qpstr, Qstr : list of str, optional
+            Coordinate labels
+        maxderiv : int, optional
+            The maximum supported derivative order. Ignored if
+            dfunction is a DFun. The default is None (no maximum).
+        zlevel : int, optional
+            The zero-level of the Q(Q') DFun. The default is None.
+
+        """
+        
+        if type(dfunction) == dfun.DFun:
+            super().__init__(dfunction._feval, nf=dfunction.nf,
+                             nx=dfunction.nx, maxderiv = dfunction.maxderiv,
+                             zlevel = dfunction.zlevel)
+                
+        else: # we expect a function
+            # dfunction should have a signature
+            # of (self, Qp, deriv = 0, out = None, var = None)
+            super().__init__(dfunction, nf = nQ, nx = nQp,
+                             maxderiv = maxderiv, zlevel = zlevel)
+        
+        self.nQp = self.nx # Inputs 
+        self.nQ  = self.nf # Outputs 
+        self.name = name        
+        if Qpstr is None:
+            self.Qpstr = [f"Q{i:d}'" for i in range(self.nQp)]
+        else:
+            self.Qpstr = Qpstr 
+            
+        if Qstr is None: 
+            self.Qstr = [f"Q{i:d}" for i in range(self.nQ)]
+        else: 
+            self.Qstr = Qstr
+                

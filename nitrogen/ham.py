@@ -15,7 +15,7 @@ import nitrogen.constants
 
 from scipy.sparse.linalg import LinearOperator
 
-def hdpdvr_bfJ(dvrs, cs, pes, masses, Jlist = 0, pesinput = 'Q'):
+def hdpdvr_bfJ(dvrs, cs, pes, masses, Jlist = 0):
     """
     Direct-product DVR grid body-frame Hamiltonian for 
     angular momentum J.
@@ -30,13 +30,11 @@ def hdpdvr_bfJ(dvrs, cs, pes, masses, Jlist = 0, pesinput = 'Q'):
     cs : CoordSys
         An *atomic* coordinate system.
     pes : function
-        A potential energy function f(Q) or f(X)
+        A potential energy function f(Q)
     masses : array_like
         Masses.
     Jlist : int or array_like
         Total angular momentum value(s).
-    pesinput : {'Q', 'X'}
-        Coordinate input mode for PES function. The default is 'Q'.
     
     Returns
     -------
@@ -103,13 +101,7 @@ def hdpdvr_bfJ(dvrs, cs, pes, masses, Jlist = 0, pesinput = 'Q'):
     Gkl = G[0]                  # G inverse metric
     hbar = nitrogen.constants.hbar    # hbar in [A, u, cm^-1] units
     # Calculate the PES grid
-    if pesinput == 'Q':
-        V = pes(Q)
-    elif pesinput == 'X':
-        V = pes(cs.Q2X(Q)[0])
-    else:
-        raise ValueError("unexpected pesinput value")
-    
+    V = pes(Q)
     
 
     ######################
