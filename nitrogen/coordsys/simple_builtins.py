@@ -1,9 +1,9 @@
-from .coordsys import CoordSys 
+from .coordsys import CoordSys, CoordTrans
 import nitrogen.autodiff.forward as adf
 import nitrogen.dfun as dfun
 import numpy as np
 
-__all__ = ['Valence3','CartesianN']
+__all__ = ['Valence3','CartesianN','LinearTrans']
 
 class Valence3(CoordSys):
     """
@@ -186,8 +186,92 @@ class CartesianN(CoordSys):
         
         return diag
             
+class LinearTrans(CoordTrans):
+    
+    """
+    Linear coordinate transformation.
+    
+    The output coordinates Qi are defined as
+    
+        :math:`Q_i = T_{ij} Q'_j`
+        
+    Parameters
+    ----------
+    
+    T : ndarray
+        The transformation matrix.
+        
+    """
+    
+    def __init__(self, T, Qpstr = None):
+        """
+        Create a LinearTrans object.
+
+        Parameters
+        ----------
+        T : ndarray
+            A square matrix.
+        Qpstr: list of str, optional
+            Labels for the new coordinates.
+
+        """
+        if np.ndim(T) != 2:
+            raise ValueError("T must be 2-dimensional")
+        m,n = T.shape
+        if m != n:
+            raise ValueError("T must be square")
             
+        super().__init__(self._lintrans, nQp = m, nQ = m, 
+                         name = 'Linear transformation',
+                         Qpstr = Qpstr, maxderiv = None,
+                         zlevel = 1)
             
+        self.T = T.copy()   # Transformation matrix, copy
+        
+    def _lintrans(self, Qp, deriv = 0, out = None, var = None):
+        """
+        Qp : ndarray
+            Shape (self.nQp, ...)
+        out : ndarray
+            Shape (nd, self.nQ, ...)
+        """
+        
+        base_shape =  Qp.shape[1:]
+        N = self.nQp # = self.nX, number of inputs = number of outputs
+        
+        if var is None:
+            var = [i for i in range(N)] # Calculate derivatives for all Qp
+    
+        nvar = len(var)
+        nd = dfun.nderiv(deriv, nvar)
+        
+        if out is None:
+            out = np.ndarray( (nd, N) + base_shape, dtype = Qp.dtype)
+        
+        out.fill(0) # Initialize derivative array to 0
+        
+        # 0th derivatives = values
+        # Q_i = T_ij * Q'_j
+        np.copyto(out[0],  np.tensordot(self.T, Qp, axes = (1,0)) )
+        
+        # 1st derivatives
+        if deriv >= 1:
+            for i in range(nvar):
+                # derivatives with respect to k = var[i]
+                # This is just the k^th column of T 
+                for j in range(self.nQ):
+                    out[i+1, j:(j+1)].fill(self.T[j,var[i]])
+                
             
-            
-            
+        # All higher derivatives are zero
+        # zlevel reflects this, which other functions can
+        # check to maximize efficiency.
+        
+        return out
+    
+    def __repr__(self):
+        return f'LinearTrans({self.T!r}, Qpstr = {self.Qstr!r})'
+    
+    
+    
+    

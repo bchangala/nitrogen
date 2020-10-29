@@ -111,7 +111,7 @@ class DFun:
         # Check the shape of input X
         n = X.shape[0]
         if n != self.nx:
-            raise ValueError('X must have shape (nx,...)')
+            raise ValueError(f'Expected input shape ({self.nx:d},...)')
         
         # Check var
         if var is None:
@@ -126,13 +126,11 @@ class DFun:
             nvar = len(var)
             
         # Create output array if no output buffer passed
-        if out is None:
-            nd = nderiv(deriv, nvar)
-            out = np.ndarray((nd, self.nf) + X.shape[1:], dtype = X.dtype)
+        #if out is None:
+        #    nd = nderiv(deriv, nvar)
+        #    out = np.ndarray((nd, self.nf) + X.shape[1:], dtype = X.dtype)
             
-        self._feval(X,deriv,out,var) # Evaluate function
-        
-        return out
+        return self._feval(X,deriv,out,var) # Evaluate function
     
     @classmethod 
     def zerofun(cls, nf=1, nx=1):

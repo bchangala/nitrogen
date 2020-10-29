@@ -2,7 +2,7 @@ import numpy as np
 import nitrogen.dfun as dfun
 import nitrogen.autodiff.forward as adf
 
-__all__ = ["CoordSys"]
+__all__ = ["CoordSys", "CoordTrans"]
 
 class CoordSys(dfun.DFun):
     """
@@ -138,35 +138,35 @@ class CoordSys(dfun.DFun):
             The result, X(Q), in DFun format.
 
         """
-        # Check the requested derivative order
-        if deriv < 0:
-            raise ValueError('deriv must be non-negative')
-        if self.maxderiv is not None and deriv > self.maxderiv:
-            raise ValueError('deriv is larger than maxderiv')
+        # # Check the requested derivative order
+        # if deriv < 0:
+        #     raise ValueError('deriv must be non-negative')
+        # if self.maxderiv is not None and deriv > self.maxderiv:
+        #     raise ValueError('deriv is larger than maxderiv')
         
-        # Check the shape of input Q
-        n = Q.shape[0]
-        if n != self.nQ:
-            raise ValueError('Q must have shape (nQ, ...)')
+        # # Check the shape of input Q
+        # n = Q.shape[0]
+        # if n != self.nQ:
+        #     raise ValueError('Q must have shape (nQ, ...)')
         
-        # Check var
-        if var is None:
-            nvar = self.nQ  # Use all variables. None will be passed to _feval.
-        else:
-            if np.unique(var).size != len(var):
-                raise ValueError('var cannot contain duplicate elements')
-            if min(var) < 0 or max(var) >= self.nQ:
-                raise ValueError('elements of var must be >= 0 and < nQ')
-            nvar = len(var)
+        # # Check var
+        # if var is None:
+        #     nvar = self.nQ  # Use all variables. None will be passed to _feval.
+        # else:
+        #     if np.unique(var).size != len(var):
+        #         raise ValueError('var cannot contain duplicate elements')
+        #     if min(var) < 0 or max(var) >= self.nQ:
+        #         raise ValueError('elements of var must be >= 0 and < nQ')
+        #     nvar = len(var)
             
-        # Create output array if no output buffer passed
-        if out is None:
-            nd = adf.nck(deriv + nvar, min(deriv,nvar))
-            out = np.ndarray((nd, self.nX) + Q.shape[1:], dtype = Q.dtype)
+        # # Create output array if no output buffer passed
+        # if out is None:
+        #     nd = dfun.nderiv(deriv, nvar)
+        #     out = np.ndarray((nd, self.nX) + Q.shape[1:], dtype = Q.dtype)
             
-        self._feval(Q, deriv, out, var) # Evaluate Q2X function
-         
-        return out
+        # self._feval(Q, deriv, out, var) # Evaluate Q2X function
+        
+        return self.f(Q, deriv, out, var)
     
     def Q2t(self, Q, deriv = 0, out = None, vvar = None, rvar = None):
         """
@@ -433,7 +433,6 @@ class CoordSys(dfun.DFun):
         
         return out
     
-    
 class CoordTrans(dfun.DFun):
     """
     A base class for coordinate transformations.
@@ -464,7 +463,8 @@ class CoordTrans(dfun.DFun):
             The maximum supported derivative order. Ignored if
             dfunction is a DFun. The default is None (no maximum).
         zlevel : int, optional
-            The zero-level of the Q(Q') DFun. The default is None.
+            The zero-level of the Q(Q') DFun. Ignored if
+            dfunction is a DFun. The default is None.
 
         """
         
@@ -483,7 +483,7 @@ class CoordTrans(dfun.DFun):
         self.nQ  = self.nf # Outputs 
         self.name = name        
         if Qpstr is None:
-            self.Qpstr = [f"Q{i:d}'" for i in range(self.nQp)]
+            self.Qpstr = [f"Q'{i:d}'" for i in range(self.nQp)]
         else:
             self.Qpstr = Qpstr 
             
@@ -491,4 +491,28 @@ class CoordTrans(dfun.DFun):
             self.Qstr = [f"Q{i:d}" for i in range(self.nQ)]
         else: 
             self.Qstr = Qstr
-                
+    
+    def Qp2Q(self, Qp, deriv = 0, out = None, var = None):
+        """
+        Evaluate the transformation function Q(Q')
+
+        Parameters
+        ----------
+        Qp : ndarray
+            An array of input coordinates with shape (:attr:`nQp`, ...).
+        deriv : int, optional
+            All derivatives up through order `deriv` are requested. The default is 0.
+        out : ndarray, optional
+            Output location. If None, a new ndarray will
+            be created. The default is None.
+        var : list of int, optional
+            Variables with respect to which derivatives are taken. If None,
+            all `nQp` variables will be used in the input order. The default is None.
+
+        Returns
+        -------
+        out : ndarray
+            The (nd, nQ, ...) derivate array for Q(Q'), in DFun format.
+
+        """        
+        return self.f(Qp, deriv, out, var)   # Evaluate the DFun.f function
