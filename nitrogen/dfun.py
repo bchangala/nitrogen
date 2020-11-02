@@ -295,7 +295,14 @@ class CompositeDFun(DFun):
             for j in range(B.nf):
                 temp = temp * bpow[j, Aidx[j]]
             for i in range(A.nf):
-                H[i] = H[i] + a[k,i] * temp
+                H[i] = H[i] + (temp * a[k,i])
+                # Note the order of temp*a[k,i]
+                # The other way around will use
+                # a[k,i] 's __mul__. If a[k,i] is
+                # still an ndarray, then it
+                # will just broadcast temp
+                # to an ndarray -- not what we want
+                # 
             
         # Copy H data to out
         for i in range(A.nf):
