@@ -846,8 +846,8 @@ def mvchain(df,X,k,ni,nck,idx, out = None, Xzlevel = None):
             # (this probably could be done more efficiently -- revisit)
             
             # Determine the zlevel of Xi
-            if Xizlevel < 0 or Xzlevel < 0:
-                Xizlevel = -1 
+            if Xizlevel < 0 or Xzlevel < 0: # if either X**i or X is iden. 0
+                Xizlevel = -1 # so is the next power
             else:
                 Xizlevel = min(Xizlevel + Xzlevel, k)
             
@@ -858,11 +858,10 @@ def mvchain(df,X,k,ni,nck,idx, out = None, Xzlevel = None):
             # Xi is non-zero
             Z += (df[i] / fact) * Xi
     
-    #X[0] = X0  # Restore the value of X
+    # Restore the value of X
     np.copyto(X[:1], X0)
     
     return Z
-
 
 def const(value,k,ni,nck = None, idx = None):
     """
