@@ -255,9 +255,11 @@ class ZMAT(CoordSys):
     def diagram(self): 
         # using U+250X box and U+219X arrows
         diag = ""
+        sQ =f"[{self.nQ:d}]"
+        sX =f"[{self.nX:d}]"
         
         diag += "     │↓              ↑│        \n"
-        diag += "     │Q              X│        \n"
+        diag +=f"     │Q {sQ:<5s}  {sX:>5s} X│        \n"
         diag += "   ╔═╪════════════════╪═╗      \n"
         diag += "   ║ │ ┌────────────┐ │ ║      \n"
         diag += "   ║ ╰─┤  Z-matrix  ├─╯ ║      \n"

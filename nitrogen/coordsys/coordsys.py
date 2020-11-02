@@ -2,7 +2,8 @@ import numpy as np
 import nitrogen.dfun as dfun
 import nitrogen.autodiff.forward as adf
 
-__all__ = ["CoordSys", "CoordTrans"]
+__all__ = ["CoordSys", "CoordTrans", "CompositeCoordTrans",
+           "QTransCoordSys"]
 
 class CoordSys(dfun.DFun):
     """
@@ -71,7 +72,7 @@ class CoordSys(dfun.DFun):
 
         """
         
-        # Call DFun constructor
+        # Call DFun initializer
         super().__init__(Q2Xfun, nf = nX, nx = nQ, maxderiv = maxderiv, zlevel = zlevel)
         self.nQ = nQ
         self.nX = nX 
@@ -433,6 +434,34 @@ class CoordSys(dfun.DFun):
         
         return out
     
+    def diagram(self):
+        # using U+250X box and U+219X arrows
+        diag = ""
+        
+        sQ =f"[{self.nQ:d}]"
+        sX =f"[{self.nX:d}]"
+        
+        diag += "     │↓              ↑│        \n"
+        diag +=f"     │Q {sQ:<5s}  {sX:>5s} X│        \n"
+        diag += "   ╔═╪════════════════╪═╗      \n"
+        diag += "   ║ │ ┌────────────┐ │ ║      \n"
+        diag += "   ║ ╰─┤  CoordSys  ├─╯ ║      \n"
+        diag += "   ║   └────────────┘   ║      \n"
+        diag += "   ╚════════════════════╝      \n"
+        
+        return diag
+    
+    
+    def __matmul__(self, other):
+        """ self @ other
+        
+            This chains self(other(x))
+        """
+        if isinstance(other, CoordTrans):
+            return QTransCoordSys(other, self)
+        else:
+            return super.__matmul__(other) 
+    
 class CoordTrans(dfun.DFun):
     """
     A base class for coordinate transformations.
@@ -468,7 +497,7 @@ class CoordTrans(dfun.DFun):
 
         """
         
-        if type(dfunction) == dfun.DFun:
+        if isinstance(dfunction, dfun.DFun):
             super().__init__(dfunction._feval, nf=dfunction.nf,
                              nx=dfunction.nx, maxderiv = dfunction.maxderiv,
                              zlevel = dfunction.zlevel)
@@ -483,7 +512,7 @@ class CoordTrans(dfun.DFun):
         self.nQ  = self.nf # Outputs 
         self.name = name        
         if Qpstr is None:
-            self.Qpstr = [f"Q'{i:d}'" for i in range(self.nQp)]
+            self.Qpstr = [f"Q{i:d}'" for i in range(self.nQp)]
         else:
             self.Qpstr = Qpstr 
             
@@ -516,3 +545,115 @@ class CoordTrans(dfun.DFun):
 
         """        
         return self.f(Qp, deriv, out, var)   # Evaluate the DFun.f function
+    
+    def diagram(self):
+        """ CoordTrans diagram string """
+        
+        sQ =f"[{self.nQ:d}]"
+        sQp =f"[{self.nQp:d}]"
+        
+        diag = ""
+        
+        diag += "     │↓       \n"
+        diag +=f"     │Q'{sQp:<5s} \n"
+        diag += "   ╔═╧═════╗  \n"
+        diag += "   ║       ║  \n"
+        diag += "   ║ Coord ║  \n"
+        diag += "   ║ Trans ║  \n"
+        diag += "   ║       ║  \n"
+        diag += "   ╚═╤═════╝  \n"
+        diag +=f"     │Q {sQ:<5s} \n"
+        
+        return diag
+    
+    def __pow__(self, other):
+        """ self ** other
+        
+            This operation chains self --> other
+        
+        """
+        if isinstance(other, CoordTrans):
+            # Return a composite CoordTrans
+            return CompositeCoordTrans(other, self)
+        
+        elif isinstance(other, CoordSys):
+            # Return a transformed CoordSys
+            return QTransCoordSys(self, other)
+        
+        else: 
+            return super().__pow__(other)
+    
+    def __matmul__(self, other):
+        """ self @ other 
+            
+            This operation chains self(other(x))
+            
+        """
+        if isinstance(other, CoordTrans):
+            return CompositeCoordTrans(self, other)
+        else:
+            return super().__matmul__(other)
+        
+class CompositeCoordTrans(CoordTrans):
+    """ Composite coordinate transformation
+    """
+    
+    def __init__(self, A, B):
+        """ Q = A(B(Q')) """
+        
+        # First make a composite DFun
+        df = dfun.CompositeDFun(A,B)
+        # (This is to get around a diamond inheritance
+        # which I cannot support with the current
+        # super() call structure)
+        #
+        # Then pass this to the CoordTrans initialzer
+        super().__init__(df,name = 'Composite coord. trans.',
+                         Qpstr = B.Qpstr, Qstr = A.Qstr) 
+                            
+        self.A = A
+        self.B = B 
+        
+    def diagram(self):
+        
+        diag = self.B.diagram()
+        diag += self.A.diagram()
+        
+        return diag
+    
+    def __repr__(self):
+        
+        return f"CompositeCoordTrans({self.A!r}, {self.B!r})"
+    
+class QTransCoordSys(CoordSys):
+    """ Input-transformed coordinate system """
+    
+    def __init__(self, T, C):
+        """ X = C(T(Q')) """
+        
+        # First make a composite DFun 
+        df = dfun.CompositeDFun(C,T)
+        super().__init__(df._feval, nQ = T.nQp, nX = C.nX,
+                         name = 'Trans. coord. sys.', 
+                         Qstr = T.Qpstr, Xstr = C.Xstr , 
+                         maxderiv = df.maxderiv, 
+                         isatomic = C.isatomic, 
+                         zlevel = df.zlevel)
+        self.T = T # CoordTrans
+        self.C = C # CoordSys
+    
+    def diagram(self):
+        
+        Tdiag = self.T.diagram() 
+        Cdiag = self.C.diagram() 
+        
+        Tdiag = Tdiag.replace("\n",
+                              8*" "+"│"+8*" "+"\n")
+        Tdiag = Tdiag.replace("│↓               │",
+                              "│↓              ↑│")
+        return Tdiag + Cdiag 
+    
+    def __repr__(self):
+        
+        return f"QTransCoordSys({self.T!r},{self.C!r})"
+                

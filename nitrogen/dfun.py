@@ -309,6 +309,79 @@ class CompositeDFun(DFun):
             np.copyto(out[:,i], H[i].d)
         
         return out
+
+class FixedInputDFun(DFun):
+    """ Fixed-input differential function
+    """
+    
+    def __init__(self, dfunction, values):
+        """
+
+        Parameters
+        ----------
+        dfunction : DFun
+            Requested inputs to DFun will
+            be held fixed.
+        values : list
+            A list of length `dfunction.nX` 
+            with the fixed input values. A
+            list element of None keeps the
+            corresponding input active.
+
+        """
+        
+        if len(values) != dfunction.nx:
+            raise ValueError("len(values) must equal dfunction.nx")
+        
+        new2old = []
+        for i in range(len(values)):
+            if values[i] is None: # keep active
+                new2old.append(i)
+        if len(new2old) < 1:
+            raise ValueError("There must remain at least one active input")
+                
+        super().__init__(self._fixedinput, dfunction.nf,
+                         len(new2old), dfunction.maxderiv,
+                         dfunction.zlevel)
+        
+        self.values = values
+        self.new2old = new2old 
+        self.oldfunction = dfunction
+        
+    
+    def _fixedinput(self, X, deriv = 0, out = None, var = None):
+        """
+        Compute derivative array for a DFun
+        with fixed inputs.
+
+        """
+        
+        # Check for use-all case
+        if var is None:
+            var = [i for i in range(self.nx)]
+        
+        # Determine the var argument for the original
+        # dfunction
+        old_var = [self.new2old[i] for i in var]
+        # The original number of inputs
+        old_nx = len(self.values)
+        base_shape = X.shape[1:]
+        
+        # Construct the input array for the original dfunction
+        oldX = np.ndarray((old_nx,) + base_shape, dtype = X.dtype)
+        k = 0
+        for i in range(len(self.values)):
+            if self.values[i] is None: # Active
+                np.copyto(oldX[i:i+1], X[k:k+1])
+                k = k + 1
+            else: # fixed value
+                oldX[i:i+1].fill(self.values[i])
+        
+        return self.oldfunction.f(oldX, deriv, out, old_var)
+
+    def __repr__(self):
+        return f"FixedInputDFun({self.dfunction!r}, {self.values!r})"
+        
     
 def _composite_maxderiv(maxA,maxB):
     """

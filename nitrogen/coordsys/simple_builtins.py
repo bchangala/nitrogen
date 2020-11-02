@@ -177,8 +177,11 @@ class CartesianN(CoordSys):
         # using U+250X box and U+219X arrows
         diag = ""
         
+        sQ =f"[{self.nQ:d}]"
+        sX =f"[{self.nX:d}]"
+        
         diag += "     │↓              ↑│        \n"
-        diag += "     │Q              X│        \n"
+        diag +=f"     │Q {sQ:<5s}  {sX:>5s} X│        \n"
         diag += "   ╔═╪════════════════╪═╗      \n"
         diag += "   ║ ╰────────────────╯ ║      \n"
         diag += "   ║   {:15s}  ║      \n".format(name)
@@ -203,7 +206,7 @@ class LinearTrans(CoordTrans):
         
     """
     
-    def __init__(self, T, Qpstr = None):
+    def __init__(self, T, Qpstr = None, name = None):
         """
         Create a LinearTrans object.
 
@@ -222,7 +225,7 @@ class LinearTrans(CoordTrans):
             raise ValueError("T must be square")
             
         super().__init__(self._lintrans, nQp = m, nQ = m, 
-                         name = 'Linear transformation',
+                         name = name,
                          Qpstr = Qpstr, maxderiv = None,
                          zlevel = 1)
             
@@ -270,8 +273,31 @@ class LinearTrans(CoordTrans):
         return out
     
     def __repr__(self):
-        return f'LinearTrans({self.T!r}, Qpstr = {self.Qstr!r})'
+        return f'LinearTrans({self.T!r}, Qpstr = {self.Qpstr!r})'
     
-    
-    
-    
+    def diagram(self):
+        """ CoordTrans diagram string """
+        
+        sQ =f"[{self.nQ:d}]"
+        sQp =f"[{self.nQp:d}]"
+        
+        if self.name is None:
+            label = " T @ Q' "
+        else:
+            label = self.name 
+            if len(label) > 8:
+                label = label[:8]
+            
+        
+        diag = ""
+        
+        diag += "     │↓       \n"
+        diag +=f"     │Q'{sQp:<5s} \n"
+        diag += "   ╔═╧══════╗ \n"
+        diag += "   ║        ║ \n"
+        diag +=f"   ║{label:^8s}║ \n"
+        diag += "   ║        ║ \n"
+        diag += "   ╚═╤══════╝ \n"
+        diag +=f"     │Q {sQ:<5s} \n"
+        
+        return diag

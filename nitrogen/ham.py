@@ -29,8 +29,9 @@ def hdpdvr_bfJ(dvrs, cs, pes, masses, Jlist = 0):
         a fixed value for that coordinate.
     cs : CoordSys
         An *atomic* coordinate system.
-    pes : function
-        A potential energy function f(Q)
+    pes : DFun
+        A potential energy function f(Q) with respect
+        to `cs` coordinates.
     masses : array_like
         Masses.
     Jlist : int or array_like
@@ -100,8 +101,9 @@ def hdpdvr_bfJ(dvrs, cs, pes, masses, Jlist = 0):
     gim4 = 1.0/(np.sqrt(gi2))   # |g|^-1/4
     Gkl = G[0]                  # G inverse metric
     hbar = nitrogen.constants.hbar    # hbar in [A, u, cm^-1] units
+    
     # Calculate the PES grid
-    V = pes(Q)
+    V = pes.f(Q, deriv = 0)[0,0]
     
 
     ######################
