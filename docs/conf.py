@@ -13,6 +13,7 @@
 import os
 import sys
 sys.path.insert(0, os.path.abspath('..'))
+from nitrogen import __version__
 
 
 # -- Project information -----------------------------------------------------
@@ -20,8 +21,8 @@ sys.path.insert(0, os.path.abspath('..'))
 project = 'NITROGEN'
 copyright = '2020, Bryan Changala'
 author = 'Bryan Changala'
-#version = '111'
-#release = 'relase111'
+version = __version__
+release = version
 
 
 # -- General configuration ---------------------------------------------------

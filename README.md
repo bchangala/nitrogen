@@ -1,6 +1,6 @@
 # nitrogen
 
-NITROGEN is a Python package for rovibronic calculations of small molecules.
+NITROGEN is a Python package for nuclear motion calculations and ab initio rovibronic spectroscopy of small molecules.
 
 It is available from PyPI via `pip install nitrogen`. The source repository is [here](https://github.com/bchangala/nitrogen).
 
