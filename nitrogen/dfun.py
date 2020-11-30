@@ -11,6 +11,7 @@ functions.
 
 import numpy as np
 import nitrogen.autodiff.forward as adf
+import scipy.optimize as spopt
 
 
 class DFun:
@@ -279,7 +280,68 @@ class DFun:
         
             
         return out
+    
+    def optimize(self, X0, fidx = 0, var = None, mode = 'min'):
+        """
+        Optimize an output value of a diff. function.
+
+        Parameters
+        ----------
+        X0 : ndarray
+            (`nx`,) array containing the initial guess
+        fidx : int 
+            The DFun function index to optimize. The default is 0.
+        var : list of int, optional
+            The input variables to optimize. If None, all variables
+            will be optimized. The default is None.
+        mode : {'min'}, optional
+            The optimization mode. 'min' determines the function
+            minimum. The default is 'min'.
+
+        Returns
+        -------
+        Xopt : ndarray
+            The optimized input values.
+        fopt : float
+            The optimized function value.
+
+        """
         
+        if var is None:
+            var = [i for i in range(self.nx)]
+        
+        def fun(x):
+            X = X0.copy() 
+            X[var] = x 
+            return self.val(X)[fidx]
+        
+        if self.maxderiv is None or self.maxderiv >= 1:
+            def jac(x):
+                X = X0.copy()
+                X[var] = x 
+                return self.jac(X,var=var)[fidx]
+        else:
+            jac = None
+            
+        if self.maxderiv is None or self.maxderiv >= 2:
+            def hess(x):
+                X = X0.copy()
+                X[var] = x 
+                return self.hes(X,var=var)[fidx]
+        else: 
+            hess = None
+        
+        if mode == 'min':
+            res = spopt.minimize(fun, X0[var], method = 'Newton-CG', 
+                                 jac = jac, hess = hess)
+        
+            Xopt = X0.copy()
+            Xopt[var] = res.x 
+            fopt = res.fun 
+        else:
+            raise ValueError(f'Unexpected mode type "{mode:s}"')
+            
+        return Xopt,fopt 
 class CompositeDFun(DFun):
     
     def __init__(self, A, B):
