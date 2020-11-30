@@ -16,7 +16,7 @@ from . import coordsys
 from . import ham
 from . import constants
 
-__version__ = '2.0.dev0'
+__version__ = '2.0.dev1'
 
 
 #################################################################
