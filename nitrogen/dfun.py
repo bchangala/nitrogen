@@ -171,7 +171,115 @@ class DFun:
             A @ (B @ C).
         """
         return CompositeDFun(self, other)
+    
+    def val(self, X, out = None):
+        """
+        Wrapper for diff. function value (zeroth derivative)
 
+        Parameters
+        ----------
+        X : ndarray
+            An (:attr:`nx`, ...) array of input values.
+        out : ndarray, optional
+            The (:attr:`nf`, ...) buffer to store the output. If None,
+            then a new output ndarray is created. The default is None.
+
+        Returns
+        -------
+        ndarray : out
+
+        """
+    
+        d = self.f(X, deriv = 0) # Calculate derivative array
+        
+        if out is None: 
+            out = np.ndarray( (self.nf,) + X.shape[1:], dtype = d.dtype)
+            
+        np.copyto(out, d[0])     # Copy zeroth derivative
+        
+        return out
+
+    def jac(self, X, out = None, var = None):
+        """
+        Wrapper for diff. function Jacobian (first derivatives)
+
+        Parameters
+        ----------
+        X : ndarray
+            An (:attr:`nx`, ...) array of input values.
+        out : ndarray, optional
+            The (:attr:`nf`, `nvar`, ...) buffer to store the output. If None,
+            then a new output ndarray is created. The default is None.
+        var : list of int
+            Variable list (see `var` in :func:`DFun.f`).
+            
+        Returns
+        -------
+        ndarray : out
+            ``out[i,j]`` is the derivative of output value ``i`` with
+            respsect to variable ``var[j]``
+
+        """
+        
+        d = self.f(X, deriv = 1, out = None, var = var)
+        
+        if out is None:
+            out = np.ndarray( (self.nf, d.shape[0]-1) + X.shape[1:], dtype = d.dtype)
+        
+        for i in range(self.nf):
+            np.copyto(out[i,:],d[1:,i])
+            
+        return out
+    
+    def hes(self, X, out = None, var = None):
+        """
+        Wrapper for diff. function Hessian (second derivatives)
+
+        Parameters
+        ----------
+        X : ndarray
+            An (:attr:`nx`, ...) array of input values.
+        out : ndarray, optional
+            The (:attr:`nf`, `nvar`,`nvar`, ...) buffer to store the output. If None,
+            then a new output ndarray is created. The default is None.
+        var : list of int
+            Variable list (see `var` in :func:`DFun.f`).
+            
+        Returns
+        -------
+        ndarray : out
+            ``out[k,i,j]`` is the second derivative of
+            output value ``k`` with respect to variables ``var[i]`` and
+            ``var[j]``.
+
+        """
+        
+        d = self.f(X, deriv = 2, out = None, var = var)
+        
+        if var is None:
+            nvar = self.nx 
+        else:
+            nvar = len(var)
+        
+        if out is None:
+            out = np.ndarray( (self.nf, nvar, nvar) + X.shape[1:], dtype = d.dtype)
+        
+        k = nvar + 1
+        for i in range(nvar):
+            for j in range(i,nvar):
+                # (i,j) derivative
+                
+                if i == j:
+                    np.copyto(out[:,i,j], 2.0 * d[k,:])
+                else:
+                    np.copyto(out[:,i,j], d[k,:])
+                    np.copyto(out[:,j,i], d[k,:])
+                    
+                k = k + 1
+        
+            
+        return out
+        
 class CompositeDFun(DFun):
     
     def __init__(self, A, B):
