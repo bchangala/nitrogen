@@ -15,6 +15,7 @@ from . import dfun
 from . import coordsys 
 from . import ham
 from . import constants
+from . import pes
 
 __version__ = '2.0.dev1'
 

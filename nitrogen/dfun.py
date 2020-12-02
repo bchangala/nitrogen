@@ -323,17 +323,17 @@ class DFun:
         else:
             jac = None
             
-        if self.maxderiv is None or self.maxderiv >= 2:
-            def hess(x):
-                X = X0.copy()
-                X[var] = x 
-                return self.hes(X,var=var)[fidx]
-        else: 
-            hess = None
+        # if self.maxderiv is None or self.maxderiv >= 2:
+        #     def hess(x):
+        #         X = X0.copy()
+        #         X[var] = x 
+        #         return self.hes(X,var=var)[fidx]
+        # else: 
+        #     hess = None
         
         if mode == 'min':
-            res = spopt.minimize(fun, X0[var], method = 'Newton-CG', 
-                                 jac = jac, hess = hess)
+            res = spopt.minimize(fun, X0[var], method = 'BFGS', 
+                                 jac = jac) #, hess = hess)
         
             Xopt = X0.copy()
             Xopt[var] = res.x 
