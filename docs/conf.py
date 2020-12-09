@@ -32,7 +32,8 @@ release = version
 # ones.
 extensions = ['sphinx.ext.napoleon',
               'sphinx.ext.intersphinx',
-]
+              'sphinx.ext.doctest',
+              ]
 autoclass_content = 'both'
 
 # Add any paths that contain templates here, relative to this directory.
@@ -48,6 +49,12 @@ intersphinx_mapping = {
     'scipy' : ('https://docs.scipy.org/doc/scipy/reference', None),
     }
 
+# Global doctest setup code
+doctest_global_setup = """
+import nitrogen as n2
+import nitrogen.autodiff.forward as adf
+import numpy as np
+"""
 
 # -- Options for HTML output -------------------------------------------------
 

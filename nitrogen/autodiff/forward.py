@@ -326,10 +326,10 @@ def nck(n,k):
         
     Examples
     --------
-    >>> nck(4,2)
+    >>> adf.nck(4,2)
     6
     
-    >>> nck(4,0)
+    >>> adf.nck(4,0)
     1
     
     See Also
@@ -370,7 +370,7 @@ def ncktab(nmax,kmax=None):
         
     Examples
     --------
-    >>> ncktab(3)
+    >>> adf.ncktab(3)
     array([[1, 0, 0, 0],
            [1, 1, 0, 0],
            [1, 2, 1, 0],
@@ -421,6 +421,14 @@ def nderiv(deriv, nvar):
     -------
     np.uint64
         The number of derivatives.
+        
+    Examples
+    --------
+    >>> adf.nderiv(3,2)
+    10
+    
+    >>> adf.nderiv(2,6)
+    28
 
     """
     n = deriv + nvar 
@@ -448,6 +456,11 @@ def nckmulti(a,b,nck):
     See Also
     --------
     ncktab : Binomial coefficient table
+    
+    Examples
+    --------
+    >>> adf.nckmulti(np.array([4,2,3]), np.array([2,1,2]), adf.ncktab(4))
+    36.0
 
     """
     
@@ -484,7 +497,7 @@ def idxtab(k,ni):
         
     Examples
     --------
-    >>> idxtab(2,3)
+    >>> adf.idxtab(2,3)
     array([[0, 0, 0],
            [1, 0, 0],
            [0, 1, 0],
@@ -578,10 +591,10 @@ def idxposk(a,nck):
     
     Examples
     --------
-    >>> idxposk(np.array([0,0,0]),ncktab(3,3))
+    >>> adf.idxposk(np.array([0,0,0]),adf.ncktab(3,3))
     0
     
-    >>> idxposk(np.array([2,0,1,3]),ncktab(5,2))
+    >>> adf.idxposk(np.array([2,0,1,3]),adf.ncktab(5,2))
     33
         
     See Also 
@@ -637,10 +650,10 @@ def idxpos(a,nck):
         
     Examples
     --------
-    >>> idxpos(np.array([0,0,0]),ncktab(3,3))
+    >>> adf.idxpos(np.array([0,0,0]),adf.ncktab(3,3))
     0
     
-    >>> idxpos(np.array([2,0,1,3]),ncktab(9,4))
+    >>> adf.idxpos(np.array([2,0,1,3]),adf.ncktab(9,4))
     159
         
     See Also 
@@ -886,13 +899,13 @@ def const(value,k,ni,nck = None, idx = None):
     
     Examples
     --------
-    >>> const(1., 2, 2).d
+    >>> adf.const(1., 2, 2).d
     array([1., 0., 0., 0., 0., 0.])
     
-    >>> const(42j, 1, 3).d
+    >>> adf.const(42j, 1, 3).d
     array([0.+42.j, 0. +0.j, 0. +0.j, 0. +0.j])
     
-    >>> const([2.0, 3.0], 2, 2).d
+    >>> adf.const([2.0, 3.0], 2, 2).d
     array([[2., 3.],
            [0., 0.],
            [0., 0.],
@@ -947,13 +960,13 @@ def sym(value,i,k,ni,nck = None, idx = None):
         
     Examples
     --------
-    >>> sym(2.0, 0, 2, 2).d
+    >>> adf.sym(2.0, 0, 2, 2).d
     array([2., 1., 0., 0., 0., 0.])
     
-    >>> sym(3.0, 1, 2, 2).d
+    >>> adf.sym(3.0, 1, 2, 2).d
     array([3., 0., 1., 0., 0., 0.])
     
-    >>> sym([3.0, 4.0j], 1, 2, 2).d
+    >>> adf.sym([3.0, 4.0j], 1, 2, 2).d
     array([[3.+0.j, 0.+4.j],
            [0.+0.j, 0.+0.j],
            [1.+0.j, 1.+0.j],
@@ -1024,6 +1037,13 @@ def add(x, y, out = None):
     -------
     adarray
         Result.
+        
+    Examples
+    --------
+    >>> x = adf.sym(1.0, 0, 2, 2)
+    >>> y = adf.sym(3.0, 1, 2, 2)
+    >>> adf.add(x,y).d
+    array([4., 1., 1., 0., 0., 0.])
 
     """
     
@@ -1055,6 +1075,13 @@ def subtract(x, y, out = None):
     -------
     adarray
         Result.
+        
+    Examples
+    --------
+    >>> x = adf.sym(1.0, 0, 2, 2)
+    >>> y = adf.sym(3.0, 1, 2, 2)
+    >>> adf.subtract(x,y).d
+    array([-2.,  1., -1.,  0.,  0.,  0.])
 
     """
     
@@ -1086,6 +1113,13 @@ def mul(x, y, out = None):
     -------
     adarray
         Result.
+        
+    Examples
+    --------
+    >>> x = adf.sym(1.0, 0, 2, 2)
+    >>> y = adf.sym(3.0, 1, 2, 2)
+    >>> adf.mul(x,y).d
+    array([3., 3., 1., 0., 1., 0.])
 
     """
     
@@ -1124,6 +1158,14 @@ def div(x, y, out = None):
     -------
     adarray
         Result.
+        
+    Examples
+    --------
+    >>> x = adf.sym(1.0, 0, 2, 2)
+    >>> y = adf.sym(3.0, 1, 2, 2)
+    >>> adf.div(x,y).d
+    array([ 0.33333333,  0.33333333, -0.11111111,  0.        , -0.11111111,
+            0.03703704])
 
     """
     
@@ -1203,8 +1245,8 @@ def sin(x, out=None):
 
     Examples
     --------
-    >>> x = sym(1.0, 0, 3, 1)
-    >>> sin(x).d
+    >>> x = adf.sym(1.0, 0, 3, 1)
+    >>> adf.sin(x).d
     array([ 0.84147098,  0.54030231, -0.42073549, -0.09005038])
     """
     
@@ -1245,8 +1287,8 @@ def cos(x, out=None):
 
     Examples
     --------
-    >>> x = sym(2.0, 0, 3, 1)
-    >>> cos(x).d
+    >>> x = adf.sym(2.0, 0, 3, 1)
+    >>> adf.cos(x).d
     array([-0.41614684, -0.90929743,  0.20807342,  0.15154957])
     
     """
@@ -1288,8 +1330,8 @@ def exp(x, out = None):
         
     Examples
     --------
-    >>> x = sym(1.5, 0, 3, 1)
-    >>> exp(x).d
+    >>> x = adf.sym(1.5, 0, 3, 1)
+    >>> adf.exp(x).d
     array([4.48168907, 4.48168907, 2.24084454, 0.74694818])
 
     """
@@ -1323,7 +1365,13 @@ def log(x, out = None):
     -------
     adarray
         Result.
-
+        
+    Examples
+    --------
+    >>> x = adf.sym(3.0, 0, 3, 1)
+    >>> adf.log(x).d
+    array([ 1.09861229,  0.33333333, -0.05555556,  0.01234568])
+    
     """
     
     xval = x.d[:1] # Value array of x
@@ -1343,7 +1391,7 @@ def log(x, out = None):
         # i^th derivative of f:
         # (1/x)**i = 1/x * (1/x)**(i-1)
         #
-        np.multiply(df[1:2], df[(i-1):i], out = df[i:(i+1)])
+        np.multiply((-i + 1) * df[1:2], df[(i-1):i], out = df[i:(i+1)])
             
     return adchain(df, x, out = out)
 
@@ -1373,8 +1421,8 @@ def powf(x, p, out = None):
     
     Examples
     --------
-    >>> x = sym(1.5, 0, 3, 1)
-    >>> powf(x, -2.5).d
+    >>> x = adf.sym(1.5, 0, 3, 1)
+    >>> adf.powf(x, -2.5).d
     array([ 0.36288737, -0.60481228,  0.70561433, -0.70561433])
     
     """
@@ -1388,10 +1436,8 @@ def powf(x, p, out = None):
     df = np.ndarray( (k+1,) + x.d.shape[1:], dtype = xval.dtype)
     
     df[0] = np.float_power(xval, p)
-    coeff = 1.0*p
     for i in range(1, k+1):
-        df[i] = coeff * (df[i-1] / xval)
-        coeff *= (p-i)
+        df[i] = (p-i+1) * (df[i-1] / xval)
     
     return adchain(df, x, out = out)
 
@@ -1416,7 +1462,12 @@ def sqrt(x, out = None):
     -----
     The adarray sqrt function uses the NumPy :func:`~numpy.sqrt` function
     as its underlying routine. The branch-cut convention there is inherited.
-
+    
+    Examples
+    --------
+    >>> x = adf.sym(2.5, 0, 3, 1)
+    >>> adf.sqrt(x).d
+    array([ 1.58113883,  0.31622777, -0.03162278,  0.00632456])
     """
     
     xval = x.d[0] # Value array of x
@@ -1425,10 +1476,8 @@ def sqrt(x, out = None):
     df = np.ndarray( (k+1,) + x.d.shape[1:], dtype = xval.dtype)
     
     df[0] = np.sqrt(xval) # Uses numpy branch cut
-    coeff = +0.5
     for i in range(1, k+1):
-        df[i] = coeff * (df[i-1] / xval)
-        coeff *= (+0.5 - i)
+        df[i] = (1.5 - i) * (df[i-1] / xval)
     
     return adchain(df, x, out = out)
 
@@ -1549,6 +1598,11 @@ def n2N(n):
     -------
     N : np.uint64
         The matrix rank.
+        
+    Examples
+    --------
+    >>> adf.n2N(21)
+    6
 
     """
     

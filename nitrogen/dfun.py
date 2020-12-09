@@ -43,7 +43,7 @@ class DFun:
         ----------
         fx : function
             An instance method implementing the differentiable
-            function with signature ``fx(self, X, deriv = 0, out = None, var = None)``.
+            function with signature ``fx(X, deriv = 0, out = None, var = None)``.
             See :meth:`DFun.f` for more details.
         nf : int, optional
             The number of output variables of fx. The default is 1.
@@ -57,7 +57,7 @@ class DFun:
             The zero-level of the differentiable function. All derivatives
             with total order greater than `zlevel` are zero. A value
             of None indicates all derivatives may be non-zero. The default is
-            None
+            None.
 
         """
         self._feval = fx
@@ -344,6 +344,18 @@ class DFun:
         return Xopt,fopt 
 class CompositeDFun(DFun):
     
+    """
+    A composite DFun for C(x) = A(B(x))
+    
+    Attributes
+    ----------
+    A : DFun
+        The outer function.
+    B : DFun
+        The inner function.
+    
+    """
+    
     def __init__(self, A, B):
         """
         Composite function A(B(x))
@@ -481,7 +493,10 @@ class CompositeDFun(DFun):
         return out
 
 class FixedInputDFun(DFun):
-    """ Fixed-input differential function
+    
+    """ 
+    Fixed-input differential function
+    
     """
     
     def __init__(self, dfunction, values):
@@ -552,6 +567,171 @@ class FixedInputDFun(DFun):
     def __repr__(self):
         return f"FixedInputDFun({self.dfunction!r}, {self.values!r})"
         
+class FiniteDFun(DFun):
+    """
+    Finite difference derivatives
+    
+    Attributes
+    ----------
+    steps : (nx,) ndarray
+        Finite difference step sizes for each argument.
+    
+    """
+    
+    def __init__(self, fval, nx, steps = 1e-3, isvector = False, nf = 1):
+        """
+        Initialize a FiniteDFun instance.
+
+        Parameters
+        ----------
+        fval : function
+            A function ``fval(X)`` that accepts an
+            an (`nx`, ...) ndarray input and returns
+            an (...) ndarray output (if `isvector` is False) 
+            or an (`nf`, ...) ndarray output (if `isvector` is True).
+        nx : integer 
+            The number of input values.
+        steps : scalar or array_like of float
+            Finite difference step size. If a single scalar,
+            then a uniform step size is used for all 
+            input arguments. An array_like list of length `nx` can 
+            be used to specify different step sizes for 
+            each input argument. The default is 1e-3.
+        isvector : bool
+            Indicates fval is vector-valued.
+        nf : integer
+            The number of output values. The default is 1.
+            If `isvector` is False, `nf` is ignored.
+
+        """
+        
+        if not isvector:
+            nf = 1 # ignore passed nf value 
+        
+        super().__init__(self._findiff, nf=nf, nx=nx,
+                         maxderiv = 2, zlevel = None)
+        
+        self._fval = fval 
+        self.isvector = isvector
+        
+        if np.isscalar(steps):
+            self.steps = np.full((nx,), steps)
+        else:
+            if len(steps) != nx:
+                raise ValueError("len(steps) must equal nx")
+            self.steps = np.array(steps)
+        
+        
+        
+    def _findiff(self, X, deriv = 0, out = None, var = None):
+        """
+        FiniteDFun _feval function
+
+        """
+        if var is None:
+            var = [i for i in range(self.nx)]
+        # deriv check performed by wrapper
+        nvar = len(var)
+        nd = nderiv(deriv, nvar)
+        
+        if out is None:
+            out = np.ndarray( (nd,self.nf) + X.shape[1:], dtype = X.dtype)
+            
+        # Define a lambda function to make sure
+        # that fval is always in (nf, ...) shape
+        if not self.isvector:
+            fval = lambda X : (self._fval(X)).reshape((1,) + X.shape[1:])
+        else:
+            fval = lambda X : self._fval(X)
+            
+        # Compute value at evaluation point
+        f0 = fval(X) 
+        np.copyto(out[0:1], f0) # Copy to output
+        
+        if deriv >= 1:
+            
+            Xp = X.copy() # Initialize X+
+            Xm = X.copy() #   "   "    X-
+            
+            idx2 = nvar + 1
+            for i in range(nvar): # for each requested variables
+                
+                # Compute derivative for variable idx = var[i]
+                idx = var[i] 
+                delta = self.steps[idx]  # step size
+                
+                Xp[idx:(idx+1)] += delta # forward step
+                Xm[idx:(idx+1)] -= delta # backward step
+                
+                fp = fval(Xp)   # forward value
+                fm = fval(Xm)   # backward value
+                
+                fi = (fp - fm) / (2.0 * delta) # central difference
+                np.copyto(out[(i+1):(i+2)], fi) # Copy to derivative array
+                
+                if deriv >= 2: # Diagonal second derivative 
+                    # Include the 1/2! = 0.5 permutation factor
+                    fii = 0.5 * (fp - 2.0*f0 + fm) / (delta*delta)
+                    np.copyto(out[idx2:(idx2+1)], fii)
+                    idx2 = idx2 + (nvar-i)
+                
+                # Re-initialize Xp and Xm
+                np.copyto(Xp[idx:(idx+1)], X[idx:(idx+1)])
+                np.copyto(Xm[idx:(idx+1)], X[idx:(idx+1)])
+                
+        if deriv >= 2: # Mixed second derivatives
+            
+            
+            Xpp = X.copy() # Initialize X++
+            Xpm = X.copy() # Initialize X+-
+            Xmp = X.copy() # Initialize X-+
+            Xmm = X.copy() # Initialize X--
+            
+            k = nvar
+            for i in range(nvar):
+                for j in range(i,nvar):
+                    
+                    k = k + 1 
+                    
+                    if i == j:
+                        continue # (i,i) derivative ... already done
+                        
+                    idx1 = var[i] 
+                    idx2 = var[j] 
+                    
+                    d1 = self.steps[idx1]
+                    d2 = self.steps[idx2] 
+                    
+                    Xpp[idx1] += d1; Xpp[idx2] += d2
+                    Xpm[idx1] += d1; Xpm[idx2] -= d2
+                    Xmp[idx1] -= d1; Xmp[idx2] += d2
+                    Xmm[idx1] -= d1; Xmm[idx2] -= d2
+                    
+                    fpp = fval(Xpp)
+                    fpm = fval(Xpm)
+                    fmp = fval(Xmp)
+                    fmm = fval(Xmm)
+                    
+                    # Central mixed derivative
+                    fij = (fpp - fmp - fpm + fmm) / (4.0 * d1 * d2)
+                    np.copyto(out[k:(k+1)], fij)
+                    
+                    Xpp = X.copy() # Initialize X++
+                    Xpm = X.copy() # Initialize X+-
+                    Xmp = X.copy() # Initialize X-+
+                    Xmm = X.copy() # Initialize X--       
+                    
+        return out
+
+    def __repr__(self):
+        
+        if self.isvector:
+            rep = f"""FiniteDFun({self._fval!r}, {self.nx!r}, steps = {self.steps!r},
+                              isvector = {self.isvector!r}, nf = {self.nf!r})"""
+        else:
+            rep = f"FiniteDFun({self._fval!r}, {self.nx!r}, steps = {self.steps!r})"
+            
+        return rep
     
 def _composite_maxderiv(maxA,maxB):
     """
