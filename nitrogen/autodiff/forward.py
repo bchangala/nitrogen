@@ -1444,7 +1444,7 @@ def powi(x, i, out = None):
     
     Notes
     -----
-    If `i` == 0, then powi returns a constant zero for 
+    If `i` == 0, then powi returns a constant 1 for 
     any value of `x`. For negative `i`, `x` is inverted
     and then the positive power is applied to 1/`x`.
     
