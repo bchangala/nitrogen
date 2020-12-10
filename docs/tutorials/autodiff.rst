@@ -91,8 +91,8 @@ has the same derivatives as :math:`h(x)` at :math:`x = x_0` up to the expansion 
     
 The derivatives of :math:`f` and :math:`g` are assumed to be known, so repeated application
 of the Leibniz formula allows one to straightforwardly compute the truncated Taylor series.
-This procedure is the basis by which :mod:`~nitrogen.autodiff` implements most 
-mathematical functions and including trigonometric, exponential, and logarithmic functions.
+This procedure is how :mod:`~nitrogen.autodiff` implements most 
+mathematical functions, including trigonometric, exponential, and logarithmic functions.
 
 Working with ``adarray`` objects
 --------------------------------
@@ -124,7 +124,7 @@ we can evaluate :math:`f` simply as
     >>> f = 3 + 2 * x * x - 4 * (x - y)
    
 The numerical values of the derivatives are stored in an 
-:class:`ndarray` referred to by the 
+:class:`~numpy.ndarray` referred to by the 
 :attr:`~nitrogen.autodiff.forward.adarray.d` attribute of the
 :class:`~nitrogen.autodiff.forward.adarray`. The derivatives are stored with 
 their scaled values using the same lexical ordering as :class:`~nitrogen.dfun.DFun`
@@ -179,3 +179,90 @@ used together.
            [0.      , 0.5     , 1.      , 1.5     , 2.      ],
            [0.      , 0.      , 0.      , 0.      , 0.      ]])
 
+We can also create :class:`~nitrogen.autodiff.forward.adarray` objects for 
+constant expressions
+
+..  doctest:: example-adf-1 
+
+    >>> c = adf.const(np.linspace(1,2,5), 3, 2) # c <-- [1.0, 1.2, 1.4, 1.6, 1.8, 2.0] (constant)
+    >>> c.d
+    array([[1.  , 1.25, 1.5 , 1.75, 2.  ],
+           [0.  , 0.  , 0.  , 0.  , 0.  ],
+           [0.  , 0.  , 0.  , 0.  , 0.  ],
+           [0.  , 0.  , 0.  , 0.  , 0.  ],
+           [0.  , 0.  , 0.  , 0.  , 0.  ],
+           [0.  , 0.  , 0.  , 0.  , 0.  ],
+           [0.  , 0.  , 0.  , 0.  , 0.  ],
+           [0.  , 0.  , 0.  , 0.  , 0.  ],
+           [0.  , 0.  , 0.  , 0.  , 0.  ],
+           [0.  , 0.  , 0.  , 0.  , 0.  ]])
+
+Because ``c`` is a constant, its derivatives are identically zero. Other 
+constructor functions include :func:`~nitrogen.autodiff.forward.array`, 
+:func:`~nitrogen.autodiff.forward.empty_like`, and 
+:func:`~nitrogen.autodiff.forward.const_like`.
+
+Mathematical functions
+----------------------
+
+The :mod:`~nitrogen.autodiff.forward` module implements the following 
+mathematical and arithmetical functions:
+
+:func:`~nitrogen.autodiff.forward.add` 
+    Addition (used by ``+``)
+
+:func:`~nitrogen.autodiff.forward.subtract` 
+    Subtraction (used by ``-``)
+    
+:func:`~nitrogen.autodiff.forward.mul` 
+    Multiplication (used by ``*``) 
+    
+:func:`~nitrogen.autodiff.forward.div` 
+    Division (used by ``/``) 
+    
+:func:`~nitrogen.autodiff.forward.sin`
+    Sine.
+    
+:func:`~nitrogen.autodiff.forward.cos`
+    Cosine. 
+    
+:func:`~nitrogen.autodiff.forward.exp` 
+    The exponential function, :math:`e^x`.
+    
+:func:`~nitrogen.autodiff.forward.log` 
+    Natural logarithm.
+    
+:func:`~nitrogen.autodiff.forward.powi` 
+    Integer exponentiation, :math:`x^i`.
+    
+:func:`~nitrogen.autodiff.forward.powf`
+    Real or complex exponentiatoin, :math:`x^p`.
+    
+:func:`~nitrogen.autodiff.forward.sqrt`
+    Square root, :math:`\sqrt{x}`.
+    
+In general, complex arithmetic is supported whenever possible. For certain 
+functions, like :func:`~nitrogen.autodiff.forward.sqrt` or 
+:func:`~nitrogen.autodiff.forward.powf`, different conventions for 
+branch cuts are possible. These issues are discussed in more detail in the 
+function documentation.
+
+Linear algebra
+--------------
+
+The :mod:`~nitrogen.autodiff.forward` module also supports 
+differentiation of some basic linear algebra algorithms, including:
+
+:func:`~nitrogen.autodiff.forward.chol_sp`
+    Cholesky decomposition of a symmetric packed matrix.
+    
+:func:`~nitrogen.autodiff.forward.inv_tp`
+    Inversion of a triangular matrix.
+    
+:func:`~nitrogen.autodiff.forward.llt_tp`
+    ``L @ L.T`` of a lower triangular matrix. 
+    
+:func:`~nitrogen.autodiff.forward.ltl_tp`
+    ``L.T @ L`` of a lower triangular matrix.
+
+    

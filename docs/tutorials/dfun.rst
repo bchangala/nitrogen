@@ -17,6 +17,7 @@ instances of the :class:`~nitrogen.dfun.DFun` class or its sub-classes, and
 constructing these objects is the first step for a variety of tasks.
 
 .. _tut-dfun-darray:
+
 The derivative array and lexical ordering
 -----------------------------------------
 

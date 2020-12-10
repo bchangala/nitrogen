@@ -25,6 +25,10 @@ def loadpes(pesname):
 
     """
     
-    mod = importlib.import_module("nitrogen.pes.library." + pesname)
-    
+    try : 
+        mod = importlib.import_module("nitrogen.pes.library." + pesname)
+    except ModuleNotFoundError:
+        raise ValueError("PES name is not recognized.")
+        
+        
     return mod.PES

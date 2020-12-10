@@ -1004,8 +1004,8 @@ def empty_like(x, dtype = None):
     x : adarray
         Prototype object
         
-    dtype : dtype
-        Base data-type. If None, then `x.d.dtype` is used
+    dtype : dtype, optional
+        Base data-type. If None, then `x.d.dtype` is used.
 
     Returns
     -------
@@ -1020,6 +1020,35 @@ def empty_like(x, dtype = None):
         dtype = x.d.dtype
         
     return adarray(x.d.shape[1:], x.k, x.ni, x.nck, x.idx, dtype)
+
+def const_like(value, x, dtype = None):
+    """
+    Create a constant adarray initialized to
+    `value` with similar properties to `x`.
+
+    Parameters
+    ----------
+    value : scalar or array_like
+        Value.
+    x : adarray
+        Prototype.
+    dtype : dtype, optional
+        Data-type. If None, then `x.d.dtype` is used.
+
+    Returns
+    -------
+    adarray
+
+    """
+    
+    if dtype is None:
+        dtype = x.d.dtype 
+        
+    base_shape = x.d.shape[1:]
+    if np.isscalar(value):
+        value = np.full(base_shape, value, dtype=dtype)
+    
+    return const(value, x.k, x.ni, x.nck, x.idx)
 
 def add(x, y, out = None):
     """
@@ -1395,6 +1424,76 @@ def log(x, out = None):
             
     return adchain(df, x, out = out)
 
+def powi(x, i, out = None):
+    """
+    x**i for integer i
+    
+    Parameters
+    ----------
+    x : adarray
+        Base argument.
+    i : integer
+        Integer exponent.
+    out : adarray, optional 
+        Output location of result.
+        
+    Returns
+    -------
+    adarray 
+        Result.
+    
+    Notes
+    -----
+    If `i` == 0, then powi returns a constant zero for 
+    any value of `x`. For negative `i`, `x` is inverted
+    and then the positive power is applied to 1/`x`.
+    
+    Examples
+    --------
+    >>> x = adf.sym(1.5, 0, 3, 1)
+    >>> adf.powf(x, 3).d
+    array([3.375, 6.75 , 4.5  , 1.   ])
+    
+    """
+    
+    if out is None:
+        out = empty_like(x)
+    
+    # If exponent is negative,
+    # then invert argument and
+    # and sign of exponent
+    if i < 0:
+        x = powf(x, -1.0) # 1 / x
+        i = -i
+    
+    # Check for identity, x**1 = x
+    #
+    if i == 1: # Just a copy
+        np.copyto(out.d, x.d)
+        out.zlevel = x.zlevel 
+        return out
+    
+    # Otherwise,
+    # initialize out to constant 1.
+    res = const_like(1.0, x)
+    
+    # Do right-to-left binary
+    # exponentiation
+    a = x
+    while True:
+        if i % 2 == 1:
+            res = res * a 
+            
+        i = i // 2  # floor division
+        if i == 0:
+            break 
+        a = a * a
+    
+    np.copyto(out.d, res.d)
+    out.zlevel = res.zlevel
+        
+    return out
+
 def powf(x, p, out = None):
     """
     x**p for general p
@@ -1402,9 +1501,9 @@ def powf(x, p, out = None):
     Parameters
     ----------
     x : adarray
-        Input argument
+        Base argument.
     p : float or complex
-        Power. 
+        Exponent.
     out : adarray, optional
         Output location of result.
 
@@ -1415,7 +1514,9 @@ def powf(x, p, out = None):
         
     Notes
     -----
-    powf uses the NumPy :func:`~numpy.float_power` function to 
+    powf uses the NumPy 
+    `float_power() <https://numpy.org/doc/stable/reference/generated/numpy.float_power.html#numpy.float_power>`_ 
+    function to 
     compute the value array. It inherits the branch-cut convention
     of this function.
     
@@ -1460,8 +1561,9 @@ def sqrt(x, out = None):
         
     Notes
     -----
-    The adarray sqrt function uses the NumPy :func:`~numpy.sqrt` function
-    as its underlying routine. The branch-cut convention there is inherited.
+    The adarray sqrt function uses the NumPy 
+    `sqrt() <https://numpy.org/doc/stable/reference/generated/numpy.sqrt.html#numpy.sqrt>`_ 
+    function as its underlying routine. Its branch-cut convention is inherited.
     
     Examples
     --------
