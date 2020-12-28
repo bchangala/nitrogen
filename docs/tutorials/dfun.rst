@@ -307,6 +307,9 @@ objects to :class:`~nitrogen.autodiff.forward.adarray` objects and *vice versa*.
            [ 0.],
            [ 0.],
            [ 0.]])
+
+
+.. _tut-dfun-comp:
                    
 Composition of differentiable functions
 ---------------------------------------

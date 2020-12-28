@@ -6,4 +6,5 @@ Tutorials
    
    dfun
    autodiff
+   coordsys
    
