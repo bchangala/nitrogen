@@ -228,7 +228,6 @@ be affected by your terminal's formatting settings.
        ║ ╰─┤  Z-matrix  ├─╯ ║      
        ║   └────────────┘   ║      
        ╚════════════════════╝  
-    <BLANKLINE>
 
 This diagram shows that the inputs are now the new :math:`Q'` coordinates,
 which are transformed to the original Z-matrix :math:`Q` coordinates, which 
