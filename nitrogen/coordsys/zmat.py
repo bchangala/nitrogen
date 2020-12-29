@@ -48,7 +48,7 @@ class ZMAT(CoordSys):
         notDummy = []
         natoms = 0
         for label in atomLabels:
-            if label[0].upper() == 'X':
+            if label[0].upper() == 'X': # 'X' or 'x' is a dummy label
                 notDummy.append(False)
             else:
                 notDummy.append(True)

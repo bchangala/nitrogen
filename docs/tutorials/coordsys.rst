@@ -136,7 +136,8 @@ a constant numerical coefficient:
     ... """
     
 The atom label at the start of each line is required, but has
-no meaning other than to indicate a dummy atom, for which the label is ``X``.
+no meaning other than to indicate a dummy atom, for which the label is ``X``
+or ``x``.
 
     >>> zmat = """
     ... H 
@@ -208,11 +209,11 @@ Coordinate system and transformation objects provide a
 string-based pictorial representation of the CS. This can help visualize
 a chain of possibly many transformations to keep track of its sequence and order.
 Note that the diagram strings use unicode characters, and the appearance may
-be affected by your terminal's formatting settings.
+be affected by your font settings.
 
 ..  doctest:: example-coordsys-3 
 
-    >>> print(cs_sym.diagram()) # uses unicode characters # doctest: +SKIP
+    >>> print(cs_sym.diagram()) # doctest: +SKIP
          │↓              ↑│        
          │Q'[3]           │        
        ╔═╧══════╗         │        
@@ -236,3 +237,25 @@ The numbers in brackets indicate the number of coordinates in each segment.
 
 Atomic coordinate systems
 -------------------------
+
+*Atomic* coordinate systems refer specifically to :class:`~nitrogen.coordsys.CoordSys`
+objects whose output coordinates are the :math:`3N` Cartesian positions of 
+:math:`N` particles in 3-D space. The coordinates must be ordered
+:math:`x_0, y_0, z_0, x_1, y_1, z_1, \ldots`. The object attribute 
+:attr:`~nitrogen.coordsys.isatomic` is ``True`` for atomic coordinate systems.
+Certain class methods, such as :meth:`~nitrogen.coord.CoordSys.Q2g`, have 
+different behavior or options for atomic vs. non-atomic coordinate systems. 
+:class:`~nitrogen.coordsys.CoordSys` objects for molecular problems,
+like the built-in class :class:`~nitrogen.coordsys.ZMAT`, should 
+generally be atomic. The :attr:`~nitrogen.coordsys.isatomic` value of
+transformed coordinate systems is inherited from that of the
+untransformed coordinate sytem:
+
+..  doctest:: example-coordsys-3 
+    
+    >>> cs.isatomic # instance of ZMAT
+    True
+    >>> cs_sym.isatomic # symmetry-transformed ZMAT coordinates
+    True
+
+

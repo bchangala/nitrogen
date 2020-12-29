@@ -440,7 +440,7 @@ class CoordSys(dfun.DFun):
         
         sQ =f"[{self.nQ:d}]"
         sX =f"[{self.nX:d}]"
-        
+        # generic coordinate system
         diag += "     │↓              ↑│        \n"
         diag +=f"     │Q {sQ:<5s}  {sX:>5s} X│        \n"
         diag += "   ╔═╪════════════════╪═╗      \n"
@@ -553,7 +553,7 @@ class CoordTrans(dfun.DFun):
         sQp =f"[{self.nQp:d}]"
         
         diag = ""
-        
+        # generic coordinate transformation
         diag += "     │↓       \n"
         diag +=f"     │Q'{sQp:<5s} \n"
         diag += "   ╔═╧═════╗  \n"
@@ -644,11 +644,12 @@ class QTransCoordSys(CoordSys):
     
     def diagram(self):
         
-        Tdiag = self.T.diagram() 
-        Cdiag = self.C.diagram() 
+        Tdiag = self.T.diagram() # The coordinate transformation
+        Cdiag = self.C.diagram() # The untransformed CS
         
         Tdiag = Tdiag.replace("\n",
-                              8*" "+"│"+8*" "+"\n")
+                              8 * " " + "│" + 8 * " " + "\n")
+        
         Tdiag = Tdiag.replace("│↓               │",
                               "│↓              ↑│")
         return Tdiag + Cdiag 
