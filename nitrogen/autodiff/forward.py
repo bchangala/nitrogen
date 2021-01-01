@@ -1589,7 +1589,7 @@ def reduceOrder(F, i, k, ni, idx, out = None):
     """
     Reduce the derivative array for F with respect to 
     variable i. The returned derivative array is
-    that for the function :math:`\\partial_iF`.
+    that for the function :math:`\\partial_i F`.
 
     Parameters
     ----------
@@ -1612,6 +1612,8 @@ def reduceOrder(F, i, k, ni, idx, out = None):
     Returns
     -------
     out : ndarray
+        The derivative array with shape (`nd_reduced`, ...)
+        corresponding to the new function :math:`\\partial_i F`
 
     """
 

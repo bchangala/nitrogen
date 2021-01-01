@@ -192,21 +192,23 @@ class CartesianN(CoordSys):
 class LinearTrans(CoordTrans):
     
     """
-    Linear coordinate transformation.
+    Linear coordinate transformation plus constant offset.
     
     The output coordinates Qi are defined as
     
-        :math:`Q_i = T_{ij} Q'_j`
+        :math:`Q_i = T_{ij} Q'_j + t_i`
         
-    Parameters
+    Attributes
     ----------
     
     T : ndarray
         The transformation matrix.
+    t : ndarray
+        The offset vector.
         
     """
     
-    def __init__(self, T, Qpstr = None, name = None):
+    def __init__(self, T, t = None, Qpstr = None, name = None):
         """
         Create a LinearTrans object.
 
@@ -214,8 +216,12 @@ class LinearTrans(CoordTrans):
         ----------
         T : ndarray
             A square matrix.
+        t : ndarray, optional
+            An offset vector. If None, it is ignored.
         Qpstr: list of str, optional
             Labels for the new coordinates.
+        name: str, optional
+            Coordinate transformation name.
 
         """
         if np.ndim(T) != 2:
@@ -230,6 +236,11 @@ class LinearTrans(CoordTrans):
                          zlevel = 1)
             
         self.T = T.copy()   # Transformation matrix, copy
+        
+        if t is None:
+            self.t = None 
+        else:
+            self.t = t.copy() # Offset vector.
         
     def _lintrans(self, Qp, deriv = 0, out = None, var = None):
         """
@@ -254,9 +265,12 @@ class LinearTrans(CoordTrans):
         out.fill(0) # Initialize derivative array to 0
         
         # 0th derivatives = values
-        # Q_i = T_ij * Q'_j
+        # Q_i = T_ij * Q'_j + t_i
         np.copyto(out[0],  np.tensordot(self.T, Qp, axes = (1,0)) )
-        
+        if self.t is not None:
+            for i in range(N):
+                out[0,i] += self.t[i]
+            
         # 1st derivatives
         if deriv >= 1:
             for i in range(nvar):
@@ -273,7 +287,7 @@ class LinearTrans(CoordTrans):
         return out
     
     def __repr__(self):
-        return f'LinearTrans({self.T!r}, Qpstr = {self.Qpstr!r})'
+        return f'LinearTrans({self.T!r}, t = {self.t!r}, Qpstr = {self.Qpstr!r})'
     
     def diagram(self):
         """ CoordTrans diagram string """
@@ -282,7 +296,7 @@ class LinearTrans(CoordTrans):
         sQp =f"[{self.nQp:d}]"
         
         if self.name is None:
-            label = " T @ Q' "
+            label = "T@Q' + t"
         else:
             label = self.name 
             if len(label) > 8:

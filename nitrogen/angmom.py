@@ -7,6 +7,7 @@ Angular momentum and spherical tensor routines.
 """
 
 import numpy as np
+import nitrogen.constants as constants 
 
 def Jbf_cs(J):
     """
@@ -174,3 +175,102 @@ def iJiJbf_wr(J):
     iJiJ = tuple(tuple(ac(iJ[a],iJ[b]) for b in range(3)) for a in range(3))
     
     return iJiJ
+
+
+def X2I(X, mass):
+    """
+    Calculate the inertia tensor from Cartesian
+    coordinates.
+
+    Parameters
+    ----------
+    X : ndarray
+        A (3*N,...) array containing the 
+        x, y, and z Cartesian positions of N particles.
+    mass : array_like
+        The masses of the N particles.
+
+    Returns
+    -------
+    I : ndarray
+        A (3,3,...) array containing the 
+        symmetric inertia tensor
+
+    """
+
+    if X.shape[0] % 3 != 0 :
+        raise ValueError("The first dimension of X must be a multiple of 3")
+    base_shape = X.shape[1:]
+    N = X.shape[0] // 3 # floor division (shouldn't matter)
+    
+    X3 = X.copy()
+    X3 = np.reshape(X3, (N,3) + base_shape)
+    
+    #########################################################
+    # Calculate the Center-of-Mass
+    COM = np.zeros((3,) + base_shape)
+    for i in range(N):
+        COM += mass[i] * X3[i,:]
+    COM = COM / sum(mass)
+    
+    for i in range(N):
+        X3[i,:] -= COM  # calculate X in COM frame
+    #
+    #########################################################
+        
+    ##########################################################
+    # Calculate inertia tensor 
+    I = np.zeros((3,3) + base_shape)
+    for i in range(N):
+        I[0,0] += mass[i] * (X3[i,1]**2 + X3[i,2]**2) # x,x
+        I[1,1] += mass[i] * (X3[i,2]**2 + X3[i,0]**2) # y,y
+        I[2,2] += mass[i] * (X3[i,0]**2 + X3[i,1]**2) # z,z
+        I[0,1] += -mass[i] * X3[i,0] * X3[i,1]  # x,y
+        I[0,2] += -mass[i] * X3[i,0] * X3[i,2]  # x,z
+        I[1,2] += -mass[i] * X3[i,1] * X3[i,2]  # y,z
+    # Copy symmetric elements
+    np.copyto(I[1,0:1], I[0,1:2])
+    np.copyto(I[2,0:1], I[0,2:3])
+    np.copyto(I[2,1:2], I[1,2:3])
+    #
+    ##########################################################
+    
+    return I 
+        
+    
+def X2ABC(X, mass):
+    """
+    Calculate rotational constants from
+    Cartesian positions.
+
+    Parameters
+    ----------
+    X : ndarray
+        A (3*N,...) array containing the 
+        x, y, and z Cartesian positions of N particles.
+    mass : array_like
+        The masses of the N particles.
+        
+    Returns
+    -------
+    ABC : ndarray
+        A (3,...) array containing the
+        A, B, and C rotational constants 
+        (in energy units).
+
+    """
+    
+    # Calculate moment of inertia tensor
+    I = X2I(X, mass) # shape (3, 3, ...)
+    # Move tensor indices to the last indices
+    I = np.moveaxis(I, (0,1), (-2, -1)) # shape (..., 3, 3)
+    
+    # Now diagonalize
+    w,_ = np.linalg.eigh(I) # w has shape (..., 3)
+    w = np.moveaxis(w, -1, 0)  # move abc index to front
+    
+    # Calculate rotational constants
+    # B = hbar**2 / (2 * I)
+    ABC = constants.hbar**2 / (2.0 * w) # hc * cm^-1
+    
+    return ABC

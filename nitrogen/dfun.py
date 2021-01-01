@@ -342,6 +342,59 @@ class DFun:
             raise ValueError(f'Unexpected mode type "{mode:s}"')
             
         return Xopt,fopt 
+    
+    def jacderiv(self, X, deriv = 0, out = None, var = None):
+        """
+        Calculate the Jacobian *and* its derivatives
+
+        Parameters
+        ----------
+        X : ndarray
+            An (:attr:`nx`, ...) array of input values.
+        deriv : int 
+            The derivative order of the Jacobian function.
+        out : ndarray, optional
+            Output buffer. If None, this will be created.
+        var : list of int
+            Variable list (see `var` in :func:`DFun.f`).
+            
+        Returns
+        -------
+        ndarray 
+            An array of shape (`nd`, `nvar`, `nf`, ...) 
+            where `nvar` is the number of variables requested
+            by `var`. 
+
+        """
+        
+        # Calculate derivates of f to order deriv + 1
+        F = self.f(X, deriv = deriv + 1, out = None, var = var)
+        
+        if var is None:
+            var = [i for i in range(self.nx)]
+        
+        # Calculate nd for the reduced function
+        nd, nvar = ndnvar(deriv, var, self.nx)
+        
+        if out is None:
+            out = np.ndarray( (nd, nvar, self.nf) + X.shape[1:], dtype = F.dtype)    
+        
+        # Extract Jacobian (and its derivatives) from the
+        # derivative array of f ("order reduction")
+        
+        idxtab = adf.idxtab(deriv+1, nvar)
+        
+        for k in range(self.nf):
+            # For the k^th output value
+            
+            for i in range(nvar):
+                # For the i^th requested deriv. variable
+                
+                adf.reduceOrder(F[:,k], i, deriv + 1, nvar, idxtab, 
+                                out = out[:, i, k])
+            
+        return out
+    
 class CompositeDFun(DFun):
     
     """

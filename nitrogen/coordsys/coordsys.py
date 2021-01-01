@@ -288,7 +288,9 @@ class CoordSys(dfun.DFun):
             An array of input coordinates.
             Q has shape (:attr:`nQ`, ...).
         masses : array_like
-            A list of masses of length ``natoms``.
+            A list of masses of length ``natoms`` (if `mode` == 'bodyframe')
+            or length ``nX`` (if `mode` == 'simple'). A value of None
+            is interpreted as unit masses (for applicable modes).
         deriv : int
             The requested derivative order. Derivatives are calculated 
             for all vibrational coordinates indicated by `vvar`. The default is 0.
@@ -315,6 +317,9 @@ class CoordSys(dfun.DFun):
         """
         
         if mode == 'bodyframe':
+            #
+            # Body-frame embedding for a system of particles.
+            #
             if not self.isatomic:
                 raise ValueError("'bodyframe' mode is valid for atomic CoordSys only")
             if masses is None:
@@ -340,11 +345,100 @@ class CoordSys(dfun.DFun):
                 out = np.ndarray((nd,ng)+base_shape, dtype = Q.dtype)
             # Calculate the g metric
             self.t2g(t, masses, deriv, nv, fixCOM=True, out = out)
+        
+        elif mode == 'simple':
+            #
+            # A simple set of nX rectangular coordinates
+            #
+            if masses is None:
+                # Default: unit masses
+                masses = [1.0 for i in self.nX]
+            elif len(masses) != self.nX:
+                raise ValueError("length of masses must equal nX")
+            
+            # Calculate the coordinate system Jacobian 
+            s = self.jacderiv(Q, deriv=deriv, var = vvar) 
+            
+            nd = s.shape[0] 
+            ns = s.shape[1] 
+            base_shape = Q.shape[1:] 
+            
+            ng = (ns*(ns+1)) // 2 
+            
+            if out is None:
+                out = np.ndarray((nd,ng) + base_shape, dtype = s.dtype)
+            # Calculate g metric from s (the Jacobian)
+            self.s2g(s, masses, deriv, out = out)
+            
             
         else:
             raise ValueError('Invalid mode string')
             
         return out
+    
+    @staticmethod 
+    def s2g(s, masses, deriv, out = None):
+        """
+        Calculate g metric tensor for a simple embedding.
+
+        Parameters
+        ----------
+        s : ndarray
+            An (nd, nv, nX, ...) array containing the coordinate
+            system Jacobian derivative array.
+        masses : array_like
+            A list of masses of length `nv`
+        deriv : int 
+            The derivative order of the `s` array.
+        out : ndarray, optional
+            an (nd, ng, ...) output array, where
+            ng = (nv * (nv + 1))
+
+        Returns
+        -------
+        out : ndarray
+            Result.
+
+        """
+        
+        nd = s.shape[0]
+        nv = s.shape[1] # The number of curvilinear coordinates
+        nX = s.shape[2] # The number of rectangular coordinates
+        base_shape = s.shape[3:] 
+        
+        if nd != dfun.nderiv(deriv, nv):
+            raise ValueError("Inconsistent deriv or nv value")
+        
+        ng = (nv * (nv+1) ) // 2 # Number of element of packed storage of g
+        
+        if out is None: 
+            out = np.ndarray( (nd, ng) + base_shape, dtype = s.dtype)
+        out.fill(0.0) # Initialize to zero
+        
+        # Calculate g-tensor
+        # using Leibniz product routine
+        
+        idxtab = adf.idxtab(deriv, nv)
+        ncktab = adf.ncktab(deriv+nv, min(nv,deriv))
+        sisj = np.ndarray( (nd,) + base_shape, dtype = s.dtype)
+        
+        idx = 0
+        # Loop over curvilinear coordinates
+        for j in range(nv):
+            for i in range(j+1):
+                # Sum over rectangular coordinates
+                for a in range(nX):
+                    si = s[:,i,a]
+                    sj = s[:,j,a] # shape = (nd, ) + base_shape
+                    # Compute sisj <-- si * sj
+                    adf.mvleibniz(si,sj, deriv, nv, ncktab, idxtab, out = sisj)
+                    # g_ij <-- m * si * sj
+                    out[:, idx] += masses[a] * sisj 
+                
+                idx += 1 # increment packed storage index
+        
+        return out
+        
     
     @staticmethod
     def t2g(t, masses, deriv, nv, fixCOM = True, out = None):
@@ -368,7 +462,7 @@ class CoordSys(dfun.DFun):
             If fixCOM, then the t vectors are shifted to 
             the center-of-mass frame before calculating the
             g metric tensor. **This modifies `t`.** The default is True.
-        out : ndarray
+        out : ndarray, optional
             The output location with shape ``(nd, ng, ...)``, where
             ``ng = (nt * (nt+1)) // 2``. If None, this
             will be created. The default is None. 
