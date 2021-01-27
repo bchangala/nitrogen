@@ -17,7 +17,7 @@ from . import ham
 from . import constants
 from . import pes
 
-__version__ = '2.0.dev1'
+__version__ = '2.0.dev2'
 
 import numpy as np 
 
