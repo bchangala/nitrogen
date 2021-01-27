@@ -115,7 +115,7 @@ def iJbf_wr(J):
     -------
     iJx, iJy, iJz : ndarray
         The body-frame angular momentum operators multiplied
-        by i. This are purely real, anti-symmetric matrices
+        by i. These are purely real, anti-symmetric matrices
 
     """
     
