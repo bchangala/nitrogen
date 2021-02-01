@@ -15,7 +15,7 @@ import nitrogen.constants
 
 from scipy.sparse.linalg import LinearOperator
 
-def hdpdvr_bfJ(dvrs, cs, pes, masses, Jlist = 0):
+def hdpdvr_bfJ(dvrs, cs, pes, masses, Jlist = 0, Vmax = None, Vmin = None):
     """
     Direct-product DVR grid body-frame Hamiltonian for 
     angular momentum J.
@@ -36,6 +36,12 @@ def hdpdvr_bfJ(dvrs, cs, pes, masses, Jlist = 0):
         Masses.
     Jlist : int or array_like
         Total angular momentum value(s).
+    Vmax : float, optional
+        Maximum potential energy allowed. Higher values will be 
+        replaced with `Vmax`. If None, this is ignored.
+    Vmin : float, optional
+        Minimum potential energy allowed. Lower values will be 
+        replaced with `Vmin`. If None, this is ignored.
     
     Returns
     -------
@@ -104,6 +110,10 @@ def hdpdvr_bfJ(dvrs, cs, pes, masses, Jlist = 0):
     
     # Calculate the PES grid
     V = pes.f(Q, deriv = 0)[0,0]
+    if Vmax is not None:
+        V[V > Vmax] = Vmax 
+    if Vmin is not None: 
+        V[V < Vmin] = Vmin 
     
 
     ######################

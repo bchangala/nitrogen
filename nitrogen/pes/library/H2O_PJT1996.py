@@ -54,8 +54,14 @@ def Vfun(X, deriv = 0, out = None, var = None):
     
     return n2.dfun.adf2array([v], out)
 
-
+######################################
+# 
+# Define module-scope PES DFun object
+#
 PES = n2.dfun.DFun(Vfun, nf = 1, nx = 9)
+#
+#
+######################################
 
 def V0(dq):
     """ dq : list of adarray """
