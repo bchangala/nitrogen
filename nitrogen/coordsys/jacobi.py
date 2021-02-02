@@ -181,4 +181,30 @@ class JacobiChain3N(CoordSys):
         # check to maximize efficiency.
         
         return out
+    
+    def __repr__(self):
+        return f'JacobiChain3N({self.jacobi_masses!r})'
+    
+    def diagram(self): 
+        # using U+250X box and U+219X arrows
+        diag = ""
+        sQ =f"[{self.nQ:d}]"
+        sX =f"[{self.nX:d}]"
+        
+        diag += "     │↓              ↑│        \n"
+        diag +=f"     │Q {sQ:<5s}  {sX:>5s} X│        \n"
+        diag += "   ╔═╪════════════════╪═╗      \n"
+        diag += "   ║ │ ┌────────────┐ │ ║      \n"
+        diag += "   ║ │ │   Jacobi   │ │ ║      \n"
+        diag += "   ║ │ │  Chain 3N  │ │ ║      \n"
+        diag += "   ║ │ │            │ │ ║      \n"
+        diag += "   ║ ╰─┤   ╱╲       ├─╯ ║      \n"
+        diag += "   ║   │  0 ╱╲      │   ║      \n"
+        diag += "   ║   │   1 ╱╲     │   ║      \n"
+        diag += "   ║   │    2 ╱╲    │   ║      \n"
+        diag += "   ║   │     3 ...  │   ║      \n"
+        diag += "   ║   └────────────┘   ║      \n"
+        diag += "   ╚════════════════════╝      \n"
+        
+        return diag
        
