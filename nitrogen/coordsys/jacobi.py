@@ -32,7 +32,22 @@ class JacobiChain3N(CoordSys):
     The first three coordinates are the Cartesian
     position of the total center-of-mass. 
     The second three coordinates are the Jacobi
-    vector from atom 0 to its sibling node, and so on.    
+    vector from atom 0 to its sibling node, and so on.  
+    
+    
+    Attributes
+    ----------
+    
+    jacobi_masses : ndarray
+        The masses defining the Jacobi coordinates
+    mu : ndarray
+        The effective mass of each Jacobi vector
+    J : ndarray
+        The linear transformation matrix between
+        the Jacobi coordinates and space-frame
+        Cartesian coordinates (X = J*Q)
+    
+    
     """
     
     
@@ -109,7 +124,7 @@ class JacobiChain3N(CoordSys):
         # new attributes
         self.jacobi_masses = jacobi_masses 
         self.mu = mu 
-        self.rm = rm
+        self._rm = rm
         self.J = Jfull
         
     
