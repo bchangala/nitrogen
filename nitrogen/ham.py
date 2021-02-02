@@ -29,7 +29,7 @@ def hdpdvr_bfJ(dvrs, cs, pes, masses, Jlist = 0, Vmax = None, Vmin = None):
         a fixed value for that coordinate.
     cs : CoordSys
         An *atomic* coordinate system.
-    pes : DFun
+    pes : DFun or function
         A potential energy function f(Q) with respect
         to `cs` coordinates.
     masses : array_like
@@ -109,7 +109,12 @@ def hdpdvr_bfJ(dvrs, cs, pes, masses, Jlist = 0, Vmax = None, Vmin = None):
     hbar = nitrogen.constants.hbar    # hbar in [A, u, cm^-1] units
     
     # Calculate the PES grid
-    V = pes.f(Q, deriv = 0)[0,0]
+    try: # Attempt DFun interface
+        V = pes.f(Q, deriv = 0)[0,0]
+    except:
+        V = pes(Q) # Attempt raw function
+    
+    
     if Vmax is not None:
         V[V > Vmax] = Vmax 
     if Vmin is not None: 
@@ -216,3 +221,144 @@ def hdpdvr_bfJ(dvrs, cs, pes, masses, Jlist = 0, Vmax = None, Vmin = None):
         return Hlist[0]
     else:
         return Hlist 
+
+
+class DirProdDvrCartN(LinearOperator):
+    """
+    A LinearOperator subclass for direct-product DVR
+    Hamiltonians for N Cartesian coordinates.
+    
+    
+    Attributes
+    ----------
+    V : ndarray
+        The PES grid with shape `vshape`.
+    NH : int
+        The size of the Hamiltonian (the number of direct-product grid points).
+    vvar : list 
+        The active coordinates.
+    grids : list
+        Grids (for active) and fixed scalar values (for inactive) 
+        of each coordinate.
+    vshape : tuple
+        The shape of the direct-product grid.
+    masses : ndarray
+        The mass of each coordinate.
+    """
+    
+    def __init__(self, dvrs, pes, masses = None, Vmax = None, Vmin = None):
+        """
+        
+
+        Parameters
+        ----------
+        dvrs : list of DVR objects and/or scalars
+            A list of :class:`nitrogen.dvr.DVR` objects and/or
+            scalar numbers. The length of the list must be equal to
+            the number of coordinates, `nx`. Scalar elements indicate
+            a fixed value for that coordinate.
+        pes : DFun or function
+            A potential energy function f(X) with respect
+            to the `nx` Cartesian coordinates.
+        masses : array_like, optional
+            A list of `nx` masses. If None, these will be assumed to be unity.
+        Vmax : float, optional
+            Maximum potential energy allowed. Higher values will be 
+            replaced with `Vmax`. If None, this is ignored.
+        Vmin : float, optional
+            Minimum potential energy allowed. Lower values will be 
+            replaced with `Vmin`. If None, this is ignored.
+            
+        """
+        
+        nx = len(dvrs)
+        
+        if masses is None:
+            masses = [1.0 for i in range(nx)]
+        
+        if len(masses) != nx:
+            raise ValueError("The number of masses must equal the length of dvrs")
+
+    
+        # Determine the active and fixed coordinates
+        vvar = []
+        grids = []
+        vshape = []
+        NH = 1
+        D2list = []
+        
+        for i in range(len(dvrs)):
+            
+            if np.isscalar(dvrs[i]): # inactive
+                grids.append(dvrs[i])
+                vshape.append(1)
+                D2list.append(None) 
+            else: # active, assume DVR object
+                vvar.append(i)
+                grids.append(dvrs[i].grid)
+                ni = dvrs[i].num # length of this dimension 
+                vshape.append(ni) 
+                NH *= ni 
+                D2list.append(dvrs[i].D2)
+
+        vshape = tuple(vshape)
+        # To summarize:
+        # -------------
+        # vvar is a list of active coordinates
+        # grids contains 1D active grids and fixed scalar values
+        # vshape is the grid shape *including* singleton fixed coordinates
+        # NH is the total grid size
+        # D2list is the second-derivative operator list, including None's for fixed coord.
+            
+        if len(vvar) < 1:
+            raise ValueError("There must be at least one active coordinate")
+            
+        # Calculate the coordinate grids
+        Q = np.stack(np.meshgrid(*grids, indexing = 'ij'))
+        
+        # Calculate the PES grid
+        try: # Attempt DFun interface
+            V = pes.f(Q, deriv = 0)[0,0]
+        except:
+            V = pes(Q) # Attempt raw function
+        # Check max and min limits
+        if Vmax is not None:
+            V[V > Vmax] = Vmax 
+        if Vmin is not None: 
+            V[V < Vmin] = Vmin 
+        
+        # Determine the operator data-type
+        dtype = np.result_type(Q,V)
+         
+        # Initialize the LinearOperator
+        #super().__init__((NH,NH), matvec = self._cartn_mv, dtype = dtype)
+        # Define the required LinearOperator attributes
+        self.shape = (NH,NH)
+        self.dtype = dtype
+        
+        # Define new attributes
+        self.NH = NH
+        self.vvar = vvar 
+        self.grids = grids 
+        self.vshape = vshape 
+        self._D2list = D2list 
+        self.masses = np.array(masses)
+        self.V = V
+    
+    def _matvec(self, x):
+        
+        xgrid = x.reshape(self.vshape) # Reshape vector to direct-product grid
+        y = np.zeros_like(xgrid)        # Result grid
+        
+        hbar = nitrogen.constants.hbar
+        ############################################
+        # PES term
+        y += self.V * xgrid 
+        # KEO terms
+        y += (-hbar**2 /2.0) * dvrops.opO_coeff(xgrid, self._D2list, 1.0/self.masses)
+        #
+        ############################################
+                    
+        # Reshape result grid to a 1D vector
+        return y.reshape((self.NH,))        
+    

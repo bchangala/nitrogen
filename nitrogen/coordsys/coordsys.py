@@ -352,7 +352,7 @@ class CoordSys(dfun.DFun):
             #
             if masses is None:
                 # Default: unit masses
-                masses = [1.0 for i in self.nX]
+                masses = [1.0 for i in range(self.nX)]
             elif len(masses) != self.nX:
                 raise ValueError("length of masses must equal nX")
             

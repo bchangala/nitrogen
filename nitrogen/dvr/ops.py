@@ -132,3 +132,45 @@ def opD_grid(x, f, Dlist):
         kactive += 1
             
     return y
+
+def opO_coeff(x, Olist, c = None):
+    """
+    Evaluate the matrix-vector operation for
+    :math:`\sum_{k} c_k \hat{O}_k`
+    
+    Parameters
+    ----------
+    x : ndarray
+        Input grid
+    Olist : list of ndarrays
+        List of the matrix operator for each dimension. An entry of
+        None for inactive coordinates will be skipped.
+    c : array_like, optional
+        Coefficients for each term in sum, including inactive operators
+        (whose values are ignored).  If None, this is ignored.
+
+    Returns
+    -------
+    y : ndarray
+        The result grid
+
+    """
+    
+    N = len(Olist) # The number of operators, including inactive
+        
+    # Initialize result
+    y = np.zeros_like(x)
+    
+    for k in range(N):
+        Ok = Olist[k] # O_k
+        if Ok is None:
+            continue  # do not increment kactive
+        
+        dk = np.tensordot(Ok, x, axes = (1,k)) # dk = O_k * x
+        dk = np.moveaxis(dk, 0, k)
+        if c is not None:
+            dk *= c[k] # Multiply coefficient
+        y += dk 
+        
+            
+    return y
