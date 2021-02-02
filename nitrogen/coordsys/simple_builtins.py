@@ -157,8 +157,9 @@ class CartesianN(CoordSys):
         
         # 1st derivatives
         # All requested `var` have a derivative of 1 w.r.t its output
-        for i in range(len(var)):
-            out[1+i, var[i]:(var[i]+1)].fill(1.0)
+        if deriv >= 1:
+            for i in range(len(var)):
+                out[1+i, var[i]:(var[i]+1)].fill(1.0)
             
         # All higher derivatives are zero
         
