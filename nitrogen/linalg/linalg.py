@@ -4,7 +4,7 @@ from scipy.sparse.linalg import LinearOperator
 __all__ = ['eigstrp']
 
 def eigstrp(H, k = 5, pad = 10, tol = 1e-10, maxiter = None, v0 = None,
-            rper = 20, P = None, pper = 1):
+            rper = 20, P = None, pper = 1, printlevel = 0):
     """
     Thick-restart Lanczos iterative eigensolver with projection.
 
@@ -31,6 +31,8 @@ def eigstrp(H, k = 5, pad = 10, tol = 1e-10, maxiter = None, v0 = None,
         Projection operator applied to the Lanczos vectors. The default is None.
     pper : int, optional
         The projection period. The default is 1.
+    printlevel : int, optional
+        Print level. The default is 0.
 
     Returns
     -------
@@ -113,6 +115,9 @@ def eigstrp(H, k = 5, pad = 10, tol = 1e-10, maxiter = None, v0 = None,
             T[i,i-1] = beta
             T[i-1,i] = beta
         
+        if printlevel >= 2:
+            print(f"Hvec ... alpha = {alpha:.3e}")
+        
         # Calculate the next Lanczos vector
         # Explicitly normalize first to help with finite precision errors
         w /= np.linalg.norm(w)
@@ -154,6 +159,9 @@ def eigstrp(H, k = 5, pad = 10, tol = 1e-10, maxiter = None, v0 = None,
                 T[i,i-1] = beta
                 T[i-1,i] = beta
             
+            if printlevel >= 2:
+                print(f"Hvec ... alpha = {alpha:.3e}")
+            
             # Calculate the next Lanczos vector
             w /= np.linalg.norm(w) # Normalize first
             for j in range(i+1):
@@ -191,10 +199,13 @@ def eigstrp(H, k = 5, pad = 10, tol = 1e-10, maxiter = None, v0 = None,
  
         # Finally, perform a convergence check on the first `k` Ritz values
         if restart_cnt > 0:
-            if ( np.abs(evals[0:k] - evals_old[0:k]) > tol ).any():
+            nunconverged = np.count_nonzero(np.abs(evals[0:k] - evals_old[0:k]) > tol)
+            nconverged = k - nunconverged
+            if nunconverged > 0:
                 # At least one eigenvalue is above convergence
                 # tolerance, we will continue
-                pass
+                if printlevel >= 1:
+                    print(f"End of restart {restart_cnt:d}. {nconverged:d}/{k:d} Ritz values have converged.")
             else:
                 # All eigenvalues have converged, exit the restart loop
                 print("Convergence reached in {:d} restarts ({:d} iterations).".format(restart_cnt, itercnt))
