@@ -251,3 +251,107 @@ def plot(dvrs, fun, labels = None,
         raise ValueError("There are more than 3 dimensions.")
         
     return fig, ax
+
+
+def transferDVR(grid_old, dvrs_old, dvrs_new):
+    """
+    Interpolate a direct-product DVR expansion from one
+    set of DVR bases to another.
+
+    Parameters
+    ----------
+    grid_old : ndarray
+        A grid of coefficients for the old DVR direct-product grid,
+        with shape dvr2grid(dvrs_old).shape[1:]
+    dvrs_old: list
+        A list of DVRs and/or scalar values. This is the original
+        set of grids defining `grid_old`.
+    dvrs_new : list
+        A list of DVRS and/or scalar values. This defines the 
+        new direct product grid. Scalar elements in `dvrs_new` 
+        must occur at the same position in `dvrs_old`, but their
+        values are ignored.
+
+    Returns
+    -------
+    grid_new : ndarray
+        An array with shape dvr2grid(dvrs_new).shape[1:] containing
+        the expansion coefficients for the function represented by
+        `grid_old`.
+
+    """
+    
+    grids_old = []
+    vshape_old = []
+    
+    grids_new = []
+    vshape_new = [] 
+    
+    nd = len(dvrs_old) # The number of dimensions, including singletons
+    
+    if nd != len(dvrs_new):
+        raise ValueError("dvrs_old and dvrs_new must be the same length")
+    
+    for i in range(nd):
+        
+        if isinstance(dvrs_old[i], dvr.DVR): 
+            # Grid coordinate
+            grids_old.append(dvrs_old[i].grid)
+            vshape_old.append(dvrs_old[i].num)
+            
+            if not isinstance(dvrs_new[i], dvr.DVR):
+                raise TypeError("DVR vs. scalar mis-match")
+            else:
+                grids_new.append(dvrs_new[i].grid)
+                vshape_new.append(dvrs_new[i].num)
+            
+        else:
+            # Fixed coordinate
+            grids_old.append(None) # None signifies non-active here
+            vshape_old.append(1)
+            grids_new.append(None) # None signifies non-active here
+            vshape_new.append(1)
+            
+        
+    # Grid shape, including singleton fixed coordinates
+    vshape_old = tuple(vshape_old)
+    vshape_new = tuple(vshape_new)
+    
+    # Evaluate the original expansion on the grid points
+    # of the new expansion 
+    
+    eval_old_on_new = grid_old
+    for i in range(nd):
+        if grids_old[i] is None: 
+            continue # This is a singleton/fixed dimension. Skip it
+        # For the i**th dimension
+        # 1) Evaluate the old DVR wavefunctions
+        #    on the new DVR grid points
+        # 
+        ti = dvrs_old[i].wfs(dvrs_new[i].grid) # Shape: (num_new, num_old)
+        #
+        # 2) Convert the i**th dimension from old coefficients to the value
+        #    on the new grid points
+        eval_old_on_new = np.tensordot(ti, eval_old_on_new, axes = (1,i))
+        eval_old_on_new = np.moveaxis(eval_old_on_new, 0, i)
+    #
+    # eval_old_on_new should now be complete
+
+    # Calculate the weights of the new direct-product DVR on its own grid.
+    wgt_new = np.ones(vshape_new)
+    for i in range(nd):
+        if grids_new[i] is not None:
+            
+            # Calculate the diagonal basis function values for this DVR
+            wi = np.diag(dvrs_new[i].wfs(dvrs_new[i].grid))
+            sh = [1 for i in range(len(grids_new))]
+            sh[i] = dvrs_new[i].num
+            sh = tuple(sh) # (1, 1, ... , num, ..., 1, 1)
+            # Broadcast these weights to the ND grid 
+            wgt_new *= wi.reshape(sh)
+    
+    # Finally, calculate the coefficients of the new DVR functions
+    grid_new = eval_old_on_new / wgt_new 
+    
+    return grid_new 
+        
