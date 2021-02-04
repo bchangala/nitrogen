@@ -22,6 +22,7 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib import cm
 from skimage.measure import marching_cubes
+from scipy import interpolate
 
 
 def gridshape(dvrs):
@@ -226,10 +227,21 @@ def plot(dvrs, fun, labels = None,
             
         for i in range(len(iso_val)):
             # Positive iso value
-            verts, faces, _, _ = marching_cubes(V, iso_val[i], spacing=(0.1, 0.1, 0.1))
-            ax.plot_trisurf(verts[:, 0], verts[:,1], faces, verts[:, 2],
-                            lw=1, color = color[i])
-        
+            try:
+                verts, faces, _, _ = marching_cubes(V, iso_val[i], step_size = 1)
+                vxyz = [interpolate.interp1d(np.arange(dvrs[idx[i]].num), dvrs[idx[i]].grid)(verts[:,i]) for i in range(3)]
+                ax.plot_trisurf(vxyz[0], vxyz[1], faces, vxyz[2],
+                                    lw=1, color = color[i])
+            except:
+                pass
+                # marching_cubes will raise an error if
+                # the surface isovalue is not in the range. 
+                # If this occurs, we will just not plot that 
+                # isosurfaces
+                
+                
+            
+            
         if labels is not None:
             ax.set_xlabel(labels[idx[0]])
             ax.set_ylabel(labels[idx[1]])
