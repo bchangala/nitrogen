@@ -96,7 +96,7 @@ def _fourDVRwfs(q, start, stop, num):
     for i in range(num): # DVR function at i^th grid point
         t = 1
         for k in range(1,m+1): # Calculate exponential sum as cosines explicitly
-            t += 2*np.cos(k*(q - i*period/num) * 2*np.pi/period)
+            t += 2*np.cos(k*(q - start - i*period/num) * 2*np.pi/period)
             
         wfs[:,i] = t/np.sqrt(num*period)
     
