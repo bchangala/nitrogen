@@ -4,6 +4,8 @@ from .fourDVR import _fourDVR, _fourDVRwfs
 from .hoDVR import _hoDVR,_hoDVRwfs
 from .sincDVR import _sincDVR,_sincDVRwfs
 
+import numpy as np 
+
 __all__ = ['DVR']
 
 class DVR:
@@ -93,9 +95,30 @@ class DVR:
             
 
 
+    def matchfun(self, f):
+        """
+        Calculate DVR coefficients to match a function at 
+        DVR grid points.
 
+        Parameters
+        ----------
+        f : function
+            The function to be matched.
 
+        Returns
+        -------
+        coeff : ndarray
+            A (`num`,1) array with the DVR basis function coefficients.
 
+        """
+        
+        # Calculate the values of the DVR basis functions
+        # at their respective grid-points
+        wgts = np.diag(self.wfs(self.grid))
+        
+        coeffs = (f(self.grid) / wgts).reshape((self.num,1))
+        
+        return coeffs 
 
 
     
