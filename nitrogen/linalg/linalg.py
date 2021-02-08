@@ -4,7 +4,7 @@ from scipy.sparse.linalg import LinearOperator
 __all__ = ['eigstrp']
 
 def eigstrp(H, k = 5, pad = 10, tol = 1e-10, maxiter = None, v0 = None,
-            rper = 20, P = None, pper = 1, printlevel = 0):
+            rper = 20, P = None, pper = 1, printlevel = 0, eigval = 'smallest'):
     """
     Thick-restart Lanczos iterative eigensolver with projection.
 
@@ -33,6 +33,8 @@ def eigstrp(H, k = 5, pad = 10, tol = 1e-10, maxiter = None, v0 = None,
         The projection period. The default is 1.
     printlevel : int, optional
         Print level. The default is 0.
+    eigval : {'smallest', 'largest'}, optional
+        Calculat the smallest or largest eigenvalues. The default is 'smallest'.
 
     Returns
     -------
@@ -181,7 +183,13 @@ def eigstrp(H, k = 5, pad = 10, tol = 1e-10, maxiter = None, v0 = None,
         # Diagonalize the reduced Lanczos Hamiltonian T
         if restart_cnt > 0: 
             evals_old = evals.copy() # Save previous Ritz values
+        
         evals,evecs = np.linalg.eigh(T)
+        # eigh returns the evals in ascending order
+        if eigval == 'largest':
+            # flip the order of the Ritz values/vectors
+            evals = np.flip(evals)
+            evecs = np.flip(evecs,axis = 1)
         
         # Store the first k+pad Ritz vectors
         np.copyto(L[:, 0:(k+pad)], np.matmul(L,evecs[:,0:(k+pad)]))
