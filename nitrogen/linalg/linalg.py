@@ -255,6 +255,22 @@ def bounds(H, k = 10, m = 2):
     high : float
         An estimate of the upper bound of the
         largest eigenvalue.
+        
+    Notes
+    -----
+    These spectral bound estimates are based the work of Y. Zhou
+    and R.-C. Li [1]_. Their bounds (2.6), (2.7), and (2.8) 
+    correspond to `m` = 1, `k`, and 3, respectively.
+    
+    In general, a larger value of `m` will provide a safer, but
+    looser, bound on the spectral range.
+    
+    References
+    ----------
+    .. [1] Y. Zhou and R.-C. Li, "Bound the spectrum of large Hermitian matrices."
+       Linear Algebra and its Applications, 435, 480-493 (2011).
+       https://doi.org/10.1016/j.laa.2010.06.034
+    
 
     """
     
