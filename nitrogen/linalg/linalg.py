@@ -1,7 +1,8 @@
 import numpy as np
 from scipy.sparse.linalg import LinearOperator
+from scipy.sparse.linalg import aslinearoperator
 
-__all__ = ['eigstrp']
+__all__ = ['eigstrp','aslinearoperator','bounds']
 
 def eigstrp(H, k = 5, pad = 10, tol = 1e-10, maxiter = None, v0 = None,
             rper = 20, P = None, pper = 1, printlevel = 0, eigval = 'smallest'):
@@ -228,4 +229,89 @@ def eigstrp(H, k = 5, pad = 10, tol = 1e-10, maxiter = None, v0 = None,
     return w,v
 
 
+def bounds(H, k = 10, m = 2):
+    """
+    Estimate lower and upper bounds to the
+    spectral range of the Hermitian operator H.
 
+    Parameters
+    ----------
+    H : LinearOperator
+        A Hermitian operator.
+    k : int, optional
+        The number of Lanczos steps to take
+        before estimating the bounds. The 
+        default is 10.
+    m : int, optional
+        The safe-guard level for the bound estimate.
+        This must be less than or equal to `k`. The 
+        defaults is 3.
+
+    Returns
+    -------
+    low : float
+        An estimate of the lower bound of the
+        smallest eigenvalue.
+    high : float
+        An estimate of the upper bound of the
+        largest eigenvalue.
+
+    """
+    
+    N = H.shape[0] # The size of H
+    k = 5 # The number of Lanczos steps
+    
+    
+    # Initialize a random number generator
+    rng = np.random.default_rng() 
+    
+    # Generate a random, normalized vector
+    v = rng.random((N,))
+    v = v / np.linalg.norm(v)
+    
+    # Initialize Lanczos steps
+    f = H.matvec(v)
+    alpha = np.dot(f,v)
+    f -= alpha * v 
+    
+    T = np.zeros((k,k))
+    T[0,0] = alpha 
+    
+    for j in range(1,k):
+        beta = np.linalg.norm(f)
+        v0 = v 
+        v = f/beta 
+        f = H.matvec(v) 
+        f -= beta * v0
+        alpha = np.dot(f,v) 
+        f -= alpha*v 
+        T[j,j-1] = beta 
+        T[j-1,j] = beta 
+        T[j,j] = alpha 
+    
+    # Calulate the Ritz values
+    lam,Z = np.linalg.eigh(T)
+    
+    lmin = lam[0]  # Smallest Ritz value
+    lmax = lam[-1] # Largest Ritz value
+    
+    z = np.absolute(Z[-1,:]) # The magnitude of the last element of each
+                             # Ritz vector
+    
+    m = min(m,k)
+    
+    fnorm = np.linalg.norm(f)
+    # Strategy 1:
+    #
+    #   max < lmax + |fk|
+    # ( min > lmin - |fk| )  
+    #
+    # Strategy 2:
+    # max < lmax + zmax*|fk|
+    
+    low = np.min( lmin - z[:m] * fnorm )
+    high = np.max( lmax + z[-m:] * fnorm )
+    
+    
+    return low, high 
+    
