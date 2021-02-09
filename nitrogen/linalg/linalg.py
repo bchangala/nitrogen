@@ -1,8 +1,10 @@
 import numpy as np
 from scipy.sparse.linalg import LinearOperator
 from scipy.sparse.linalg import aslinearoperator
+import scipy.fft 
 
-__all__ = ['eigstrp','aslinearoperator','bounds']
+__all__ = ['eigstrp','aslinearoperator','bounds',
+           'chebauto', 'chebspec', 'chebwindow']
 
 def eigstrp(H, k = 5, pad = 10, tol = 1e-10, maxiter = None, v0 = None,
             rper = 20, P = None, pper = 1, printlevel = 0, eigval = 'smallest'):
@@ -330,4 +332,307 @@ def bounds(H, k = 10, m = 2):
     
     
     return low, high 
+    
+def chebauto(H, K, v0 = None):
+    """
+    Calculate the auto-correlation function of a 
+    wavepacket via the Chebyshev propagator of
+    of a Hermitian operator H.
+
+    Parameters
+    ----------
+    H : LinearOperator
+        A Hermitian operator.
+    K : int
+        The number of propagation steps.
+    v0 : ndarray, optional
+        The initial vector. If None, a uniform vector is used.
+        The default is None.
+
+    Returns
+    -------
+    C : ndarray
+        A (2*K,) array containing the auto-correlation function
+        of `v0` in the Chebyshev order domain.
+    scale : (float, float)
+        The mean energy and half-width, (`ebar`, `de`) used to scale the
+        Hamiltonian. The unscaled energy is related to the 
+        Chebyshev angle parameter as ``E = de * cos(theta) + ebar``.
+    
+    Notes
+    -----
+    See Ref. [1]_ for a description of Chebyshev propagators.
+    
+    References
+    ----------
+    .. [1] R. Chen, H. Guo. "The Chebyshev propagator for 
+       quantum systems." Computer Physics Communications, 119,
+       19-31 (1999).
+       https://doi.org/10.1016/S0010-4655(98)00179-9
+
+    """
+    
+    
+    ##################
+    # Before beginning the Chebyshev propagation
+    # we must calculate the scaled Hamiltonian.
+    #
+    # Estimate the spectral range:
+    elow,ehigh = bounds(H, k = 10, m = 2)
+    ebar = (elow + ehigh) / 2.0  # The mean eigenvalue
+    de = (ehigh - elow) / 2.0    # The spectral width
+    print("Estimated outer bounds of H:")
+    print(f"  Low ... {elow:10.3f}")
+    print(f" High ... {ehigh:10.3f}")
+    #
+    # Define a scaled Hamitonian matrix-vector 
+    # product function
+    def Hs(x):
+        return (H.matvec(x) - ebar*x) / de 
+    #
+    ##################
+
+    ##################
+    # Initialize the auto-correlation function
+    #
+    C = np.zeros((2*K,))
+    #
+    # Initial wavefunction
+    NH = H.shape[0] 
+    if v0 is None:
+        c0 = np.full((NH,), np.sqrt(1.0 / NH))
+    else:
+        if np.size(v0) != NH:
+            raise ValueError("The initial vector has an unexpected size.)")
+        c0 = v0.reshape((NH,))
+    #
+    # Seed the Chebyshev vectors
+    c1 = Hs(c0)
+    # Initialize auto-correlation
+    C[0] = np.dot(c0,c0) 
+    # Initialize recursion
+    ckm1 = c0
+    ck   = c1
+    # Perform propagation
+    for k in range(1,K):
+        
+        # Calculate auto-correlation
+        C[k] = np.dot(ck,c0)
+        
+        # Calculate the next Chebyshev vector
+        ckp1 = 2 * Hs(ck) - ckm1
+        
+        # Use symmetry to calculate auto-correlation
+        # function for k >= K
+        if 2*k >= K:
+            C[2*k] = 2*np.dot(ck,ck) - C[0]
+        
+        if 2*k + 1 >= K:
+            C[2*k+1] = 2*np.dot(ckp1,ck) - C[1]
+        
+        # Update Chebyshev vectors for next iteration
+        ckm1 = ck 
+        ck   = ckp1
+    #
+    # C now contains the auto-correlation function 
+    # in the Chebyshev order domain
+    #
+    # Return the raw auto-correlation.
+    #########################
+
+    
+    return C, (ebar,de)
+
+def chebwindow(N, window, window_scale = 1.0):
+    
+    """ 
+    Calculate window function.
+    
+    Parameters
+    ----------
+    N : int
+        Length of auto-correlation function.
+    window : {'gaussian', None}
+        The window function type.
+    window_scale : floa
+        A scaling parameter for the window function. Must be
+        >= 1.0 The default is 1.0. See Notes for details.
+        
+    Returns
+    -------
+    f : ndarray
+        The window function.
+    hw : float
+        The approximate half-width-half-maximum value
+        (in units of radians).
+    
+    Notes 
+    -----
+    The window functions are always scaled to a dimensionless
+    order-time parameter, tau, ranging from 0 to 1 over the total 
+    propagation time. The 'gaussian' window multiplies the
+    raw auto-correlation function by 
+    ``np.exp(-(3.0 * window_scale * tau)**2)``.
+    
+    """
+    tau = np.linspace(0.,1.,N+1)[:-1]
+    
+    if window_scale < 1.0 :
+        print("Warning: resetting window_scale to 1.0")
+        window_scale = 1.0 
+        
+        
+    if window is None:
+        f = np.ones_like(tau)
+        hw = 1.9 / N
+    elif window == 'gaussian':
+        f = np.exp(-(3.0*tau*window_scale)**2)
+        hw = window_scale * 5.0 / N
+    else:
+        raise ValueError("Invalid window type")
+    
+    return f, hw
+
+def chebspec(H, K, v0 = None, window = 'gaussian', window_scale = 1.0,
+             sample_factor = 1, norm = 'area'):
+    """
+    Calculate the auto-correlation function of a 
+    wavepacket via the Chebyshev propagator of
+    of a Hermitian operator H. 
+
+    Parameters
+    ----------
+    H : LinearOperator
+        A Hermitian operator.
+    K : int
+        The number of propagation steps.
+    v0 : ndarray, optional
+        The initial vector. If None, a uniform vector is used.
+        The default is None.
+    window : {'gaussian', None}
+        The window function. If None, no window function is used.
+        The default is 'gaussian'. See Notes for details.
+    window_scale : float
+        A scaling parameter for the window function. The default
+        is 1.0. See Notes for details.
+    sample_factor : int
+        The over-sampling factor. Must be an integer >= 1.
+        The default is 1.
+    norm : {'area', 'peak'}
+        The normalization convention for the energy spectrum.
+        The default is 'area'. See Notes for details.
+
+    Returns
+    -------
+    E : ndarray
+        The energy axis.
+    G : ndarray
+        The energy spectrum, normalized according to `norm`.
+    fwhm : ndarray
+        The energy-dependent FWHM line width. 
+    
+    Notes
+    -----
+    This spectral method follows that described in Ref. [1]_.
+        
+    If the `norm` parameter is 'area' (default), then 
+    the returned spectrum `G` is normalized such that
+    its energy integral is equal to the norm-squared of
+    the initial vector, `v0`. 
+    
+    The non-linear relationship between energy and the
+    Chebyshev angle lead to an energy-dependent line width.
+    Therefore, the peak amplitude of a resolved transition
+    will not be proportional to the spectral intensity
+    globally. The `norm` is 'peak', then the spectrum
+    is rescaled such that the peak amplitude of 
+    individual, resolved transitions does correspond
+    to the spectral intensity. The line widths are not 
+    affected, however, such that the integrated area
+    now no longer has a meaningful norm.
+    
+    References
+    ----------
+    .. [1] R. Chen, H. Guo. "The Chebyshev propagator for 
+       quantum systems." Computer Physics Communications, 119,
+       19-31 (1999).
+       https://doi.org/10.1016/S0010-4655(98)00179-9
+
+    """
+    
+    ################################
+    # Compute the Chebyshev propagator
+    # auto-correlation function 
+    # (in the order domain)
+    #
+    C, scale = chebauto(H, K, v0)
+    #
+    ################################
+    
+    ################################
+    # Apply window function
+    f, hw = chebwindow(len(C), window, window_scale)
+    C *= f 
+    # 
+    ################################
+    
+    ################################
+    # Zero-pad the auto-correlation function
+    # to over-sample the spectrum
+    sample_factor = max(1,round(sample_factor))
+    N = sample_factor * 2 * K
+    Cz = np.zeros((N,))
+    np.copyto(Cz[0:2*K], C)
+    # Cz is the zero-padded auto-correlation
+    ################################
+    
+    ################################
+    # Compute the discrete cosine transform,
+    #
+    # G(theta) = 1/pi * sum_k (2-delta_k,0) cos(k*theta) * C_k
+    #
+    # We use SciPy's built-in DCT. See 
+    # SciPy documention for a careful description
+    # of their conventions and normalization. The definition
+    # of G(theta) above corresponds to 
+    # Type III, norm = "backward"
+    # with an extra prefactor of 1/pi
+    #
+    G = (1/np.pi) * scipy.fft.dct(Cz, type = 3)
+    # The Chebyshev angles are uniformly distributed
+    theta = (np.arange(N) + 0.5) * np.pi/ N
+    # Compute the actual energy from the Chebyshev angles
+    E = scale[0] + scale[1] * np.cos(theta)
+    #
+    # As defined above, G(theta) is normalized
+    # such that its integral w.r.t. theta over 
+    # [0,pi] is equal to C[0]. i.e. if the 
+    # initial vector is a normalized wavefunction,
+    # then this is unity. Upon transforming to the
+    # energy domain, G(E) = G(theta) / sin(theta)
+    # will be normalized to `de`, because
+    # E = de * cos(theta) + ebar.
+    # Therefore, if we want the `area` normalization
+    # to integrate to the total "absorption" we need
+    # to divide out by `de`.
+    # 
+    #################################
+    if norm == 'peak':
+        pass 
+    elif norm == 'area':
+        # G(E) integrates w.r.t. E 
+        # to C[0]
+        G /= (np.sin(theta) * scale[1])
+        
+    ##################################
+    # Finally, determine the energy-dependent 
+    # FWHM line-width
+    # 
+    # | \Delta E | = de * sin(theta) * | \Delta theta | 
+    fwhm = (2*hw) * np.sin(theta) * scale[1]
+    #
+    ##################################
+        
+    
+    return np.flip(E), np.flip(G), np.flip(fwhm)
     
