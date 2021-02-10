@@ -231,7 +231,7 @@ def eigstrp(H, k = 5, pad = 10, tol = 1e-10, maxiter = None, v0 = None,
     return w,v
 
 
-def bounds(H, k = 10, m = 2):
+def bounds(H, k = 10, m = 3):
     """
     Estimate lower and upper bounds to the
     spectral range of the Hermitian operator H.
@@ -247,7 +247,7 @@ def bounds(H, k = 10, m = 2):
     m : int, optional
         The safe-guard level for the bound estimate.
         This must be less than or equal to `k`. The 
-        defaults is 3.
+        default is 3.
 
     Returns
     -------
@@ -352,7 +352,7 @@ def chebauto(H, K, v0 = None):
     Returns
     -------
     C : ndarray
-        A (2*K,) array containing the auto-correlation function
+        A (2*K+1,) array containing the auto-correlation function
         of `v0` in the Chebyshev order domain.
     scale : (float, float)
         The mean energy and half-width, (`ebar`, `de`) used to scale the
@@ -378,7 +378,7 @@ def chebauto(H, K, v0 = None):
     # we must calculate the scaled Hamiltonian.
     #
     # Estimate the spectral range:
-    elow,ehigh = bounds(H, k = 10, m = 2)
+    elow,ehigh = bounds(H, k = 10, m = 4)
     ebar = (elow + ehigh) / 2.0  # The mean eigenvalue
     de = (ehigh - elow) / 2.0    # The spectral width
     print("Estimated outer bounds of H:")
@@ -395,7 +395,7 @@ def chebauto(H, K, v0 = None):
     ##################
     # Initialize the auto-correlation function
     #
-    C = np.zeros((2*K,))
+    C = np.zeros((2*K + 1,))
     #
     # Initial wavefunction
     NH = H.shape[0] 
@@ -415,7 +415,11 @@ def chebauto(H, K, v0 = None):
     ck   = c1
     # Perform propagation
     for k in range(1,K):
-        
+        # 
+        # At beginning of loop
+        # ck is c_k and
+        # ckm1 = c_{k-1}
+        #
         # Calculate auto-correlation
         C[k] = np.dot(ck,c0)
         
@@ -431,30 +435,36 @@ def chebauto(H, K, v0 = None):
             C[2*k+1] = 2*np.dot(ckp1,ck) - C[1]
         
         # Update Chebyshev vectors for next iteration
-        ckm1 = ck 
+        ckm1 = ck
         ck   = ckp1
+    #
+    # At loop exit,
+    # ck is c_{k = k}
+    # 
+    # Calculate the final element in the auto-correlation
+    C[2*K] = 2*np.dot(ck,ck) - C[0] 
     #
     # C now contains the auto-correlation function 
     # in the Chebyshev order domain
     #
     # Return the raw auto-correlation.
     #########################
-
     
     return C, (ebar,de)
 
 def chebwindow(N, window, window_scale = 1.0):
     
     """ 
-    Calculate window function.
+    Calculate the window function for a Chebyshev
+    order-domain correlation function.
     
     Parameters
     ----------
     N : int
-        Length of auto-correlation function.
-    window : {'gaussian', None}
+        Length of correlation function.
+    window : {'gaussian', 'boxcar', None}
         The window function type.
-    window_scale : floa
+    window_scale : float
         A scaling parameter for the window function. Must be
         >= 1.0 The default is 1.0. See Notes for details.
         
@@ -470,9 +480,10 @@ def chebwindow(N, window, window_scale = 1.0):
     -----
     The window functions are always scaled to a dimensionless
     order-time parameter, tau, ranging from 0 to 1 over the total 
-    propagation time. The 'gaussian' window multiplies the
-    raw auto-correlation function by 
-    ``np.exp(-(3.0 * window_scale * tau)**2)``.
+    propagation time. The 'gaussian' window is equal to
+    ``np.exp(-(3.0 * window_scale * tau)**2)``. The 'boxcar'
+    window is 1 for tau < 1/window_scale and 0 for tau >-
+    1/window_scale.
     
     """
     tau = np.linspace(0.,1.,N+1)[:-1]
@@ -483,8 +494,15 @@ def chebwindow(N, window, window_scale = 1.0):
         
         
     if window is None:
+        ############
+        # Do nothing
+        # (equivalent to boxcar with window_scale = 1.0)
         f = np.ones_like(tau)
         hw = 1.9 / N
+    elif window == 'boxcar':
+        f = np.ones_like(tau)
+        f[tau >= 1.0/window_scale] = 0.0 
+        hw = window_scale * 1.9 / N 
     elif window == 'gaussian':
         f = np.exp(-(3.0*tau*window_scale)**2)
         hw = window_scale * 5.0 / N
@@ -530,6 +548,8 @@ def chebspec(H, K, v0 = None, window = 'gaussian', window_scale = 1.0,
         The energy spectrum, normalized according to `norm`.
     fwhm : ndarray
         The energy-dependent FWHM line width. 
+    C : ndarray
+        The windowed auto-correlation function.
     
     Notes
     -----
@@ -580,9 +600,9 @@ def chebspec(H, K, v0 = None, window = 'gaussian', window_scale = 1.0,
     # Zero-pad the auto-correlation function
     # to over-sample the spectrum
     sample_factor = max(1,round(sample_factor))
-    N = sample_factor * 2 * K
+    N = sample_factor * len(C) 
     Cz = np.zeros((N,))
-    np.copyto(Cz[0:2*K], C)
+    np.copyto(Cz[0:len(C)], C)
     # Cz is the zero-padded auto-correlation
     ################################
     
@@ -634,5 +654,5 @@ def chebspec(H, K, v0 = None, window = 'gaussian', window_scale = 1.0,
     ##################################
         
     
-    return np.flip(E), np.flip(G), np.flip(fwhm)
+    return np.flip(E), np.flip(G), np.flip(fwhm), C
     
