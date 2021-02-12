@@ -21,6 +21,23 @@ def _besDVR(start,stop,num,nu):
     Returns
     -------
     grid, D, D2 : ndarrays
+    
+    Notes
+    -----
+    Bessel DVRs are discussed comprehensively by Littlejohn and Cargo [1]_.
+    For generalized angular momentum :math:`\lambda` in :math:`d` dimensions,
+    the Bessel order is :math:`\nu = \lambda + d/2 - 1`, where :math:`\lambda`
+    is the generalized angular momentum quantum number. For the common case
+    of 2-dimensional problems, :math:`\nu = \lambda = |m|`. Radial wavefunctions
+    normalized with volume element :math:`dr` go as :math:`r^{\nu+1/2}` near the origin.
+    
+    
+    References
+    ----------
+    .. [1] R. G. Littlejohn and M. Cargo, "Bessel discrete variable representation
+       bases." J. Chem. Phys. 117, 27 (2002).
+       https://doi.org/10.1063/1.1481388
+
 
     """
     
@@ -38,6 +55,7 @@ def _besDVR(start,stop,num,nu):
     # Construct the full KEO operator
     #
     #  T = -d^2/dr^2 + (nu^2 - 1/4) / r^2
+    #
     T = np.zeros((nz,nz))
     for i in range(nz):
         for j in range(nz):
@@ -47,36 +65,40 @@ def _besDVR(start,stop,num,nu):
             else:
                 T[i,j] = (-1)**(i-j) * 8.0 * K**2 \
                     * z[i]*z[j]/(z[i]**2 - z[j]**2)**2
+    #
     # Construct the full D2 operator
+    # by adding back the singular centrifugal potential
+    #
     d2 = -T + np.diag((nu**2 - 1/4.0) / r**2)
     #
+    
     
     # Construct an approximate d operator
     
     # Construct the quadrature
-    d = np.zeros((nz,nz))
-    for i in range(nz):
-        for j in range(nz):
-            if i == j:
-                d[i,j] = 0.0
-                continue
+    # d = np.zeros((nz,nz))
+    # for i in range(nz):
+    #     for j in range(nz):
+    #         if i == j:
+    #             d[i,j] = 0.0
+    #             continue
             
-            # J'(nu, K*r[i])
-            # Jpi = 0.5*(scipy.special.jn(nu-1, z[i]) - scipy.special.jn(nu+1,z[i] ))
-            # Ji = scipy.special.jn(nu,K*r[i]) # this should always be zero
+    #         # J'(nu, K*r[i])
+    #         # Jpi = 0.5*(scipy.special.jn(nu-1, z[i]) - scipy.special.jn(nu+1,z[i] ))
+    #         # Ji = scipy.special.jn(nu,K*r[i]) # this should always be zero
             
-            den = (K*r[i])**2 - z[j]**2
+    #         den = (K*r[i])**2 - z[j]**2
             
-            dFj = (-1)**(i+1)*K*z[j]*(np.sqrt(2*r[i])*K/den) # * Jpi
-            # The next term should always be zero
-            # + (0.5*np.sqrt(2/r[i])/den - np.sqrt(8*r[i])*K*r[i]/den**2) * Ji)
+    #         dFj = (-1)**(i+1)*K*z[j]*(np.sqrt(2*r[i])*K/den) # * Jpi
+    #         # The next term should always be zero
+    #         # + (0.5*np.sqrt(2/r[i])/den - np.sqrt(8*r[i])*K*r[i]/den**2) * Ji)
             
             
-            Fi = (-1)**(i+1) * np.sqrt(K*z[i]/2.0) # * Jpi
-            d[i,j] = dFj/Fi
-    #
-    # Force skew-symmetric
-    d = (d - d.transpose()).copy() * 0.5
+    #         Fi = (-1)**(i+1) * np.sqrt(K*z[i]/2.0) # * Jpi
+    #         d[i,j] = dFj/Fi
+    # #
+    # # Force skew-symmetric
+    # d = (d - d.transpose()).copy() * 0.5
     
     # Calculate the truncated arrays
     grid = r[-num:].copy()
@@ -146,11 +168,43 @@ def _besFnun(n, nu, K, z, r):
 
 def _besDVRzeros(start, stop, num, nu):
     
+    """
+    Calculate Bessel zero's, the DVR grid points
+    
+    Parameters
+    ----------
+    start : float
+        Start bound.
+    stop : float
+        Stop bound.
+    num : int
+        The number of grid points to calculate
+    nu : float
+        The Bessel order.
+        
+    Returns
+    -------
+    z : ndarray
+        A list of unscaled Bessel zeros
+    K : float
+        The scaling parameter, K = z/r
+    r : ndarray
+        A list of dimension-ful (scaled) zeros. The final
+        `num` of these fit between `start` and `stop`
+    nz : int
+        The number of zeros calculated
+    """
+    
     # Look for the correct set of zeros
+    
+    # Start by calculating the first nz = num
+    # zeros
     nz = num
     while True: 
         #z = scipy.special.jn_zeros(nu, nz)
+        # Calculate the first nz zeros of J_nu
         z = _besselzero(nu, nz)
+        # Scale the final zero to equal `stop`
         K = z[-1] / stop
         r = z / K
         
@@ -186,7 +240,7 @@ def _besselzero(nu, nz = 5):
     Returns
     -------
     ndarray
-        First nz zeros of the Bessel function.
+        First `nz` zeros of the Bessel function.
 
     """
     
