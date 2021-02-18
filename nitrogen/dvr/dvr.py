@@ -233,6 +233,7 @@ class NDBasis:
         return self._quadToFbr(w, axis)
     
     def _fbrToQuad(self, v, axis = 0):
+        
         """ The default implemention of
         the FBR to quadrature transformation"""
         
