@@ -3,8 +3,9 @@ nitrogen.dvr
 ------------
 
 This module provides support for discrete-variable 
-representation (DVR) basis functions. The main object
-is the :class:`DVR` class.
+representation (DVR) and finite-basis representation
+(FBR) basis sets. The main objects are the
+:class:`DVR` and :class:`NDBasis` classes.
 
 """
 
