@@ -19,6 +19,8 @@ class JacobiChain3N(CoordSys):
     
     The Jacobi binary tree diagram is
     
+    ::
+    
            +
           / \
          0   +

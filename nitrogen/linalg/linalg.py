@@ -50,11 +50,11 @@ def eigstrp(H, k = 5, pad = 10, tol = 1e-10, maxiter = None, v0 = None,
     Notes
     -----
     The restarted Lanczos method is based on that described by Wu 
-    and Simon [1]_.
+    and Simon [WS00]_.
     
     References
     ----------
-    .. [1] K. Wu and H. Simon, "Thick-Restart Lanczos Method for Large Symmetric Eigenvalue Problems."
+    .. [WS00] K. Wu and H. Simon, "Thick-Restart Lanczos Method for Large Symmetric Eigenvalue Problems."
        SIAM Journal on Matrix Analysis and Applications, 22(2), 602-616. (2000)
        https://doi.org/10.1137/S0895479898334605
     """
@@ -261,7 +261,7 @@ def bounds(H, k = 10, m = 3):
     Notes
     -----
     These spectral bound estimates are based the work of Y. Zhou
-    and R.-C. Li [1]_. Their bounds (2.6), (2.7), and (2.8) 
+    and R.-C. Li [ZL11]_. Their bounds (2.6), (2.7), and (2.8) 
     correspond to `m` = 1, `k`, and 3, respectively.
     
     In general, a larger value of `m` will provide a safer, but
@@ -269,7 +269,7 @@ def bounds(H, k = 10, m = 3):
     
     References
     ----------
-    .. [1] Y. Zhou and R.-C. Li, "Bound the spectrum of large Hermitian matrices."
+    .. [ZL11] Y. Zhou and R.-C. Li, "Bound the spectrum of large Hermitian matrices."
        Linear Algebra and its Applications, 435, 480-493 (2011).
        https://doi.org/10.1016/j.laa.2010.06.034
     
@@ -361,14 +361,13 @@ def chebauto(H, K, v0 = None):
     
     Notes
     -----
-    See Ref. [1]_ for a description of Chebyshev propagators.
+    See Ref. [CG99]_ for a description of Chebyshev propagators.
     
     References
     ----------
-    .. [1] R. Chen, H. Guo. "The Chebyshev propagator for 
+    .. [CG99] R. Chen, H. Guo. "The Chebyshev propagator for 
        quantum systems." Computer Physics Communications, 119,
-       19-31 (1999).
-       https://doi.org/10.1016/S0010-4655(98)00179-9
+       19-31 (1999). https://doi.org/10.1016/S0010-4655(98)00179-9
 
     """
     
@@ -553,7 +552,7 @@ def chebspec(H, K, v0 = None, window = 'gaussian', window_scale = 1.0,
     
     Notes
     -----
-    This spectral method follows that described in Ref. [1]_.
+    This spectral method follows that described in Ref. [CG99]_.
         
     If the `norm` parameter is 'area' (default), then 
     the returned spectrum `G` is normalized such that
@@ -570,13 +569,6 @@ def chebspec(H, K, v0 = None, window = 'gaussian', window_scale = 1.0,
     to the spectral intensity. The line widths are not 
     affected, however, such that the integrated area
     now no longer has a meaningful norm.
-    
-    References
-    ----------
-    .. [1] R. Chen, H. Guo. "The Chebyshev propagator for 
-       quantum systems." Computer Physics Communications, 119,
-       19-31 (1999).
-       https://doi.org/10.1016/S0010-4655(98)00179-9
 
     """
     

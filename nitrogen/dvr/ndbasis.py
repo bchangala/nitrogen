@@ -5,7 +5,9 @@ Implements the NDBasis base class and common
 sub-classes: 
 
     1) SinCosBasis: a sine-cosine basis function
-      (i.e. a real Fourier/exponential basis)
+       (i.e. a real Fourier/exponential basis)
+    2) LegendreLMCosBasis: Associated Legendre 
+       polynomials with cosine arguments.
 
 """
 
@@ -170,10 +172,14 @@ class SinCosBasis(NDBasis):
     
     A 1-D, real sine/cosine basis set,
     
-    f_m(phi) = 1/sqrt(pi) * sin(|m| * phi) ... m < 0
-             = 1/sqrt(2*pi)                ... m = 0
-             = 1/sqrt(pi) * cos( m  * phi) ... m > 0
-             
+    .. math::
+
+       f_m(\\phi) = 1/\sqrt{\pi} \sin(|m|\phi) \ldots m < 0
+       
+       = 1/\sqrt{2\pi}              \ldots m = 0
+        
+       = 1/\sqrt{\pi} \cos(m \phi)  \ldots m > 0 
+
     Attributes
     ----------
     
@@ -190,13 +196,13 @@ class SinCosBasis(NDBasis):
         ----------
         
         m : int or 1-D array_like of int, optional
-            If scalar, the 2|`m`| + 1 basis functions with
-            index <= |`m`| will be included. If array_like,
+            If scalar, the :math:`2|m|+1` basis functions with
+            index :math:`\leq |m|` will be included. If array_like,
             then `m` lists all m-indices to be included.
             The default is `m` = 10.
         Nq : int, optional
             The number of quadrature points. The default
-            is 2*(max(abs(m)) + 1)
+            is 2*(max(abs(`m`)) + 1)
 
         """
         
@@ -236,9 +242,18 @@ class LegendreLMCosBasis(NDBasis):
     """
     
     Associated Legendre polynomials with cosine
-    argument. See :class:`~nitrogen.special.LegendreLMCos`.
+    argument, :math:`F_\ell^m(\\theta) \propto P_\ell^m(\cos\\theta)`.
+    See :class:`~nitrogen.special.LegendreLMCos`.
     
     Quadrature is performed with a Gauss-Legendre grid.
+    
+    These functions are eigenfunctions of the differential
+    operator
+    
+    .. math::
+       -\\frac{\partial^2}{\partial \\theta^2} - \cot \\theta \\frac{\partial}{\partial \\theta} + \\frac{m^2}{\sin^2\\theta}
+       
+    with eigenvalue :math:`\ell(\ell+1)`.
              
     Attributes
     ----------
