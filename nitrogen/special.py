@@ -1,6 +1,6 @@
 """
 nitrogen.special
--------------
+----------------
 
 Special math and basis functions 
 as differentiable DFun objects.
@@ -10,6 +10,7 @@ Function         Description
 --------------   ----------------------------------------------------
 SinCosDFun       Real sine-cosine basis
 LegendreLMCos    Associated Legendre functions with cosine argument
+==============   ====================================================
 
 """
 
@@ -22,11 +23,13 @@ from scipy.special import factorial, factorial2
 class SinCosDFun(dfun.DFun):
     
     """
-    A real sine/cosine basis set
+    A real sine/cosine basis set,
     
-    f_m(phi) = 1/sqrt(pi) * sin(|m| * phi) ... m < 0
-             = 1/sqrt(2*pi)                ... m = 0
-             = 1/sqrt(pi) * cos( m  * phi) ... m > 0
+    .. math::
+
+       f_m(\\phi) &= 1/\sqrt{\pi} \sin(|m|\phi) &\ldots m < 0\\\\
+       &= 1/\sqrt{2\pi}              &\ldots m = 0\\\\
+       &= 1/\sqrt{\pi} \cos(m \phi)  &\ldots m > 0 
              
     Attributes
     ----------
@@ -43,8 +46,8 @@ class SinCosDFun(dfun.DFun):
         Parameters
         ----------
         m : scalar or 1-D array_like
-            If scalar, the 2|`m`| + 1 basis functions with
-            index <= |`m`| will be included. If array_like,
+            If scalar, the :math:`2|m|+1` basis functions with
+            index :math:`\leq |m|` will be included. If array_like,
             then `m` lists all m-indices to be included.
 
         """
@@ -118,17 +121,22 @@ class SinCosDFun(dfun.DFun):
 class LegendreLMCos(dfun.DFun):  
     """
     Associated Legendre polynomials of a 
-    given order, m, with 
-    cos(theta) argument for theta in [0,pi]
+    given order, :math:`m`, with 
+    :math:`\cos \\theta` argument for 
+    :math:`\\theta \in [0,\pi]`.
     
-    F_lm(theta) = N^m_l * P_l,|m|(cos(theta)),
-    m = 0, 1, 2, 3, ...
-    l = |m|, |m|+1,|m|+2,..., lmax
-    (negative m is defined, but just equal to m = |m|)
+    .. math::
+       F_\ell^m(\\theta) = N^m_l  P_l^{|m|}(\cos \\theta),
+       
+    with :math:`m = 0, 1, 2, \ldots` and 
+    :math:`\ell = |m|, |m|+1, \ldots, \ell_\\text{max}`.
+    (Negative :math:`m` is defined, but just equal to :math:`m = |m|`).
     
-    where the normalization coefficient, N^m_l, is
-      
-      N^m_l = [2/(2*l+1)  * (l+|m|)!/(l-|m|)!] ** (-1/2)
+    The normalization coefficient is
+    
+    .. math::
+        
+       N_\ell^m = \\left( \\frac{2}{2\ell+1}  \\frac{(l+|m|)!}{(l-|m|)!} \\right) ^{-1/2}
     
     
     Attributes
@@ -149,8 +157,8 @@ class LegendreLMCos(dfun.DFun):
         m : int
             The Legendre order.
         lmax : int
-            The maximum value of l. This must
-            be greater than or equal to |m|.
+            The maximum value of :math:`\ell`. This must
+            be greater than or equal to :math:`|m|`.
         """
         
         if lmax < abs(m):

@@ -174,17 +174,19 @@ class SinCosBasis(NDBasis):
     
     .. math::
 
-       f_m(\\phi) = 1/\sqrt{\pi} \sin(|m|\phi) \ldots m < 0
-       
-       = 1/\sqrt{2\pi}              \ldots m = 0
-        
-       = 1/\sqrt{\pi} \cos(m \phi)  \ldots m > 0 
+       f_m(\\phi) &= 1/\sqrt{\pi} \sin(|m|\phi) &\ldots m < 0\\\\
+       &= 1/\sqrt{2\pi}              &\ldots m = 0\\\\
+       &= 1/\sqrt{\pi} \cos(m \phi)  &\ldots m > 0 
 
     Attributes
     ----------
     
     m : ndarray
         The m quantum number of each basis function.
+        
+    See Also
+    --------
+    special.SinCosDFun : DFun sub-class for sine-cosine basis set.
     
     """
     
@@ -261,6 +263,10 @@ class LegendreLMCosBasis(NDBasis):
         The associated Legendre order.
     l : ndarray
         A list of l-indices of the basis functions.
+        
+    See Also
+    --------
+    nitrogen.special.LegendreLMCos : DFun sub-class for associated Legendre functions.
 
     
     """

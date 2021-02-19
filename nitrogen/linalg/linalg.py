@@ -359,6 +359,11 @@ def chebauto(H, K, v0 = None):
         Hamiltonian. The unscaled energy is related to the 
         Chebyshev angle parameter as ``E = de * cos(theta) + ebar``.
     
+    See Also
+    --------
+    bounds : Used to scale the Hamiltonian
+    chebspec : Calculate a spectrum from the Chebyshev auto-correlation function.
+    
     Notes
     -----
     See Ref. [CG99]_ for a description of Chebyshev propagators.
@@ -549,6 +554,12 @@ def chebspec(H, K, v0 = None, window = 'gaussian', window_scale = 1.0,
         The energy-dependent FWHM line width. 
     C : ndarray
         The windowed auto-correlation function.
+        
+    See Also
+    --------
+    bounds : Used to scale the Hamiltonian
+    chebauto : Calculates the Chebyshev auto-correlation function.
+    chebwindow : Standard windows functions.
     
     Notes
     -----
@@ -627,20 +638,22 @@ def chebspec(H, K, v0 = None, window = 'gaussian', window_scale = 1.0,
     # Therefore, if we want the `area` normalization
     # to integrate to the total "absorption" we need
     # to divide out by `de`.
-    # 
-    #################################
+    #
     if norm == 'peak':
         pass 
     elif norm == 'area':
         # G(E) integrates w.r.t. E 
         # to C[0]
         G /= (np.sin(theta) * scale[1])
+    # 
+    #################################
         
     ##################################
     # Finally, determine the energy-dependent 
     # FWHM line-width
     # 
     # | \Delta E | = de * sin(theta) * | \Delta theta | 
+    #
     fwhm = (2*hw) * np.sin(theta) * scale[1]
     #
     ##################################

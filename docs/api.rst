@@ -11,6 +11,10 @@ NITROGEN API reference
    :members:
    :show-inheritance:
    
+.. automodule:: nitrogen.special
+   :members:
+   :show-inheritance:
+   
 .. automodule:: nitrogen.coordsys
    :members:
    :show-inheritance:
