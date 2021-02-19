@@ -56,8 +56,9 @@ class DFun:
         zlevel : int, optional
             The zero-level of the differentiable function. All derivatives
             with total order greater than `zlevel` are zero. A value
-            of None indicates all derivatives may be non-zero. The default is
-            None.
+            of None indicates all derivatives may be non-zero, while
+            -1 indicates an identically zero function and 0 a constant function.
+            The default is None.
 
         """
         self._feval = fx
@@ -792,41 +793,49 @@ class FiniteDFun(DFun):
     
 class MergedDFun(DFun):
     """
-    Concatenate the outputs of two DFuns as
-    a single, merged DFUn.
+    Concatenate the outputs of multiple DFuns
+    into a single, merged DFun.
     
     """
     
-    def __init__(self, A, B):
+    def __init__(self, dfuns):
         """
         Create a merged DFun with the outputs of
-        A and B.
+        multiples DFuns.
            
         Parameters
         ----------
-        A,B : DFun
-            Component DFun.
+        dfuns : list of DFun
+            The component DFun's.
            
         """
         
-        # Check that A and B have the same
-        # number of input variables
-        if A.nx != B.nx:
-            raise ValueError("A and B have different numbers of inputs.")
+        if len(dfuns) == 0:
+            raise ValueError("dfuns list must have at least one element")
         
+        nx = dfuns[0].nx 
+        # Check that each DFun has the same number of inputs
+        for df in dfuns:
+            if df.nx != nx:
+                raise ValueError("All DFun's must have the same number of inputs.")
+        
+        nf = 0
         # The new number of outputs is the sum of
-        # those of A and B 
-        nf = A.nf + B.nf 
+        # DFun's outputs
+        for df in dfuns:
+            nf += df.nf 
         
         # Determine the maxderiv and zlevel of the
         # merged functions
-        maxderiv = _merged_maxderiv(A.maxderiv, B.maxderiv)
-        zlevel = _merged_zlevel(A.zlevel, B.zlevel) 
+        maxderiv = None 
+        zlevel = -1
+        for df in dfuns:
+            maxderiv = _merged_maxderiv(df.maxderiv, maxderiv)
+            zlevel = _merged_zlevel(df.zlevel, zlevel) 
         
-        super().__init__(self._fmerged, nf, A.nx, maxderiv, zlevel)
+        super().__init__(self._fmerged, nf, nx, maxderiv, zlevel)
         
-        self.A = A  # Maintain references to the merged DFuns
-        self.B = B 
+        self.dfuns = dfuns 
         
         return 
     
@@ -841,21 +850,19 @@ class MergedDFun(DFun):
             base_shape = X.shape[1:]
             out = np.ndarray( (nd, self.nf) + base_shape, dtype = X.dtype)
             
-        # We first calculate the derivative arrays
-        # for A and B, then we simply contenate 
-        # the output function indices.
-        #
-        # This is done in one step by sending output
-        # directly to `out`.
-        nA = self.A.nf  
+        # Place the derivative array outputs 
+        # of each DFun into the combined output
+        # array, `out`, in order
         
-        self.A.f(X, deriv = deriv, out = out[:,0:nA], var = var)
-        self.B.f(X, deriv = deriv, out = out[:,nA:],  var = var)
+        offset = 0
+        for df in self.dfuns:
+            df.f(X, deriv = deriv, out = out[:,offset:(offset+df.nf)], var = var)
+            offset += df.nf
            
         return out
     
     def __repr__(self):
-        return f"MergedDFun({self.A!r}, {self.B!r})"
+        return f"MergedDFun({self.dfuns!r})"
            
         
     
