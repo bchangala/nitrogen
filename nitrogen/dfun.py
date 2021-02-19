@@ -544,6 +544,9 @@ class CompositeDFun(DFun):
             np.copyto(out[:,i], H[i].d)
         
         return out
+    
+    def __repr__(self):
+        return f"CompositeDFun({self.A!r}, {self.B!r})"
 
 class FixedInputDFun(DFun):
     
@@ -786,6 +789,76 @@ class FiniteDFun(DFun):
             
         return rep
     
+    
+class MergedDFun(DFun):
+    """
+    Concatenate the outputs of two DFuns as
+    a single, merged DFUn.
+    
+    """
+    
+    def __init__(self, A, B):
+        """
+        Create a merged DFun with the outputs of
+        A and B.
+           
+        Parameters
+        ----------
+        A,B : DFun
+            Component DFun.
+           
+        """
+        
+        # Check that A and B have the same
+        # number of input variables
+        if A.nx != B.nx:
+            raise ValueError("A and B have different numbers of inputs.")
+        
+        # The new number of outputs is the sum of
+        # those of A and B 
+        nf = A.nf + B.nf 
+        
+        # Determine the maxderiv and zlevel of the
+        # merged functions
+        maxderiv = _merged_maxderiv(A.maxderiv, B.maxderiv)
+        zlevel = _merged_zlevel(A.zlevel, B.zlevel) 
+        
+        super().__init__(self._fmerged, nf, A.nx, maxderiv, zlevel)
+        
+        self.A = A  # Maintain references to the merged DFuns
+        self.B = B 
+        
+        return 
+    
+    def _fmerged(self, X, deriv = 0, out = None, var = None):
+        """
+        Merged DFun derivative array evaluation function.
+        
+        """
+        # Set up output
+        nd,nvar = ndnvar(deriv, var, self.nx)
+        if out is None:
+            base_shape = X.shape[1:]
+            out = np.ndarray( (nd, self.nf) + base_shape, dtype = X.dtype)
+            
+        # We first calculate the derivative arrays
+        # for A and B, then we simply contenate 
+        # the output function indices.
+        #
+        # This is done in one step by sending output
+        # directly to `out`.
+        nA = self.A.nf  
+        
+        self.A.f(X, deriv = deriv, out = out[:,0:nA], var = var)
+        self.B.f(X, deriv = deriv, out = out[:,nA:],  var = var)
+           
+        return out
+    
+    def __repr__(self):
+        return f"MergedDFun({self.A!r}, {self.B!r})"
+           
+        
+    
 def _composite_maxderiv(maxA,maxB):
     """
     Determine the maxderiv value of a composite
@@ -840,6 +913,64 @@ def _composite_zlevel(zlevelA, zlevelB):
         zlevel = zlevelA # then H is zero or constant
     else:
         zlevel = zlevelA * zlevelB # composite polynomials
+    
+    return zlevel
+
+def _merged_maxderiv(maxA,maxB):
+    """
+    Calculate the maxderiv of a merged DFun.
+
+    Parameters
+    ----------
+    maxA, maxB : int or None
+        maxderiv of merged DFun.
+
+    Returns
+    -------
+    int or None
+        The maxderiv of the merger.
+
+    """
+    
+    if maxA is None and maxB is None:
+        maxderiv = None
+    elif maxA is None:
+        maxderiv = maxB
+    elif maxB is None:
+        maxderiv = maxA
+    else:
+        maxderiv = min(maxA,maxB)
+    
+    return maxderiv
+
+def _merged_zlevel(zlevelA, zlevelB):
+    """
+    Determine the zlevel of a merged
+    DFun.
+
+    Parameters
+    ----------
+    zlevelA, zlevelB : int or None
+        zlevel parameter of merged DFuns.
+
+    Returns
+    -------
+    int or None
+        zlevel of merged function
+
+    """
+    
+    # If zlevel is None, then the merged
+    # outputs also have no zlevel.
+    if zlevelA is None or zlevelB is None:
+        zlevel = None
+    else:
+        # If neither is none, i.e. both
+        # have some finite zlevel, then the
+        # merged zlevel is the greater of the 
+        # two.
+        zlevel = max(zlevelA, zlevelB)
+
     
     return zlevel
 

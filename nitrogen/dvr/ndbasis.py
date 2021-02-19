@@ -186,7 +186,7 @@ class SinCosBasis(NDBasis):
         
     See Also
     --------
-    special.SinCosDFun : DFun sub-class for sine-cosine basis set.
+    nitrogen.special.SinCosDFun : DFun sub-class for sine-cosine basis set.
     
     """
     

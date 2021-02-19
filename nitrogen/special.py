@@ -278,3 +278,102 @@ class Sin(dfun.DFun):
             np.copyto(out[k,0:1], y)
             
         return out 
+    
+class RealSphericalH(dfun.DFun):
+    
+    """
+    Real-valued spherical harmonics,
+    
+    .. math::
+       \Phi_\ell^m(\\theta, \\phi) = F_\ell^m(\\theta) f_m (\\phi)
+    
+    For definitions of the associated Legendre polynomials
+    :math:`F_\ell^m` and sine-cosine functions :math:`f_m`, see
+    :class:`~nitrogen.special.LegendreLMCos` and 
+    :class:`~nitrogen.special.SinCosDFun`.
+    
+    Attributes
+    ----------
+    l : ndarray
+        The :math:`\ell` quantum numbers.
+    m : ndarray
+        The :math:`m` quantum numbers.
+    
+    """
+    
+    def __init__(self, m, lmax):
+        """
+        Create a real spherical harmonic basis.
+        
+        Parameters
+        ----------
+        m : scalar or 1-D array_like
+            The projection quantum number. 
+            If scalar, then all :math:`m` with 
+            :math:`|m| \leq` `m` will be included. If array_like,
+            then `m` lists all :math:`m` to be included.
+        lmax : int
+            The maximum value of :math:`\ell`, the angular momentum
+            (or azimuthal) quantum number.
+
+        """
+        
+        # Parse m-list
+        if np.isscalar(m):
+            m = np.arange(-abs(m), abs(m)+1)
+        else:
+            m = np.array(m)
+        
+        # Require every m quantum number to have at least
+        # one basis function, i.e. lmax must be >= max(abs(m))
+        if lmax < np.max(abs(m)):
+            raise ValueError("At least one m-order is empty. Increase lmax")
+        
+        mlist = []
+        llist = []
+        for M in m:
+            for L in range(abs(m),lmax+1):
+                mlist.append(M)
+                llist.append(L) 
+        
+        nf = len(mlist) # = len(llist)
+        if nf == 0:
+            raise ValueError("Invalid m or l quantum number constraints.")
+        
+        
+        super().__init__(self._Philm, nf = nf, nx = 2,
+                         maxderiv = None, zlevel = None)
+        
+        # Save the quantum number lists 
+        # as ndarray's
+        self.l = np.array(L) 
+        self.m = np.array(M) 
+        
+        # Set up DFun's for the theta basis and the phi 
+        # basis separable factors 
+        self.phi_basis = SinCosDFun(m) # only supplies functions for index M in `m`
+        theta_bases = []
+        for M in m: # Legendre basis for each M in `m`
+            theta_bases.append(LegendreLMCos(M,lmax))
+        self.theta_bases = theta_bases 
+        
+        
+        return 
+    
+    def _Philm(self, X, deriv = 0, out = None, var = None):
+        
+        # Setup
+        nd,nvar = dfun.ndnvar(deriv, var, self.nx)
+        if out is None:
+            base_shape = X.shape[1:]
+            out = np.ndarray( (nd, self.nf) + base_shape, dtype = X.dtype)
+            
+        # Evaluate the separable factors for the theta and phi
+        # basis functions 
+        #f_phi = self.phi_basis.f(X[1:2], deriv, var
+        raise NotImplementedError()
+       
+            
+        return out 
+    
+    
