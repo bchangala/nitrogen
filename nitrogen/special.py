@@ -9,7 +9,8 @@ as differentiable DFun objects.
 Function         Description
 --------------   ----------------------------------------------------
 SinCosDFun       Real sine-cosine basis
-LegendreLMCos    Associated Legendre functions with cosine argument
+LegendreLMCos    Associated Legendre functions with cosine 
+RealSphericalH   Real spherical harmonics
 ==============   ====================================================
 
 """
@@ -17,6 +18,7 @@ LegendreLMCos    Associated Legendre functions with cosine argument
 import nitrogen.dfun as dfun
 import nitrogen.autodiff.forward as adf
 import numpy as np 
+import scipy.special 
 from scipy.special import factorial, factorial2
 
 
@@ -470,4 +472,64 @@ class RealSphericalH(dfun.DFun):
         return out 
 
     
+class BesselJ(dfun.DFun):
+    """
     
+    Bessel functions of the first kind.
+    
+    """
+    
+    def __init__(self, v):
+        """
+        Bessel function of the first kind
+        J_v(x)
+
+        Parameters
+        ----------
+        v : float
+            The real order parameter.
+
+        """
+        
+        super().__init__(self._jv, nf = 1, nx = 1, 
+                         maxderiv = None, zlevel = None)
+        
+        self.v = v 
+        
+        return 
+        
+    def _jv(self, X, deriv = 0, out = None, var = None):
+        """
+        Bessel function of the first kind, Jv.
+        Derivative array eval function.
+        """
+        # Setup
+        nd,nvar = dfun.ndnvar(deriv, var, self.nx)
+        if out is None:
+            base_shape = X.shape[1:]
+            out = np.ndarray( (nd, self.nf) + base_shape, dtype = X.dtype)
+        
+        # Make adf objects for theta and phi 
+        x = X[0] 
+        
+        #
+        # Calculate derivatives
+        #
+        # For now, we will just use the SciPy
+        # Bessel function derivatives routine for 
+        # each deriative order. This routine
+        # makes use of the recursive definition of 
+        # derivatives of Jv 
+        #
+        # (d/dx)^k J_v = (1/2)**k  * Sum_n=0^k  (-1)**n * (k choose n) * J_{v-k+2n}
+        #
+        # By calling it for each derivative order, 
+        # we are calculating some Bessel functions
+        # multiple times. But this is not that expensive anyway,
+        # so don't worry about the efficiency issue.
+        #
+        for k in range(nd):
+            dk = scipy.special.jvp(self.v, x, n = k)
+            np.copyto(out[k:(k+1),0], dk)
+        
+        return out 
