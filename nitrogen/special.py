@@ -190,47 +190,12 @@ class LegendreLMCos(dfun.DFun):
         # Create adf object for theta
         theta = dfun.X2adf(X, deriv, var)[0]
         m = abs(self.m) # |m| 
-        
-        F = []
-        # Calculate Legendre polynomials 
-        #
-        # Start with F_l=|m|, m
-        #  = N * P_l,l     with l = |m|
-        #  = N * (-1)**l * (2l-1)!! * sin(theta)**l
         sinm = adf.powi(adf.sin(theta), m)
-        Nmm = (2/(2*m+1) * factorial(2*m)) ** (-0.5)
-        c = (Nmm * (-1)**m * factorial2(2*m-1))
-        Fmm = c * sinm
-        F.append(Fmm)
         cos = adf.cos(theta)
-        #
-        if self.nf > 1:
-            # The second function is related to the first via
-            # 
-            #                N^|m|_|m|+1
-            #  F^|m|_|m|+1 = ------------ cos(theta) * (2|m|+1) F^|m|_|m|
-            #                 N^|m|,|m|
-            #
-            # The ratio of N's is just
-            # sqrt(2|m|+3) / (2|m| + 1)
-            #
-            Fmmp1 = np.sqrt(2*m+3) * (cos * Fmm) 
-            F.append(Fmmp1)
-        for l in self.l[2:]:
-            # 
-            # Continue with general recursion relation
-            #
-            #           2l-1             N^m_l                 l+m-1 N^m_l
-            # F^m_l =  ------ cos(theta) -------- F^m_l-1   -  ----- ------- F^m_l-2
-            #           l - m            N^m_l-1               l-m   N^m_l-2
-            #
-            # first N ratio:
-            N1 = np.sqrt((2*l+1)/(2*l-1) * (l-m)/(l+m))
-            # second N ratio: 
-            N2 = np.sqrt((2*l+1)/(2*l-3) * ((l-m)/(l+m)) * ((l-m-1)/(l+m-1)))
-            Fl = ((2*l-1) / (l-m) * N1) * (cos * F[-1]) - ((l+m-1)/(l-m)*N2) * F[-2]
-            
-            F.append(Fl)
+        
+        # Calculate Legendre polynomials 
+        # with generic algebra
+        F = _leg_gen(sinm, cos, m, np.max(self.l))
             
         # Convert adf objects to a single
         # derivative array
@@ -238,18 +203,93 @@ class LegendreLMCos(dfun.DFun):
         
         return out 
     
+def _leg_gen(sinm,cos,m,lmax):
+    
+    """ Calculate associated Legendre polynomials
+    of order m for abs(m) <= l <= lmax with generic algebra.
+    
+    Parameters
+    ----------
+    
+    sinm : ndarray, adarray, or other algebraic object
+        sin(theta)**abs(m)
+    cos : ndarray, adarray, or other algebraic object
+        cos(theta)
+    m : int
+        The Legendre order.
+    lmax : int
+        The maximum :math:`\ell` index.
+        
+    Returns
+    -------
+    F : list
+        The associated Legendre polynomials as the 
+        result type of `sinm` and `cos`.
+    
+    """
+    F = []
+    
+    m = abs(m) 
+    # Start with F_l=|m|, m
+    #  = N * P_l,l     with l = |m|
+    #  = N * (-1)**l * (2l-1)!! * sin(theta)**l
+    Nmm = (2/(2*m+1) * factorial(2*m)) ** (-0.5)
+    c = (Nmm * (-1)**m * factorial2(2*m-1))
+    Fmm = c * sinm
+    if lmax >= m:
+        F.append(Fmm)
+    
+    #
+    if lmax >= m + 1:
+        # The second function is related to the first via
+        # 
+        #                N^|m|_|m|+1
+        #  F^|m|_|m|+1 = ------------ cos(theta) * (2|m|+1) F^|m|_|m|
+        #                 N^|m|,|m|
+        #
+        # The ratio of N's is just
+        # sqrt(2|m|+3) / (2|m| + 1)
+        #
+        Fmmp1 = np.sqrt(2*m+3) * (cos * Fmm) 
+        F.append(Fmmp1)
+    for l in range(m+2, lmax+1):
+        # 
+        # Continue with general recursion relation
+        #
+        #           2l-1             N^m_l                 l+m-1 N^m_l
+        # F^m_l =  ------ cos(theta) -------- F^m_l-1   -  ----- ------- F^m_l-2
+        #           l - m            N^m_l-1               l-m   N^m_l-2
+        #
+        # first N ratio:
+        N1 = np.sqrt((2*l+1)/(2*l-1) * (l-m)/(l+m))
+        # second N ratio: 
+        N2 = np.sqrt((2*l+1)/(2*l-3) * ((l-m)/(l+m)) * ((l-m-1)/(l+m-1)))
+        Fl = ((2*l-1) / (l-m) * N1) * (cos * F[-1]) - ((l+m-1)/(l-m)*N2) * F[-2]
+        
+        F.append(Fl)
+        
+    return F 
+    
 class Sin(dfun.DFun):
     
     """
-    The function sin(phi). 
+    The function sin(theta). 
     (Used for Legendre Basis weight function)
              
     """
     
-    def __init__(self):
+    def __init__(self, nx = 1):
         """
+        
+        Parameters
+        ----------
+        nx : int, optional
+            The total number of input variables. The
+            argument of sine is always the first.
+            The rest are dummies. The default is 1.
+            
         """
-        super().__init__(self._sin, nf = 1, nx = 1,
+        super().__init__(self._sin, nf = 1, nx = nx,
                          maxderiv = None, zlevel = None)
         return 
     
@@ -261,19 +301,19 @@ class Sin(dfun.DFun):
             base_shape = X.shape[1:]
             out = np.ndarray( (nd, self.nf) + base_shape, dtype = X.dtype)
             
-        phi = X 
+        theta = X[0]
         for k in range(nd):
             #
             # The k^th derivative order
             #
             if k % 4 == 0: 
-                y =  np.sin(phi)
+                y =  np.sin(theta)
             elif k % 4 == 1:
-                y =  np.cos(phi)
+                y =  np.cos(theta)
             elif k % 4 == 2:
-                y = -np.sin(phi)
+                y = -np.sin(theta)
             else: # k % 4 == 3
-                y = -np.cos(phi)   
+                y = -np.cos(theta)   
                 
             np.copyto(out[k,0:1], y)
             
@@ -332,7 +372,7 @@ class RealSphericalH(dfun.DFun):
         mlist = []
         llist = []
         for M in m:
-            for L in range(abs(m),lmax+1):
+            for L in range(abs(M),lmax+1):
                 mlist.append(M)
                 llist.append(L) 
         
@@ -346,8 +386,8 @@ class RealSphericalH(dfun.DFun):
         
         # Save the quantum number lists 
         # as ndarray's
-        self.l = np.array(L) 
-        self.m = np.array(M) 
+        self.l = np.array(llist) 
+        self.m = np.array(mlist) 
         
         # Set up DFun's for the theta basis and the phi 
         # basis separable factors 
@@ -367,13 +407,67 @@ class RealSphericalH(dfun.DFun):
         if out is None:
             base_shape = X.shape[1:]
             out = np.ndarray( (nd, self.nf) + base_shape, dtype = X.dtype)
+        
+        # Make adf objects for theta and phi 
+        x = dfun.X2adf(X, deriv, var)
+        theta = x[0]
+        phi = x[1] 
+        
+        #########################################
+        #
+        # Calculate F and f factors first
+        #
+        sinth = adf.sin(theta)
+        costh = adf.cos(theta)
+        lmax = np.max(self.l)
+        # Calculate the associated Legendre factors
+        Flm = [] 
+        amuni = np.unique(abs(self.m)) # list of unique |m|
+        for aM in amuni:
+            # Order aM = |M|
+            sinM = adf.powi(sinth, aM)
+            # Calculate F^M up to l <= lmax
+            Flm.append(_leg_gen(sinM, costh, aM, lmax))
+        #Flm is now a nested list 
+        
+        # Calculate the phi factors 
+        smuni = np.unique(self.m) # list of unique signed m
+        fm = []
+        for sM in smuni:
+            if sM == 0:
+                fm.append(adf.const_like(1/np.sqrt(2*np.pi), phi))
+            elif sM < 0:
+                fm.append(1/np.sqrt(np.pi) * adf.sin(abs(sM) * phi))
+            else: #sM > 0
+                fm.append(1/np.sqrt(np.pi) * adf.cos(sM * phi))
+        #
+        ##############################################
+        
+        ###########################################
+        # Now calculate the list of real spherical harmonics 
+        Phi = []
+        for i in range(self.nf):
+            l = self.l[i]
+            m = self.m[i] # signed m
             
-        # Evaluate the separable factors for the theta and phi
-        # basis functions 
-        #f_phi = self.phi_basis.f(X[1:2], deriv, var
-        raise NotImplementedError()
-       
+            # Gather the associated Legendre polynomial (theta factor)
+            aM_idx = np.where(amuni == abs(m))[0][0]
+            l_idx = l - abs(m)
+            F_i = Flm[aM_idx][l_idx] 
+            # Gather the sine/cosine (phi factor)
+            sM_idx = np.where(smuni == m)[0][0]
+            f_i = fm[sM_idx]
             
+            # Add their product to the list of functions
+            Phi.append(F_i * f_i) 
+        #
+        ###########################################
+            
+        # Convert the list to a single 
+        # DFun derivative array
+        dfun.adf2array(Phi, out)
+        # and return
         return out 
+
     
     

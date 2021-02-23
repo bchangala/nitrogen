@@ -8,6 +8,8 @@ sub-classes:
        (i.e. a real Fourier/exponential basis)
     2) LegendreLMCosBasis: Associated Legendre 
        polynomials with cosine arguments.
+    3) RealSphericalHBasis: real spherical
+       harmonics.
 
 """
 
@@ -307,3 +309,98 @@ class LegendreLMCosBasis(NDBasis):
         self.l = basisfun.l  # The l-index list
 
         return
+    
+class RealSphericalHBasis(NDBasis):
+    
+    """
+    
+    Real spherical harmonics,
+    :math:`\\Phi_\ell^m(\\theta,\\phi) = F_\ell^m(\\theta)f_m(\\phi)`.
+    See :class:`~nitrogen.special.RealSphericalH`.
+    
+    Quadrature is performed with a direct product of 
+    a Gauss-Legendre grid over :math:`\\theta` and a uniform Fourier
+    grid over :math:`\\phi`.
+    
+    These functions are eigenfunctions of the differential
+    operator
+    
+    .. math::
+       -\\frac{\partial^2}{\partial \\theta^2} - \cot \\theta \\frac{\partial}{\partial \\theta} - \\frac{\partial_\\phi^2}{\sin^2\\theta}
+       
+    with eigenvalue :math:`\ell(\ell+1)`.
+             
+    Attributes
+    ----------
+    m : ndarray
+        The project quantum number :math:`m`.
+    l : ndarray
+        The azimuthal quantum number :math:`\ell`.
+        
+    See Also
+    --------
+    nitrogen.special.RealSphericalH : DFun sub-class real spherical harmonics.
+    nitrogen.special.LegendreCosLM : DFun sub-class for associated Legendre polynomials.
+    nitrogen.special.SinCosDFun : DFun sub-class for sine-cosine basis.
+
+    
+    """
+    
+    def __init__(self, m, lmax, Ntheta = None, Nphi = None):
+        """
+        Create a RealSphericalH basis.
+
+        Parameters
+        ----------
+        
+        m : int or array_like
+            The associated Legendre order(s).
+        lmax : int
+            The maximum :math:`\ell` quantum number.
+        Ntheta : int, optional
+            The number of quadrature points over :math:`\\theta`.
+            The default is `lmax` + 1.
+        Nphi : int, optional
+            The number of quadrature points over :math:`\\phi`.
+            The default is 2(mmax+1).
+
+        """
+        
+        # Create a DFun for the basis functions
+        basisfun = special.RealSphericalH(m, lmax)
+        
+        #
+        # Construct the quadrature grid
+        # and weights.
+        if Ntheta is None: 
+            Ntheta = max(basisfun.l) + 1 # default quadrature grid size
+        if Nphi is None:
+            Nphi = 2*(max(abs(basisfun.m)) + 1) 
+        
+        # theta grid
+        x,w = scipy.special.roots_legendre(Ntheta)
+        theta_grid = np.flip(np.arccos(x)).reshape((1,Ntheta))
+        theta_wgt = np.flip(w)
+        # phi grid 
+        phi_grid = np.linspace(0,2*np.pi,Nphi+1)[:-1].reshape((1,Nphi))
+        phi_wgt = np.full((Nphi,), 2*np.pi / Nphi)
+        
+        qgrid = np.stack(np.meshgrid(theta_grid, phi_grid, indexing = 'ij'))
+        qgrid = qgrid.reshape((2,Ntheta*Nphi)) # (nd, Nq)
+        
+        wgt = theta_wgt.reshape((Ntheta,1)) * phi_wgt 
+        wgt = wgt.reshape((Ntheta*Nphi,)) 
+        
+        super().__init__(basisfun, special.Sin(nx=2), qgrid, wgt) 
+        
+        self.m = basisfun.m  # The associated Legendre order
+        self.l = basisfun.l  # The l-index list
+
+        return
+    #
+    # TO-DO:
+    # For now, the default NDBasis FBR-to-grid routines
+    # will be used. This should be replaced with a new
+    # routine that takes advantage of the separability
+    # of the spherical harmonic basis functions.
+    #

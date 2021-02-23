@@ -4,12 +4,13 @@ from .fourDVR import _fourDVR, _fourDVRwfs
 from .hoDVR import _hoDVR,_hoDVRwfs
 from .sincDVR import _sincDVR,_sincDVRwfs
 
-from .ndbasis import NDBasis, SinCosBasis, LegendreLMCosBasis
+from .ndbasis import NDBasis, SinCosBasis, LegendreLMCosBasis, RealSphericalHBasis
 
 import numpy as np 
 
 __all__ = ['DVR', 
-           'NDBasis','SinCosBasis', 'LegendreLMCosBasis']
+           'NDBasis','SinCosBasis', 'LegendreLMCosBasis',
+           'RealSphericalHBasis']
 
 class DVR:
     """
