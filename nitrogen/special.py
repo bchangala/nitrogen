@@ -14,6 +14,7 @@ RealSphericalH   Real spherical harmonics.
 LaguerreL        Generalized Laguerre polynomials, :math:`L^{(\\alpha)}_n(x)`.
 RadialHO         Radial harmonic oscillator eigenfunctions in :math:`d` dimensions.
 BesselJ          Bessel functions of the first kind, :math:`J_{\\nu}(x)`.
+Real2DHO         Real 2-D isotropic harmonic oscillator wavefunctions.
 ==============   ====================================================
 
 """
@@ -323,6 +324,50 @@ class Sin(dfun.DFun):
                 
             np.copyto(out[k,0:1], y)
             
+        return out 
+    
+class Monomial(dfun.DFun):
+    
+    """
+    The monominal in multiple variables
+             
+    """
+    
+    def __init__(self, pows):
+        """
+        
+        Parameters
+        ----------
+        pows : array_like
+            A list of non-negative integer exponents.
+            
+        """
+        pows = np.array(pows)
+        nx = len(pows)
+        maxpow = np.max(pows) # The maximum
+        if np.any(pows < 0):
+            raise ValueError("All elements of pows must be non-negative integers.")
+        
+        super().__init__(self._monomial, nf = 1, nx = nx,
+                         maxderiv = None, zlevel = maxpow)
+        
+        self.pows = pows 
+        return 
+    
+    def _monomial(self, X, deriv = 0, out = None, var = None):
+        """ evaluation function """
+        raise NotImplementedError("NONO")
+        nd,nvar = dfun.ndnvar(deriv, var, self.nx)
+        if out is None:
+            base_shape = X.shape[1:]
+            out = np.ndarray( (nd, self.nf) + base_shape, dtype = X.dtype)
+            
+        x = dfun.X2adf(X, deriv, var)
+        res = adf.powi(x[0], self.pows[0]) 
+        for i in range(1, self.nx):
+            res = res * adf.powi(x[i], self.pows[i])
+            
+        dfun.adf2array(res, out)
         return out 
     
 class RealSphericalH(dfun.DFun):
@@ -934,7 +979,7 @@ class Real2DHO(dfun.DFun):
         ell_list = []
         v_list = []
         for ELL in ell:
-            for V in range(ELL, vmax, 2):
+            for V in range(abs(ELL), vmax+1, 2):
                 ell_list.append(ELL)
                 v_list.append(V) 
         
@@ -950,7 +995,7 @@ class Real2DHO(dfun.DFun):
         # as ndarray's
         self.ell = np.array(ell_list) 
         self.v = np.array(v_list) 
-        self.n = (self.v - self.ell)//2
+        self.n = (self.v - abs(self.ell))//2
         self.vmax = vmax 
         
         # Calculate the alpha scaling parameter
@@ -971,8 +1016,6 @@ class Real2DHO(dfun.DFun):
         return 
     
     def _chinell(self, X, deriv = 0, out = None, var = None):
-        
-        raise NotImplementedError("_chinell")
         
         # Setup
         nd,nvar = dfun.ndnvar(deriv, var, self.nx)

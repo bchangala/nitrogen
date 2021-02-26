@@ -405,3 +405,120 @@ class RealSphericalHBasis(NDBasis):
     # routine that takes advantage of the separability
     # of the spherical harmonic basis functions.
     #
+    
+class Real2DHOBasis(NDBasis):
+    
+    """
+    
+    Real 2-D isotropic harmonic oscillator basis functions
+    in cylindrical coordinates.
+    :math:`\\chi_n^{\\ell}(r,\\phi) = R_n^{\\ell}(r)f_{\\ell}(\\phi)`.
+    See :class:`~nitrogen.special.Real2DHO`.
+    
+    Quadrature is performed with a direct product of 
+    a Gauss-Laguerre-tyupe grid over :math:`r` and a uniform Fourier
+    grid over :math:`\\phi`.
+             
+    Attributes
+    ----------
+    v : ndarray
+        The :math:`v` quantum numbers, where
+        :math:`v = 2n + \\ell`.
+    ell : ndarray
+        The :math:`\\ell` quantum numbers.
+    n : ndarray
+        The :math:`n` Laguerre degree.
+    R : float
+        The radial extent of the basis.
+    alpha : float
+        The radial scaling parameter, :math:`\\alpha`, 
+        corresponding to radial extent `R`.
+        
+    See Also
+    --------
+    nitrogen.special.Real2DHO : DFun sub-class real 2-D harmonic oscillator wavefunctions.
+    nitrogen.special.RadialHO : DFun sub-class for d-dimensional radial harmonic oscillator wavefunctions.
+    nitrogen.special.SinCosDFun : DFun sub-class for sine-cosine basis.
+
+    
+    """
+    
+    def __init__(self, vmax, R, ell = None, Nr = None, Nphi = None):
+        """
+        Create a RealSphericalH basis.
+
+        Parameters
+        ----------
+        vmax : int 
+            The maximum vibrational quantum number :math:`v`, 
+            in the conventional sum-of-modes sense.
+        R : float
+            The radial extent of the basis.
+        ell : scalar or 1-D array_like, optional
+            The angular momentum quantum number.
+            If scalar, then all :math:`\\ell` with 
+            :math:`|\\ell| \leq` |`ell`| will be included. If array_like,
+            then `ell` lists all (signed) :math:`\\ell` values to be included.
+            A value of None is equivalent to `ell` = `vmax`. The default is 
+            None.
+        Nr : int, optional
+            The number of quadrature points over :math:`r`.
+            The default is `vmax` + 1.
+        Nphi : int, optional
+            The number of quadrature points over :math:`\\phi`.
+            The default is :math:`2(\\ell_{max} + 1)`.
+
+        """
+        
+        # Create a DFun for the basis functions
+        #basisfun = special.RealSphericalH(m, lmax)
+        basisfun = special.Real2DHO(vmax, R, ell)
+        
+        #
+        # Construct the quadrature grid
+        # and weights.
+        if Nr is None: 
+            Nr = vmax + 1 # default quadrature grid size
+        if Nphi is None:
+            Nphi = 2*(max(abs(basisfun.ell)) + 1) 
+            
+        # r grid 
+        d = 2 # The dimensionality 
+        #
+        # For dimensionality d, we should use a radial
+        # quadrature built on Laguerre polynomials 
+        # of order nu = d/2 - 1, which is the order 
+        # corresponding to the lambda = 0 angular momentum
+        # series. (nu = lambda + d/2 - 1)
+        #
+        x,wx = scipy.special.roots_genlaguerre(Nr, d/2 - 1) 
+        r_grid = np.flip( np.sqrt(x/basisfun.alpha) )
+        r_wgt = np.flip( np.exp(x) * wx/2.0 * (basisfun.alpha)**(-d/2) )
+        
+        # phi grid 
+        phi_grid = np.linspace(0,2*np.pi,Nphi+1)[:-1].reshape((1,Nphi))
+        phi_wgt = np.full((Nphi,), 2*np.pi / Nphi)
+        
+        qgrid = np.stack(np.meshgrid(r_grid, phi_grid, indexing = 'ij'))
+        qgrid = qgrid.reshape((2,Nr*Nphi)) # (nd, Nq)
+        
+        wgt = r_wgt.reshape((Nr,1)) * phi_wgt 
+        wgt = wgt.reshape((Nr*Nphi,)) 
+        
+        # Volume element = r * dr dphi
+        super().__init__(basisfun, special.Monomial([1,0]), qgrid, wgt) 
+        
+        self.v = basisfun.v         # The convention vibrational quantum number
+        self.ell = basisfun.ell     # The angular momentum quantum number
+        self.n = basisfun.n         # The Laguerre index: v = 2*n + ell
+        self.R = basisfun.R         # The radial extent
+        self.alpha = basisfun.alpha # The corresponding alpha scaling parameter
+
+        return
+    #
+    # TO-DO:
+    # For now, the default NDBasis FBR-to-grid routines
+    # will be used. This should be replaced with a new
+    # routine that takes advantage of the separability
+    # of the basis functions.
+    #
