@@ -2,14 +2,15 @@
 ndbasis.py
 
 Implements the NDBasis base class and common
-sub-classes: 
+sub-classes.
 
-    1) SinCosBasis: a sine-cosine basis function
-       (i.e. a real Fourier/exponential basis)
-    2) LegendreLMCosBasis: Associated Legendre 
-       polynomials with cosine arguments.
-    3) RealSphericalHBasis: real spherical
-       harmonics.
+=============================================  =================================
+:class:`~nitrogen.ndbasis.NDBasis` sub-class   Description
+---------------------------------------------  --------------------------------- 
+:class:`~nitrogen.dvr.SinCosBasis`             A sine-cosine (real Fourier) basis
+:class:`~nitrogen.dvr.LegendreLMCosBasis`      Associated Legendre polynomials.
+:class:`~nitrogen.dvr.RealSphericalHBasis`     Real spherical harmonics.
+=============================================  =================================
 
 """
 

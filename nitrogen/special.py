@@ -8,9 +8,12 @@ as differentiable DFun objects.
 ==============   ====================================================
 Function         Description
 --------------   ----------------------------------------------------
-SinCosDFun       Real sine-cosine basis
-LegendreLMCos    Associated Legendre functions with cosine 
-RealSphericalH   Real spherical harmonics
+SinCosDFun       Real sine-cosine basis.
+LegendreLMCos    Associated Legendre functions with cosine argument.
+RealSphericalH   Real spherical harmonics.
+LaguerreL        Generalized Laguerre polynomials, :math:`L^{(\\alpha)}_n(x)`.
+RadialHO         Radial harmonic oscillator eigenfunctions in :math:`d` dimensions.
+BesselJ          Bessel functions of the first kind, :math:`J_{\\nu}(x)`.
 ==============   ====================================================
 
 """
@@ -209,6 +212,7 @@ def _leg_gen(sinm,cos,m,lmax):
     
     """ Calculate associated Legendre polynomials
     of order m for abs(m) <= l <= lmax with generic algebra.
+    These are normalized.
     
     Parameters
     ----------
@@ -481,8 +485,8 @@ class BesselJ(dfun.DFun):
     
     def __init__(self, v):
         """
-        Bessel function of the first kind
-        J_v(x)
+        Bessel function of the first kind,
+        :math:`J_{\\nu}(x)`.
 
         Parameters
         ----------
@@ -532,4 +536,504 @@ class BesselJ(dfun.DFun):
             dk = scipy.special.jvp(self.v, x, n = k)
             np.copyto(out[k:(k+1),0], dk)
         
+        return out 
+    
+    
+def _laguerre_gen(x, alpha, nmax):
+    
+    """ Calculate generalized Laguerre polynomials
+    of order `alpha` up to degree `nmax` with generic algebra,
+    
+    .. math:
+       L^{(\\alpha)}_n(x)
+      
+    
+    
+    Parameters
+    ----------
+    x : ndarray, adarray, or other algebraic object
+        The argument of the Laguerre polynomials
+    alpha : float
+        The order parameter.
+    nmax : int
+        The maximum degree.
+        
+    Returns
+    -------
+    L : list
+        The generalized Laguerre polynomials as the 
+        same type of `x`.
+    
+    """
+    L = []
+    
+    if nmax >= 0:
+        L0 = 1.0 + 0.0 * x # L_0 = 1, always
+        L.append(L0)
+    
+    if nmax >= 1:
+        L1 = 1.0 + alpha - x # L_1 = 1 + alpha - x, always
+        L.append(L1)
+        
+    for n in range(2,nmax+1):
+        #
+        # Use recurrence relation
+        #
+        # L^a_n = (2n-1+a-x)L^a_{n-1} - (n-1+a)L^a_{n-2}
+        #         -------------------------------------
+        #                            n
+        #
+        
+        f1 = (2*n - 1 + alpha - x) * L[-1]
+        f2 = (n - 1 + alpha) * L[-2] 
+        L.append((f1-f2) / n)
+        
+    return L 
+
+class LaguerreL(dfun.DFun):  
+    """
+    Generalized Laguerre polynomials of a 
+    given order, :math:`\\alpha`.
+    
+    .. math::
+       L_n^{(\\alpha)}(x)
+    
+    Attributes
+    ----------
+    
+    nmax : int
+        The maximum degree.
+    alpha : float 
+        The associated Legendre function order index.
+    """
+    
+    def __init__(self, alpha, nmax):
+        """
+        Create associated Legendre basis DFuns
+
+        Parameters
+        ----------
+        m : float
+            The real order parameter.
+        nmax : int
+            The maximum degree.
+        """
+        
+        if nmax < 0:
+            return ValueError("nmax must be >= 0")
+         
+        super().__init__(self._Lx, nf = nmax + 1, nx = 1,
+                         maxderiv = None, zlevel = None)
+        #
+        # The zlevel is actually finite, but 
+        # I will ignore that here.
+        #
+        self.nmax = nmax 
+        self.alpha = alpha 
+        
+        return 
+        
+    def _Lx(self, X, deriv = 0, out = None, var = None):
+        """
+        basis evaluation function 
+        
+        Use recursion relations for generalized 
+        Laguerre polynomials
+    
+        """    
+        nd,nvar = dfun.ndnvar(deriv, var, self.nx)
+        if out is None:
+            base_shape = X.shape[1:]
+            out = np.ndarray( (nd, self.nf) + base_shape, dtype = X.dtype)
+        
+        # Create adf object for theta
+        x = dfun.X2adf(X,deriv,var)[0]
+        
+        # Calculate Laguerre polynomials
+        # with generic algebra
+        L = _laguerre_gen(x, self.alpha, self.nmax)
+            
+        # Convert adf objects to a single
+        # derivative array
+        dfun.adf2array(L, out)
+        
+        return out 
+    
+    
+def _radialHO_gen(r, expar2, nmax, ell, d, alpha):
+    
+    """ Calculate radial eigenfunctions of the d-dimensional
+    isotropic harmonic oscillator for generalized angular 
+    momentum quantum number :math:`\ell`.
+    
+    .. math:
+       R^{(\ell)}_n(r) = (-1)^n \\alpha^{d/4} \left[ \\frac{2 \Gamma(n+1) }{Gamma(n+\ell + d/2)} \\right]^{1/2} e^{-\alpha r^2/2} (\alpha^{1/2} r)^\ell L_n^{(\ell + d/2 - 1)}(\alpha r^2)
+       
+    
+    
+    Parameters
+    ----------
+    r : ndarray, adarray, or other algebraic object
+        The argument of the radial function
+    expar2 : ndarray, adarray or other algebraic object
+        The expression :math:`e^{-\alpha r^2 / 2}`.
+    nmax: int
+        The maximum degree
+    ell : int
+        The angular momentum quantum number: 0, 1, 2, ...
+    d : int 
+        The dimensionality, d >= 2.
+    alpha : float
+        The radial scaling parameter. This has units
+        of inverse-length-squared.
+        
+    Returns
+    -------
+    R : list
+        The (nmax+1) radial eigenfunctions.
+        
+    Notes
+    -----
+    The standard total vibrational quantum number of the d-dimensional
+    HO is :math:`v = 2n + \ell`. 
+    
+    """
+    
+    rell = 1.0 + 0.0*r 
+    for i in range(ell): 
+        rell = rell * r  
+    # rell = r^ell
+    
+    r2 = r * r # r^2
+    x = alpha * r2 # The Laguerre argument
+    
+    R = []
+    
+    if d < 2:
+        raise ValueError("d must be >= 2")
+    if alpha <= 0:
+        raise ValueError("alpha must be > 0")
+        
+    c0 =  (alpha)**(d/4 + ell/2) * np.sqrt(2 / scipy.special.gamma(  ell+d/2))
+    c1 = -(alpha)**(d/4 + ell/2) * np.sqrt(2 / scipy.special.gamma(1+ell+d/2))
+    
+    nu = ell + d/2 - 1 # The Laguerre order 
+    
+    if nmax >= 0:
+        R0 = c0 * expar2 * rell
+        R.append(R0)
+    
+    if nmax >= 1:
+        R1 = c1 * expar2 * rell * (1 + nu - x)  
+        R.append(R1)
+        
+    for n in range(2,nmax+1):
+        #
+        # Use recurrence relation
+        #
+        # R_n =  -(2n-1+nu-x) * sqrt(n/(n+nu)) * R_{n-1} - (n-1+nu) * sqrt(n(n-1)/((n+nu)(n+nu-1))) * R_{n-2}
+        #        -------------------------------------------------------------------------------------------
+        #                                       n
+        #
+        f1 = -np.sqrt(n/(n+nu)) * (2*n - 1 + nu - x) * R[-1]
+        f2 = -np.sqrt(n*(n-1)/((n+nu)*(n+nu-1))) * (n - 1 + nu) * R[-2]
+        
+        R.append((f1 + f2) / n)
+        
+    return R
+
+class RadialHO(dfun.DFun):  
+    """
+    Radial eigenfunctions for a :math:`d`-dimensional isotropic
+    harmonic oscillator.
+    
+    .. math::
+       R_n^{(\ell)}(r) = (-1)^n \\alpha^{d/4} \\left[ \\frac{2 \\Gamma(n+1) }
+           {\\Gamma(n+\ell + d/2)} \\right]
+           ^{1/2} e^{-\\alpha r^2/2} (\\alpha^{1/2} r)^\ell L_n^{(\ell + d/2 - 1)}
+           (\\alpha r^2)
+    
+    Attributes
+    ----------
+    nmax : int
+        The maximum Laguerre index.
+    ell : int
+        The generalized angular momentum quantum number.
+    d : int 
+        The dimensionality
+    alpha : float
+        The radial scaling parameter :math:`\\alpha` with units
+        inverse-length-squared.
+    
+    Notes
+    -----
+    These wavefunctions are orthonormal with respect to an integration
+    volume element of :math:`r^{d-1} dr` over :math:`r = [0,\\infty)`. An
+    isotropic harmonic oscillator of mass :math:`m` and frequency :math:`\\omega`
+    has :math:`\\alpha = m \\omega / \\hbar`. The conventional vibrational
+    quantum number :math:`v` is related to the Laguerre polynomial degree 
+    parameter as :math:`v = 2n + \\ell`, and the energy eigenvalue is
+    :math:`E /\\hbar \\omega = v + d/2 = 2n + \\ell + d/2`.
+    
+    For a given :math:`\ell` and :math:`d`, the matrix elements of 
+    :math:`r^2` are tri-diagonal,
+    
+    .. math::
+       \\langle n \\vert  r^2 \\vert n \\rangle &= \\alpha^{-1}(2n + \\ell + d/2) \\\\
+       \\langle n+1 \\vert r^2 \\vert n\\rangle = 
+           \\langle n \\vert r^2 \\vert n + 1 \\rangle &= \\alpha^{-1}\\sqrt{(n+1)(n+\\ell + d/2)}.
+       
+    The differential operator,
+    
+    .. math::
+       \\hat{D}^2 \\equiv \\partial_r^2 + \\frac{d-1}{r} \\partial_r -
+           \\frac{\\ell(\\ell + d - 2)}{r^2},
+          
+    is also tri-diagonal with matrix elements,
+    
+    .. math::
+       \\langle n \\vert  \hat{D}^2 \\vert n \\rangle &= -\\alpha(2n + \\ell + d/2) \\\\
+       \\langle n+1 \\vert \hat{D}^2\\vert n\\rangle = 
+           \\langle n \\vert \hat{D}^2 \\vert n + 1 \\rangle &= \\alpha\\sqrt{(n+1)(n+\\ell + d/2)}.
+       
+    By inspection, we can now see that the Hamiltonian operator
+    
+    .. math::
+       \\hat{H}/\\hbar\\omega = -\\frac{1}{2}\\alpha^{-1} \\hat{D}^2 + \\frac{1}{2}\\alpha r^2
+       
+    is diagonal, with eigenvalue :math:`2n + \\ell + d/2 = v + d/2`.
+
+
+    """
+    
+    def __init__(self, nmax, ell, d = 2, alpha = 1.0):
+        """
+        Create radial harmonic oscillator wavefunctions.
+
+        Parameters
+        ----------
+        nmax : int
+            The maximum Laguerre index.
+        ell : int
+            The generalized angular momentum quantum number.
+        d : int, optional
+            The dimensionality. The default is 2.
+        alpha : float, optional
+            The radial scaling parameter, :math:`\\alpha`, with units
+            inverse-length-squared. The default is 1.
+        """
+        
+        if nmax < 0:
+            return ValueError("nmax must be >= 0")
+         
+        super().__init__(self._Rr, nf = nmax + 1, nx = 1,
+                         maxderiv = None, zlevel = None)
+        #
+        #
+        self.nmax = nmax 
+        self.ell = ell
+        self.d = d
+        self.alpha = alpha 
+        
+        return 
+        
+    def _Rr(self, X, deriv = 0, out = None, var = None):
+        """
+        basis evaluation function 
+        
+        Use generic algebra evaluation function
+    
+        """    
+        nd,nvar = dfun.ndnvar(deriv, var, self.nx)
+        if out is None:
+            base_shape = X.shape[1:]
+            out = np.ndarray( (nd, self.nf) + base_shape, dtype = X.dtype)
+        
+        # Create adf object for theta
+        r = dfun.X2adf(X,deriv,var)[0]
+        expar2 = adf.exp(-0.5 * self.alpha * (r*r))
+        
+        # Calculate radial wavefunctions
+        R = _radialHO_gen(r, expar2, self.nmax, self.ell, self.d, self.alpha)
+ 
+        # Convert adf objects to a single
+        # derivative array
+        dfun.adf2array(R, out)
+        
+        return out 
+    
+class Real2DHO(dfun.DFun):
+    
+    """
+    Real-valued eigenfunctions of 2-D 
+    isotropic harmonic oscillator in
+    cylindrical coordinates.
+    
+    .. math::
+       \chi_n^{\\ell}(r, \\phi) = R_n^{|\\ell|}(r) f_{\\ell} (\\phi)
+    
+    For definitions of the radial wavefunctions
+    :math:`R_n^{\\ell}` and sine-cosine functions :math:`f_{\\ell}`, see
+    :class:`~nitrogen.special.RadialHO` and 
+    :class:`~nitrogen.special.SinCosDFun`.
+    
+    Attributes
+    ----------
+    v : ndarray
+        The :math:`v` quantum numbers, where
+        :math:`v = 2n + \\ell`.
+    ell : ndarray
+        The :math:`\\ell` quantum numbers.
+    n : ndarray
+        The :math:`n` Laguerre degree.
+    vmax : int
+        The initial `vmax` parameter.
+    R : float
+        The radial extent of the basis.
+    alpha : float
+        The radial scaling parameter, :math:`\\alpha`, 
+        corresponding to radial extent `R`.
+    
+    """
+    
+    def __init__(self, vmax, R, ell = None):
+        """
+        Create a 2D harmonic oscillator basis.
+        
+        Parameters
+        ----------
+        vmax : int 
+            The maximum vibrational quantum number :math:`v`, 
+            in the conventional sum-of-modes sense.
+        R : float
+            The radial extent of the basis.
+        ell : scalar or 1-D array_like, optional
+            The angular momentum quantum number.
+            If scalar, then all :math:`\\ell` with 
+            :math:`|\\ell| \leq` |`ell`| will be included. If array_like,
+            then `ell` lists all (signed) :math:`\\ell` values to be included.
+            A value of None is equivalent to `ell` = `vmax`. The default is 
+            None.
+
+        """
+        
+        if vmax < 0 :
+            return ValueError("vmax must be >= 0")
+        
+        # Parse ell list
+        if ell is None:
+            ell = np.arange(-vmax, vmax+1)
+        elif np.isscalar(ell):
+            ell = np.arange(-abs(ell), abs(ell) + 1)
+        else:
+            ell = np.array(ell)
+            
+        if vmax < np.max(abs(ell)):
+            print(f"Warning: values of ell above vmax = {vmax:d} will have no basis functions.")
+            
+        ell_list = []
+        v_list = []
+        for ELL in ell:
+            for V in range(ELL, vmax, 2):
+                ell_list.append(ELL)
+                v_list.append(V) 
+        
+        nf = len(ell_list) # = len(v_list)
+        if nf == 0:
+            raise ValueError("Zero basis functions!")
+        
+        
+        super().__init__(self._chinell, nf = nf, nx = 2,
+                         maxderiv = None, zlevel = None)
+        
+        # Save the quantum number lists 
+        # as ndarray's
+        self.ell = np.array(ell_list) 
+        self.v = np.array(v_list) 
+        self.n = (self.v - self.ell)//2
+        self.vmax = vmax 
+        
+        # Calculate the alpha scaling parameter
+        alpha = (2*vmax+1) / (R**2) 
+        self.R = R 
+        self.alpha = alpha 
+        
+        # # Set up DFun's for the radial basis and the 
+        # # polar angular basis as separable factors 
+        # self.phi_basis = SinCosDFun(ell) # only supplies functions for index in `ell`
+        # radial_bases = []
+        # for ELL in ell: # Radial HO basis for each ELL in `ell`
+        #     nmax = round(np.floor(vmax-abs(ELL))/2)
+        #     radial_bases.append(RadialHO(nmax, ELL, d = 2, alpha = self.alpha))
+        # self.radial_bases = radial_bases
+        
+        
+        return 
+    
+    def _chinell(self, X, deriv = 0, out = None, var = None):
+        
+        raise NotImplementedError("_chinell")
+        
+        # Setup
+        nd,nvar = dfun.ndnvar(deriv, var, self.nx)
+        if out is None:
+            base_shape = X.shape[1:]
+            out = np.ndarray( (nd, self.nf) + base_shape, dtype = X.dtype)
+        
+        # Make adf objects for theta and phi 
+        x = dfun.X2adf(X, deriv, var)
+        r = x[0]        # Cylindrical radius
+        phi = x[1]      # Angular coordinate
+        
+        #########################################
+        #
+        # Calculate R and f factors first
+        #        
+        # Calculate the radial wavefunctions
+        Rnell = [] 
+        abs_ell_uni = np.unique(abs(self.ell)) # list of unique |ell|
+        expar2 = adf.exp(-self.alpha * (r*r))  # The exponential radial factor
+        for aELL in abs_ell_uni:
+            nmax = round(np.floor(self.vmax - aELL) / 2)
+            Rnell.append(_radialHO_gen(r, expar2, nmax, aELL, 2, self.alpha))
+        
+        
+        # Calculate the phi factors, f_ell(phi)
+        sig_ell_uni = np.unique(self.ell) # list of unique signed ell
+        fell = []
+        for sELL in sig_ell_uni:
+            if sELL == 0:
+                fell.append(adf.const_like(1/np.sqrt(2*np.pi), phi))
+            elif sELL < 0:
+                fell.append(1/np.sqrt(np.pi) * adf.sin(abs(sELL) * phi))
+            else: #sELL > 0
+                fell.append(1/np.sqrt(np.pi) * adf.cos(sELL * phi))
+        #
+        ##############################################
+        
+        ###########################################
+        # Now calculate the list of real 2-D HO wavefunctions
+        chi = []
+        for i in range(self.nf):
+            
+            ell = self.ell[i] 
+            n = self.n[i] 
+            
+            # Gather the radial factor
+            abs_ELL_idx = np.where(abs_ell_uni == abs(ell))[0][0]
+            R_i = Rnell[abs_ELL_idx][n] 
+            
+            # Gather the angular factor
+            sig_ELL_idx = np.where(sig_ell_uni == ell)[0][0]
+            f_i = fell[sig_ELL_idx]
+            
+            # Add their product to the list of functions
+            chi.append(R_i * f_i)
+        #
+        ###########################################
+            
+        # Convert the list to a single 
+        # DFun derivative array
+        dfun.adf2array(chi, out)
+        # and return
         return out 
