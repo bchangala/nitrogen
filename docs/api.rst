@@ -27,6 +27,10 @@ NITROGEN API reference
    :members:
    :show-inheritance:
    
+.. automodule:: nitrogen.tensor 
+   :members:
+   :show-inheritance:
+   
 .. automodule:: nitrogen.ham
    :members:
 
