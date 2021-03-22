@@ -428,7 +428,7 @@ class Real2DHOBasis(NDBasis):
         The :math:`\\ell` quantum numbers.
     n : ndarray
         The :math:`n` Laguerre degree.
-    R : float
+    rmax : float
         The radial extent of the basis.
     alpha : float
         The radial scaling parameter, :math:`\\alpha`, 
@@ -443,7 +443,7 @@ class Real2DHOBasis(NDBasis):
     
     """
     
-    def __init__(self, vmax, R, ell = None, Nr = None, Nphi = None):
+    def __init__(self, vmax, rmax, ell = None, Nr = None, Nphi = None):
         """
         Create a RealSphericalH basis.
 
@@ -452,12 +452,12 @@ class Real2DHOBasis(NDBasis):
         vmax : int 
             The maximum vibrational quantum number :math:`v`, 
             in the conventional sum-of-modes sense.
-        R : float
+        rmax : float
             The radial extent of the basis.
         ell : scalar or 1-D array_like, optional
             The angular momentum quantum number.
             If scalar, then all :math:`\\ell` with 
-            :math:`|\\ell| \leq` |`ell`| will be included. If array_like,
+            :math:`|\\ell| \leq` abs(`ell`) will be included. If array_like,
             then `ell` lists all (signed) :math:`\\ell` values to be included.
             A value of None is equivalent to `ell` = `vmax`. The default is 
             None.
@@ -469,19 +469,12 @@ class Real2DHOBasis(NDBasis):
             The default is :math:`2(\\ell_{max} + 1)`.
 
         """
-        
-        # Create a DFun for the basis functions
-        #basisfun = special.RealSphericalH(m, lmax)
-        basisfun = special.Real2DHO(vmax, R, ell)
-        
+
         #
         # Construct the quadrature grid
         # and weights.
         if Nr is None: 
             Nr = vmax + 1 # default quadrature grid size
-        if Nphi is None:
-            Nphi = 2*(max(abs(basisfun.ell)) + 1) 
-            
         # r grid 
         d = 2 # The dimensionality 
         #
@@ -492,16 +485,29 @@ class Real2DHOBasis(NDBasis):
         # series. (nu = lambda + d/2 - 1)
         #
         x,wx = scipy.special.roots_genlaguerre(Nr, d/2 - 1) 
-        r_grid = np.flip( np.sqrt(x/basisfun.alpha) )
-        r_wgt = np.flip( np.exp(x) * wx/2.0 * (basisfun.alpha)**(-d/2) )
+        alpha = max(x) / rmax**2  # Determine the alpha scaling parameter
+                                  # needed to place the last radial grid point
+                                  # at rmax 
+        r_grid = np.sqrt(x/alpha)
+        r_wgt =  np.exp(x) * wx/2.0 * (alpha)**(-d/2)
         
-        # phi grid 
+        #
+        # Now that we know the value of alpha, we can
+        # construct the basis DFun
+        basisfun = special.Real2DHO(vmax, alpha, ell)
+        
+        # Now that we have the basis set set up, 
+        # we know what the maximum ell value is.
+        # 
+        if Nphi is None:
+            Nphi = 2*(max(abs(basisfun.ell)) + 1) 
+        # Calculate the phi quadrature grid
         phi_grid = np.linspace(0,2*np.pi,Nphi+1)[:-1].reshape((1,Nphi))
         phi_wgt = np.full((Nphi,), 2*np.pi / Nphi)
-        
+        # Combine the two grids
         qgrid = np.stack(np.meshgrid(r_grid, phi_grid, indexing = 'ij'))
         qgrid = qgrid.reshape((2,Nr*Nphi)) # (nd, Nq)
-        
+        # and the weights...
         wgt = r_wgt.reshape((Nr,1)) * phi_wgt 
         wgt = wgt.reshape((Nr*Nphi,)) 
         
@@ -511,8 +517,11 @@ class Real2DHOBasis(NDBasis):
         self.v = basisfun.v         # The convention vibrational quantum number
         self.ell = basisfun.ell     # The angular momentum quantum number
         self.n = basisfun.n         # The Laguerre index: v = 2*n + ell
-        self.R = basisfun.R         # The radial extent
+        self.rmax = rmax            # The radial extent
         self.alpha = basisfun.alpha # The corresponding alpha scaling parameter
+        # (private attributes)
+        self._nr = Nr               # The number of radial quadrature points
+        self._nphi = Nphi           # The number of angular quadrature points
 
         return
     #

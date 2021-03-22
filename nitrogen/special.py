@@ -933,15 +933,12 @@ class Real2DHO(dfun.DFun):
         The :math:`n` Laguerre degree.
     vmax : int
         The initial `vmax` parameter.
-    R : float
-        The radial extent of the basis.
     alpha : float
-        The radial scaling parameter, :math:`\\alpha`, 
-        corresponding to radial extent `R`.
+        The radial scaling parameter, :math:`\\alpha`.
     
     """
     
-    def __init__(self, vmax, R, ell = None):
+    def __init__(self, vmax, alpha, ell = None):
         """
         Create a 2D harmonic oscillator basis.
         
@@ -950,12 +947,12 @@ class Real2DHO(dfun.DFun):
         vmax : int 
             The maximum vibrational quantum number :math:`v`, 
             in the conventional sum-of-modes sense.
-        R : float
-            The radial extent of the basis.
+        alpha : float
+            The radial scaling parameter, :math:`\\alpha`.
         ell : scalar or 1-D array_like, optional
             The angular momentum quantum number.
             If scalar, then all :math:`\\ell` with 
-            :math:`|\\ell| \leq` |`ell`| will be included. If array_like,
+            :math:`|\\ell| \leq` abs(`ell`) will be included. If array_like,
             then `ell` lists all (signed) :math:`\\ell` values to be included.
             A value of None is equivalent to `ell` = `vmax`. The default is 
             None.
@@ -998,9 +995,7 @@ class Real2DHO(dfun.DFun):
         self.n = (self.v - abs(self.ell))//2
         self.vmax = vmax 
         
-        # Calculate the alpha scaling parameter
-        alpha = (2*vmax+1) / (R**2) 
-        self.R = R 
+        # Save the alpha scaling parameter
         self.alpha = alpha 
         
         # # Set up DFun's for the radial basis and the 
@@ -1035,7 +1030,7 @@ class Real2DHO(dfun.DFun):
         # Calculate the radial wavefunctions
         Rnell = [] 
         abs_ell_uni = np.unique(abs(self.ell)) # list of unique |ell|
-        expar2 = adf.exp(-self.alpha * (r*r))  # The exponential radial factor
+        expar2 = adf.exp(-0.5 * self.alpha * (r*r))  # The exponential radial factor
         for aELL in abs_ell_uni:
             nmax = round(np.floor(self.vmax - aELL) / 2)
             Rnell.append(_radialHO_gen(r, expar2, nmax, aELL, 2, self.alpha))
