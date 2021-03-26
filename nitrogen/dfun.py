@@ -865,6 +865,66 @@ class MergedDFun(DFun):
         return f"MergedDFun({self.dfuns!r})"
            
         
+class PolyFactor(DFun):
+    
+    def __init__(self, terms, nx = None):
+        """
+        Parameters
+        ----------
+        terms : list of lists
+            Each element of terms is a list corresponding
+            to one term in a summation. Each term is itself
+            a list of 2 elements. The first element is a 
+            list of factors and the second is a scalar coefficient.
+            For example, the term element [[0,0,1], 0.5] corresponds
+            to x0*x0*x1 * 0.5.
+        nx : int, optional
+            The number of coordinates. If None (default), `nx` is assumed
+            to the be maximum 
+        """
+        
+        nterms = len(terms) # May be zero 
+        
+        max_degree = 0 
+        nvar = 1 
+        for i in range(nterms):
+            term = terms[i] 
+            factors = term[0]
+            max_degree = max(len(factors), max_degree) 
+            nvar = max(nvar, 1 + max(factors + [0]))
+            
+        if nx is None: # Default
+            nx = nvar 
+        
+        
+        super().__init__(self._fpoly, nf = 1, nx = nx, maxderiv = None,
+                         zlevel = max_degree)
+        self.terms = terms 
+        
+    def _fpoly(self, X, deriv = 0, out = None, var = None):
+        
+        x = X2adf(X, deriv, var) # x[0], x[1], x[2] are adf objects for each variable
+        
+        res = 0*x[0] 
+        
+        for term in self.terms :
+            
+            factors = term[0] # the list of factors (by variable label)
+            coeff = term[1]   # the coefficient 
+            
+            if len(factors) == 0: # constant
+                res += coeff # res <-- res + coeff
+            else:
+                temp = x[factors[0]] # temp <-- first factor 
+                for i in range(1,len(factors)):
+                    temp = temp * x[factors[i]] # product of all factors 
+                
+                res += coeff * temp 
+        
+        # Return result
+        return adf2array([res],out)
+        
+    
     
 def _composite_maxderiv(maxA,maxB):
     """

@@ -16,6 +16,8 @@ from . import coordsys
 from . import ham
 from . import constants
 from . import pes
+from . import tensor 
+from . import scf 
 
 __version__ = '2.0.dev3'
 

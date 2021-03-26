@@ -245,9 +245,11 @@ class DirProdDvrCartN(LinearOperator):
         The shape of the direct-product grid.
     masses : ndarray
         The mass of each coordinate.
+    hbar : float
+        The value of :math:`\\hbar`. 
     """
     
-    def __init__(self, dvrs, pes, masses = None, Vmax = None, Vmin = None):
+    def __init__(self, dvrs, pes, masses = None, hbar = None, Vmax = None, Vmin = None):
         """
         
 
@@ -263,6 +265,8 @@ class DirProdDvrCartN(LinearOperator):
             to the `nx` Cartesian coordinates.
         masses : array_like, optional
             A list of `nx` masses. If None, these will be assumed to be unity.
+        hbar : float, optional
+            The value of :math:`\\hbar`. If None, the default NITROGEN units are used.
         Vmax : float, optional
             Maximum potential energy allowed. Higher values will be 
             replaced with `Vmax`. If None, this is ignored.
@@ -280,7 +284,9 @@ class DirProdDvrCartN(LinearOperator):
         if len(masses) != nx:
             raise ValueError("The number of masses must equal the length of dvrs")
 
-    
+        if hbar is None:
+            hbar = nitrogen.constants.hbar 
+            
         # Determine the active and fixed coordinates
         vvar = []
         grids = []
@@ -344,6 +350,7 @@ class DirProdDvrCartN(LinearOperator):
         self.vshape = vshape 
         self._D2list = D2list 
         self.masses = np.array(masses)
+        self.hbar = hbar 
         self.V = V
     
     def _matvec(self, x):
@@ -351,7 +358,7 @@ class DirProdDvrCartN(LinearOperator):
         xgrid = x.reshape(self.vshape) # Reshape vector to direct-product grid
         y = np.zeros_like(xgrid)        # Result grid
         
-        hbar = nitrogen.constants.hbar
+        hbar = self.hbar 
         ############################################
         # PES term
         y += self.V * xgrid 
@@ -389,9 +396,11 @@ class DirProdDvrCartNQD(LinearOperator):
         The shape of the direct-product coordinate grid.
     masses : ndarray
         The mass of each coordinate.
+    hbar : float
+        The value of :math:`\\hbar`. 
     """
     
-    def __init__(self, dvrs, pes, masses = None, pesorder = 'LR'):
+    def __init__(self, dvrs, pes, masses = None, hbar = None, pesorder = 'LR'):
         """
         
         Parameters
@@ -407,6 +416,9 @@ class DirProdDvrCartNQD(LinearOperator):
             output values for `NS` states.
         masses : array_like, optional
             A list of `nx` masses. If None, these will be assumed to be unity.
+        hbar : float
+            The value of :math:`\\hbar`. If None, the default value is that in 
+            NITROGEN units. 
         pesorder : {'LR', 'LC'}, optional
             V matrix electronic state ordering. The `pes` function returns
             the *lower* triangle of the diabatic potential matrix. If 'LR'
@@ -422,6 +434,8 @@ class DirProdDvrCartNQD(LinearOperator):
         if len(masses) != nx:
             raise ValueError("The number of masses must equal the length of dvrs")
 
+        if hbar is None:
+            hbar = nitrogen.constants.hbar 
     
         # Determine the active and fixed coordinates
         vvar = []
@@ -461,7 +475,7 @@ class DirProdDvrCartNQD(LinearOperator):
         
         # Calculate the PES/coupling grids
         try: # Attempt DFun interface
-            V = pes.f(Q, deriv = 0)[0]  # shape is (NS,) + vshape
+            V = pes.f(Q, deriv = 0)[0]  # shape is (NS*(NS+1)/2,) + vshape
         except:
             V = pes(Q) # Attempt raw function
             
@@ -507,6 +521,7 @@ class DirProdDvrCartNQD(LinearOperator):
         self.vshape = vshape 
         self._D2list = D2list 
         self.masses = np.array(masses)
+        self.hbar = hbar 
         self.Vij = Vij
         
     
@@ -517,7 +532,7 @@ class DirProdDvrCartNQD(LinearOperator):
         xgrid = x.reshape(evshape)  # Reshape vector to elec-vib grid
         y = np.zeros_like(xgrid)    # Result grid
         
-        hbar = nitrogen.constants.hbar
+        hbar = self.hbar 
         
         ############################################
         #
