@@ -269,8 +269,156 @@ class TensorOperator():
         """
         raise NotImplementedError()
         return 
+
+class ConfigurationOperator():
+    """
+    Base class for matrix elements in
+    a configuration representation.
     
+    Attributes
+    ----------
+    shape : tuple
+        The one-sided operator shape
+    dtype : data-type
+        The operator data type.
+        
+    """
+    def __init__(self, shape, dtype = np.float64):
+        self.shape = tuple(shape) 
+        self.dtype = dtype 
     
+    def block(self, bra_configs, ket_configs = None):
+        """
+        Calculate a block of the operator matrix.
+        
+        Parameters
+        ----------
+        bra_configs : array_like
+            A list of left-hand-side configurations.
+        ket_configs : array_like or {'symmetric', 'diagonal'}, optional
+            A list of right-hand-side configurations. If None,
+            then the diagonal block given by `bra_configs` will be 
+            calculated.
+        """
+        
+        bra_configs = np.array(bra_configs).reshape((-1, len(self.shape)))
+        if ket_configs is None or isinstance(ket_configs, str):
+            mode = ket_configs # None or string
+            ket_configs = bra_configs
+        else:
+            mode = None
+            ket_configs = np.array(ket_configs).reshape((-1, len(self.shape)))
+        
+        return self._block(bra_configs, ket_configs, mode)
+        
+    def _block(self, bra_configs, ket_configs, mode):
+        raise NotImplementedError()
+        pass # TO BE IMPLEMENTED BY SUB-CLASS 
+
+class DirectSumConfigurationOperator(ConfigurationOperator):
+    """ A sum of configuration operators"""
+    def __init__(self, *args):
+        """ ConfigurationOperator sum """
+        n = len(args)
+        if n < 1:
+            raise ValueError("At least one TensorOperator is required.")
+        
+        self.shape = args[0].shape 
+        self.dtype = args[0].dtype 
+        
+        for i,A in enumerate(args):
+            if A.shape != self.shape:
+                raise ValueError(f"The shape of args[{i:d}] does not match.")
+            self.dtype = np.result_type(self.dtype, args[i].dtype)
+            
+        self.terms = args 
+    
+    def _block(self, bra_configs, ket_configs, mode):
+        """ Return the sum of the each term 
+        """
+        result = 0
+        for A in self.terms:
+            result += A._block(bra_configs, ket_configs, mode) 
+        return result
+
+class SingleIndexOperator(ConfigurationOperator):
+    
+    """ A 1-group operator in configuration 
+    representation. The representation is assumed
+    to be separably orthonormal in each configuration index
+    """
+    
+    def __init__(self, A, index, shape):
+        """
+        Parameters
+        ----------
+        A : ndarray
+            A square matrix representing the 1-body 
+            operator for axis `index` of the configuratoin 
+            representation.
+        index : int
+            The 1-body index.
+        shape : tuple
+            The full configuration space shape
+        """
+        
+        super().__init__(shape, dtype = A.dtype) 
+        self.A = A 
+        self.index = index 
+        
+        if index < 0 or index >= len(self.shape):
+            raise ValueError("Invalid index ({index:d})")
+        
+    def _block(self, bra_configs, ket_configs, mode):
+        
+        nb = bra_configs.shape[0] 
+        nk = ket_configs.shape[0] 
+        n  = bra_configs.shape[1] # == ket_configs.shape[1], the number of bodies
+        
+        
+        if mode == 'diagonal':
+            
+            out = np.empty((nb,), dtype = self.dtype)
+            
+            for i in range(nb):
+                bra = bra_configs[i,:] # == ket
+                out[i] = self.A[bra[self.index], bra[self.index]]
+                
+        else:
+            
+            out = np.empty((nb,nk), dtype = self.dtype) 
+            
+            for i in range(nb):
+                bra = bra_configs[i,:]
+                
+                for j in range(nk):
+                    
+                    if j < i and mode == 'symmetric':
+                        # If mode is symmetric, then bra and ket list
+                        # are the same. Assume upper triangle is equal
+                        # to lower triangle 
+                        out[i,j] = out[j,i]
+                        continue 
+                    
+                    ket = ket_configs[j,:]
+                    
+                    # Check that all non-`index` indices are equal
+                    # If they are not, then the matrix element
+                    # is zero by orthogonality
+                    mask = np.arange(n)!=self.index
+                    if np.any(bra[mask] != ket[mask]):
+                        out[i,j] = 0.0 
+                        continue
+                    else:
+                        # All non-`index` indices are the same. The 
+                        # matrix element is equal to the 1-body matrix element
+                        #
+                        out[i,j] = self.A[bra[self.index], ket[self.index]]
+        
+        return out 
+                
+                
+        
 
     
 class DirectSumOperator(TensorOperator):
@@ -1119,3 +1267,32 @@ def diagonal(a):
     mask = np.repeat(np.arange(n), [2 for i in range(n)])
     return Tensor(a,mask)
         
+
+def label2grppos(labels):
+    """
+    Convert a list of lists of labels to 
+    a group/position map 
+    """
+    
+    ngroups = len(labels)
+    
+    all_labels = sum(labels,[])
+    nlabels = max(all_labels) + 1 
+    
+    if list(np.arange(nlabels)) != list(np.unique(all_labels)):
+        raise ValueError(f"Invalid labels: {labels!r}")
+        
+    grp = []
+    pos = [] 
+    for i in range(nlabels):
+        # Find where label `i` is 
+        for g in range(ngroups):
+            if i in labels[g]:
+                # Found the group
+                grp.append(g)
+                pos.append(labels[g].index(i))
+                break 
+    
+    return grp,pos 
+    
+    
