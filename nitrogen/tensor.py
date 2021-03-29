@@ -213,19 +213,17 @@ class TensorOperator():
     def __init__(self, shape, dtype = np.float64):
         self.shape = tuple(shape)
         self.dtype = dtype
-        
-    
-    def contract(self, bra = None, ket = None):
+
+
+    def contract(self, network = None):
         """
-        Contract the tensor operator with tensor networks
-        to its left and right.
+        Contract the tensor operator with a TensorNetwork.
     
         Parameters
         ----------
-        bra : TensorNetwork or None
-            The left-hand-side network
-        ket : TensorNetwork or None
-            The right-hand-side network
+        network : TensorNetwork, optional
+            A tensor network to contract with the operator. 
+            If None, then no indices will be contracted.
 
         Returns
         -------
@@ -235,37 +233,39 @@ class TensorOperator():
         Notes
         -----
         The tensor operator has external indices labeled
-        (-1, -2, -3, ...) on each side with dimensions given 
-        by `shape`.
+        (-1, -3, -5, ...) on the left side with dimensions given 
+        by `shape` and (-2, -4, -6, ...) on the right side.
 
-        The input tensor networks will be contracted with the 
+        The input tensor network will be contracted with the 
         operator based on the negative integer elements in 
-        their respective `labels` attributes. Missing 
-        labels in these networks will not be contracted.
+        its respective `labels` attributes. Missing 
+        labels in the network will not be contracted.
 
         """
         
         # Handle Nones
-        if bra is None:
-            bra = TensorNetwork([],[])
-        if ket is None:
-            ket = TensorNetwork([],[])
+        if network is None:
+            network = TensorNetwork([],[])
         
         # Check external legs 
-        for i,label in enumerate(bra.elegs):
-            if bra.eshape[i] != self.shape[-1 - label]:
-                raise ValueError("External shape of bra does not match "
-                                 "operator shape.")
-        for i,label in enumerate(ket.elegs):
-            if ket.eshape[i] != self.shape[-1 - label]:
-                raise ValueError("External shape of ket does not match "
-                                 "operator shape.")
+        for i,label in enumerate(network.elegs):
+            if label % 2 == 1 : # An odd negative label
+                idx = -(label + 1) // 2 # Map -1, -3, -5, ... to 0, 1, 2, ...
+            else: # An even negative label
+                idx = -(label + 2) // 2 # Map -2, -4, -6, ... to 0, 1, 2, ...
+                
+            if network.eshape[i] != self.shape[idx]:
+                raise ValueError(f"External shape of network does not match "
+                                 f"operator shape. ({label:d} : {network.eshape[i]:d} "
+                                 f"vs shape[{idx:d}] : {self.shape[idx]:d}")
+
+        return self._contract(network)
         
-        return self._contract(bra, ket)
-        
-    def _contract(self, bra, ket):
-        """ bra, ket : TensorNetwork 
-            The implementation of contract.
+    def _contract(self, network):
+        """ network : TensorNetwork 
+                The network to contract with the operator
+            This is a private implementation of the contraction
+            routine, to be implemented by sub-classes.
         """
         raise NotImplementedError()
         return 
@@ -446,13 +446,13 @@ class DirectSumOperator(TensorOperator):
             
         self.terms = args 
     
-    def _contract(self, bra, ket):
+    def _contract(self, network):
         """ Contraction implementation.
             Return the sum of the contractions of each term.
         """
         result = 0
         for T in self.terms:
-            result += T._contract(bra, ket) 
+            result += T._contract(network) 
         return result
 
 class DirectProductOperator(TensorOperator):
@@ -525,39 +525,23 @@ class DirectProductOperator(TensorOperator):
         self.labels = labels 
         self.iden_labels = iden_labels 
         
-    def _contract(self, bra, ket):
+    def _contract(self, network):
         """ The TensorOperator contraction function"""
         #
         # Use con to contract the tensor network
         # 
-        # We have up to 3 lists of tensors, whose
+        # We have up to 2 lists of tensors, whose
         # labels need to be reconciled
         #
-        
+        # The negative indices of `network`
+        # correspond to external indices of the TensorOperator
+        # with [-1, -3, -5, ...] on the left-hand side and
+        # [-2, -4, -6, ...] on the right-hand side
         #
-        # First, merge the bra and ket networks
-        #
-        # The external indices of the bra and ket need to be mapped
-        # to [-1 -2 -3 ... ] -> [-1 -3 -5 ...] for the bra and 
-        # to [-1 -2 -3 ... ] -> [-2 -4 -6 ...] for the ket
-        #
-        # The internal indices of the ket needed to be offset 
-        # so as not to conflict with those of the bra
-        #
+        braket_tensors = network.tensors
+        braket_labels = network.labels 
         
-        braket_tensors = bra.tensors + ket.tensors
-        
-        # Calculate the necessary offset for the ket internals.
-        # These is the largest positive label in the bra network.
-        # If there are no positive labels there, then it should be 0.
-        # Use sum(...) to flatten the bra labels and append 0.
-        offset = max(sum(bra.labels,[0])) 
-        
-        bra_labels = [[i          if i > 0 else 2*i+1 for i in lab] for lab in bra.labels]
-        ket_labels = [[i + offset if i > 0 else 2*i   for i in lab] for lab in ket.labels]
-        
-        braket_labels = bra_labels + ket_labels 
-        
+        # Collect a list of all the negative labels in the input `network`
         neg_labels = [i for g in braket_labels for i in g if i < 0] 
         # Now we merge the bra/ket network with the operator,
         # handling cases involving iden_labels
@@ -1296,3 +1280,38 @@ def label2grppos(labels):
     return grp,pos 
     
     
+def interleaveNetworks(net1, net2):
+    """
+    Merge two TensorNetworks by interleaving
+    their external indices.
+    
+    The external indices of `net1` are mapped from
+    [-1, -2, -3, ... ] to [-1, -3, -5, ...]. The
+    external indices of `net2` are mapped from 
+    [-1, -2, -3, ... ] to [-2, -4, -6, ...].
+
+    Parameters
+    ----------
+    net1, net2 : TensorNetwork
+        Input networks
+
+    Returns
+    -------
+    TensorNetwork
+
+    """
+    
+    tensors = net1.tensors + net2.tensors 
+    
+    # Calculate the necessary offset for the net2 internals.
+    # These is the largest positive label in the net1 network.
+    # If there are no positive labels there, then it should be 0.
+    # Use sum(...) to flatten the net1 labels and append 0.
+    offset = max(sum(net1.labels,[0])) 
+    
+    net1_labels = [[i          if i > 0 else 2*i+1 for i in lab] for lab in net1.labels]
+    net2_labels = [[i + offset if i > 0 else 2*i   for i in lab] for lab in net2.labels]
+    
+    labels = net1_labels + net2_labels 
+    
+    return TensorNetwork(tensors, labels) 

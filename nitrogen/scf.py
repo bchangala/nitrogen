@@ -11,6 +11,7 @@ import nitrogen.tensor as tensor
 import numpy as np 
 
 
+
 def calcSCF(H, labels = None, init_wfs = None, target = None, 
             sorting = 'energy', tol = 1e-10, maxiter = 100, printlevel = 0):
         """
@@ -128,7 +129,7 @@ def calcSCF(H, labels = None, init_wfs = None, target = None,
                 ket = bra # Same on each side 
                 
                 # Calculate the effective Hamiltonian 
-                Heff = H.contract(bra, ket)
+                Heff = H.contract(tensor.interleaveNetworks(bra, ket))
                 nh = 1
                 nd = len(Heff.shape) # The number of axes of Heff
                 for j in range(0,len(Heff.shape),2):
