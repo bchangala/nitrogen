@@ -9,6 +9,7 @@ General self-consistent field methods.
 
 import nitrogen.tensor as tensor  
 import numpy as np 
+import time
 
 
 
@@ -166,3 +167,223 @@ def calcSCF(H, labels = None, init_wfs = None, target = None,
                   " and exited!")
         
         return e_scf, wfs, ve, vwfs
+    
+    
+def config_table(maxf, n, sort = True, fun = None, index_range = None, minf = None):
+    """
+    Tabulate a list of configurations in `n` indices 
+    with fun(config) <= `maxf`. 
+
+    Parameters
+    ----------
+    maxf : scalar
+        The maximum excitation.
+    n : int
+        The number of indices.
+    sort : boolean
+        If True (default), the configuration table is sorted 
+        by the excitation function.
+    fun : function, optional
+        The excitation function. If None (default), the sum
+        of indices is used. 
+    index_range : array_like
+        The dimension of each index. The default is infinite.
+    minf : scalar
+        The minimum excitation. The default is negative infinity.
+        Allowed configurations are *strictly greater than* `minf`.
+
+    Returns
+    -------
+    ndarray
+
+
+    Notes
+    -----
+    Custom exciations functions `fun` take an argument
+    ''configs'' with is a (..., `n`) array_like containing
+    an array of configuration index vectors. It must return
+    a (...)-shaped array with the excitation value. 
+    The excitation value must be monotonically increasing with
+    an increment of one or more configuration indices. 
+    
+    """
+    
+    if fun is None:
+        fun = lambda x : np.sum(x, axis = -1)  # sum over last axis
+    if index_range is None:
+        index_range = [np.inf for i in range(n)] # Maximum index values 
+    if minf is None:
+        minf = -np.inf # Negative infinity 
+        
+    #######################################################
+    # Loop once to count how many configurations there are.
+    # Then repeat and actually record them.
+    #
+    nconfig = 0 
+    for record in [False, True]:
+        
+        if record:
+            table = np.zeros((nconfig, n), dtype = np.int32) 
+        
+        config = np.zeros((n,), dtype = np.uint32) 
+        nconfig = 0 
+        if fun(config) > maxf: # The [0 0 0 ... ] configuration is already
+        # greater than the maximum excitation. Return an empty table.
+            return np.zeros((0,n))
+        # Otherwise, continue
+        if fun(config) > minf: # Strictly greater than minf !
+            nconfig += 1 # Count [0 0 0 0 ...]
+            if record:
+                np.copyto(table[0,:], config)
+            
+        while True:
+            #
+            # Attempt to increment the current configuration `config`
+            #
+            # 
+            next_config = config.copy()
+            found_valid = False 
+            for j in range(n):
+                # Try to increment index j, starting from the left.
+                next_config[j] += 1 
+                if next_config[j] < index_range[j] and fun(next_config) <= maxf:
+                    # This config is okay.
+                    if fun(next_config) > minf: # Strictly greater than minf!
+                        nconfig += 1 
+                    config = next_config
+                    found_valid = True 
+                    break 
+                else: # next_config is out-of-bounds
+                    # Set this index to zero and move on to the next one
+                    next_config[j] = 0 
+            
+            if not found_valid: # We were not able to find a new valid configuration
+                break 
+            elif found_valid and record and fun(next_config) > minf:
+                np.copyto(table[nconfig-1, :], next_config)
+    
+    if sort:
+        # First sort table by configuration indices
+        for j in range(n-1, -1, -1):
+            I = np.argsort(-table[:,j], kind = 'stable')
+            table = table[I,:] # descending sort 
+        # Then sort by the excitation number of each configuration
+        # This will leave the final table sorted by excitation first,
+        # and then by each column left-to-right
+        I = np.argsort(fun(table), kind = 'stable')
+        table = table[I,:] # Sort table by the excitation number 
+    
+    return table 
+    
+            
+        
+def Heff_ci_mp2(Hcfg, ci_max, mp2_max = None, neff = None, fun = None,
+                printlevel = 1):
+    """
+    Calculate hybrid VCI + VMP2 effective Hamiltonian 
+
+    Parameters
+    ----------
+    Hcfg : ConfigurationOperator
+        The configuration representation Hamiltonian.
+    ci_max : scalar
+        The maximum excitation of the variational block.
+    mp2_max : scalar, optional
+        The maximum excitation of the perturbative block. If None (default),
+        no perturbative corrections will be made.
+    neff : int, optional
+        The size of the effective Hamiltonian. If None (default), then the
+        entire variational space will be used.
+    fun : function, optional
+        The configuration excitation function. If None, then the sum
+        of configuration indices is used. See :func:`~nitrogen.scf.config_table`.
+    printlevel : int, optional
+        Printed output level. The default is 1. 
+        
+    Returns
+    -------
+    Heff : ndarray
+        The effective Hamiltonian 
+
+    """
+    
+    #################################
+    # First, calculate the configurations that define
+    # the variational and perturbative blocks
+    index_range = Hcfg.shape
+    n = len(index_range)
+    
+    cfg0 = config_table(ci_max, n, fun = fun, index_range = index_range) 
+    
+    if mp2_max is None:
+        cfg1 = np.empty((0, n))
+    else:
+        cfg1 = config_table(mp2_max, n, fun = fun, index_range = index_range, 
+                            minf = ci_max)
+    if neff is None:
+        neff = cfg0.shape[0]
+    else:
+        neff = min(cfg0.shape[0], neff) 
+    if neff < 1:
+        raise ValueError("The size of the effective Hamiltonian is zero!") 
+    #
+    # cfg0 contains the variational space
+    # cfg1 contains the perturbative space
+    ##################################
+    
+    ##################################
+    # Calculate the variational block
+    # assuming a symmetric Hamiltonian 
+    if printlevel >=1 : tic = time.perf_counter(); print("Calculating H00: ", end = "")
+    H00 = Hcfg.block(cfg0, ket_configs = 'symmetric') 
+    if printlevel >=1 : toc = time.perf_counter(); print(f"{toc-tic:.3f} s")
+    #
+    # Calculate the perturbative block
+    if printlevel >=1 : tic = time.perf_counter(); print("Calculating H10: ", end = "")
+    H10 = Hcfg.block(cfg1, ket_configs = cfg0)
+    if printlevel >=1 : toc = time.perf_counter(); print(f"{toc-tic:.3f} s")
+    # and its energies
+    if printlevel >=1 : tic = time.perf_counter(); print("Calculating E1: ", end = "")
+    E1 = Hcfg.block(cfg1, ket_configs = 'diagonal') 
+    if printlevel >=1 : toc = time.perf_counter(); print(f"{toc-tic:.3f} s")
+    #
+    ##################################
+    
+    ##################################
+    # Diagonalize the variational block
+    w0,u0 = np.linalg.eigh(H00) 
+    # Keep only the lowest `neff` eigenvectors 
+    w0 = w0[:neff]
+    u0 = u0[:, :neff] 
+    #
+    Heff = np.diag(w0)
+    if cfg1.shape[0] == 0: # there is no perturbative block to consider
+        return Heff
+    #
+    # Transform the perturbative block
+    H10p = H10 @ u0 
+    # 
+    # H10p[i,j] is the matrix element between the i**th perturbative
+    # configuration and the j**th eigenvector of the variational block 
+    #
+    deltaE = np.subtract.outer(E1, w0) 
+    # deltaE[i,j] equals E1[i] - w0[j]
+    #
+    ideltaE = 1.0 / deltaE # the energy denominator 
+    
+    for i in range(neff):
+        for j in range(i+1):
+            # Calculate the second-order contribution
+            # to Heff[i,j]
+            
+            h2 = np.sum(-0.5 * H10p[:,i] * H10p[:,j] * (ideltaE[:,i] + ideltaE[:,j]))
+            Heff[i,j] += h2
+            if i != j:
+                Heff[j,i] += h2 
+            
+            #for m in range(H10p.shape[0]):
+            #    c = H10p[m,i] * H10p[m,j]
+            #    Heff[i,j] += 0.5 * c * (-ideltaE[m,i] - ideltaE[m,j])
+            
+    
+    return Heff 
