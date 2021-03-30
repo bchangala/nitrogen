@@ -12,162 +12,366 @@ import numpy as np
 import time
 
 
-
 def calcSCF(H, labels = None, init_wfs = None, target = None, 
             sorting = 'energy', tol = 1e-10, maxiter = 100, printlevel = 0):
-        """
-        Calculate the generalized self-consistent field solution
-        for a TensorOperator `H`.
+    """
+    Calculate the generalized self-consistent field solution
+    for a TensorOperator `H`.
 
-        Parameters
-        ----------
-        H : TensorOperator
-            The Hamiltonian as a tensor operator in the primitive basis 
-            representation.
-        labels : list of lists, optional
-            Each element of list is a list of labels one factor of the product
-            wavefunction. The labels 0, 1, 2, ... correspond to the axes 
-            of `H`. The default is [[0], [1], [2], ...]
-        init_wfs : list of ndarrays, optional
-            The initial wavefunction factors. If None, default values will
-            be used.
-        target : array_like, optional
-            The SCF target configuration. The default [0, 0, ...]
-        sorting : {'energy'}
-            The SCF factor sorting mode. This defines the meaning of the 
-            target index values. The default is 'energy'.
-        tol : float, optional
-            The SCF energy convergence tolerance. The default is 1e-10.
-        maxiter : int, optional
-            The maximum number of SCF iterations. The default is 100.
-        printlevel : int, optional
-            Output print level. The default is 0.
+    Parameters
+    ----------
+    H : TensorOperator
+        The Hamiltonian as a tensor operator in the primitive basis 
+        representation.
+    labels : list of lists, optional
+        Each element of list is a list of labels one factor of the product
+        wavefunction. The labels 0, 1, 2, ... correspond to the axes 
+        of `H`. The default is [[0], [1], [2], ...]
+    init_wfs : list of ndarrays, optional
+        The initial wavefunction factors. If None, default values will
+        be used.
+    target : array_like, optional
+        The SCF target configuration. The default [0, 0, ...]
+    sorting : {'energy'}
+        The SCF factor sorting mode. This defines the meaning of the 
+        target index values. The default is 'energy'.
+    tol : float, optional
+        The SCF energy convergence tolerance. The default is 1e-10.
+    maxiter : int, optional
+        The maximum number of SCF iterations. The default is 100.
+    printlevel : int, optional
+        Output print level. The default is 0.
 
-        Returns
-        -------
-        e_scf : float
-            The final SCF energy
-        wfs : list of ndarrays
-            The final SCF wavefunctions
-        ve : list of ndarrays
-            ve[i] are the 1-mode SCF energies for factor i.
-        vwfs : list of ndarrays
-            vwfs[i] is the array of virtual SCF wavefunction for factor i
+    Returns
+    -------
+    e_scf : float
+        The final SCF energy
+    wfs : list of ndarrays
+        The final SCF wavefunctions
+    ve : list of ndarrays
+        ve[i] are the 1-mode SCF energies for factor i.
+    vwfs : list of ndarrays
+        vwfs[i] is the array of virtual SCF wavefunctions for factor i
 
-        """
-        
-        ##################
-        # Default labels: [ [0], [1], [2], ... for each axis of shape]
-        if labels is None:
-            labels = [[i] for i in range(len(H.shape))]
-        ##################
-        # Check that each label is used once
-        if list(np.unique(sum(labels,[]))) != [i for i in range(len(H.shape))]:
-            raise ValueError("labels must use 0, 1, 2, ... once each")
-        ##################
-        
-        ##################
-        # Default init_wfs
-        if init_wfs is None:
-            init_wfs = []
-            for i,lab in enumerate(labels):
-                wfshape = tuple([H.shape[j] for j in lab]) # The shape of this factor 
-                wf = np.ones(wfshape, dtype = np.float64)  # Uniform initial wavefuncion
-                init_wfs.append(wf)
-        ##################
-        # Continue with init_wfs processing
-        # 1) Explicitly normalize each factor 
-        try:
-            for i in range(len(init_wfs)):
-                init_wfs[i] = init_wfs[i] / np.sqrt( np.sum(init_wfs[i] ** 2))
-        except:
-            raise ValueError("Invalid init_wfs")
-        ##################
-        
-        ##################
-        # Parse target vector
-        if target is None: # Default: [0, 0, 0  ... for each factor]
-            target = np.zeros((len(labels),) ,dtype = np.uint16)
-        #
-        target = np.array(target) 
-        if len(target) != len(labels):
-            raise ValueError("target array has an unexpected size")
-        #
-        ##################
-        
-        ########################
-        # Parse sorting strategy 
-        if sorting == 'energy':
-            pass  # OK
-        else:
-            raise ValueError("Unexpected sorting string")
-        ########################
-        
-        ########################
-        #
-        # Begin SCF iterations
-        #
-        cnt = 0 
-        wfs = [wf for wf in init_wfs]
-        e_scf = 1e99 #dummy start value
-        vwfs = [None for i in range(len(init_wfs))] # The complete virtual wfs
-        ve = [None for i in range(len(init_wfs))]   # The complete SCF 1-mode energies
-        
-        while cnt < maxiter:
-            #
-            # Perform an SCF sweep for each wavefunction factor
-            #
-            for i in range(len(wfs)):
-                
-                # Construct the TensorNetwork for the bra / ket,
-                # which includes all factors except the i**th
-                bra_tensors = [wfs[j] for j in range(len(wfs)) if j != i]
-                # Construct the labels for the TensorNetwork
-                # This requires mapping 0,1,2,... -> -1,-2,-3,...
-                bra_labels = [[ (-l-1) for l in labels[j]] for j in range(len(labels)) if j != i]
-                
-                bra = tensor.TensorNetwork(bra_tensors, bra_labels)
-                ket = bra # Same on each side 
-                
-                # Calculate the effective Hamiltonian 
-                Heff = H.contract(tensor.interleaveNetworks(bra, ket))
-                nh = 1
-                nd = len(Heff.shape) # The number of axes of Heff
-                for j in range(0,len(Heff.shape),2):
-                    nh *= Heff.shape[j]
-                # nh = the square side length of matricized Heff
-                
-                # Reshape and diagonalize Heff 
-                h = np.transpose(Heff, list(range(0,nd,2)) + list(range(1,nd,2)))
-                h = h.reshape((nh,nh))
-                w,u = np.linalg.eigh(h) 
-                # Currently no sorting to perform, 'energy' is default 
-                wfs[i] = (u[:,target[i]]).reshape(wfs[i].shape)
-                vwfs[i] = (u.T).reshape((nh,) + wfs[i].shape)
-                ve[i] = w 
-            
-            # After one sweep through each factor, calculate the scf energy
-            #
-            e = w[target[-1]]  # the current scf energy 
-            err = np.abs(e - e_scf) 
-            if printlevel > 0 :
-                print(f"SCF iteration {cnt:d} ... E = {e:+10.6e} ... delta = {err:10.6e}")
-            e_scf = e 
-            cnt += 1 
-            
-            # Check for convergence or max 
-            if err < tol: 
-                if printlevel > 0:
-                    print("SCF convergence reached.")
-                break # Exit SCF loop 
-        #########################################
-        #
-        if cnt >= maxiter:
-            print(f"Warning: SCF loop reached maxiter = {maxiter:d} iterations"
-                  " and exited!")
-        
-        return e_scf, wfs, ve, vwfs
+    """
     
+    ##################
+    # Default labels: [ [0], [1], [2], ... for each axis of shape]
+    if labels is None:
+        labels = [[i] for i in range(len(H.shape))]
+    ##################
+    # Check that each label is used once
+    if list(np.unique(sum(labels,[]))) != [i for i in range(len(H.shape))]:
+        raise ValueError("labels must use 0, 1, 2, ... once each")
+    ##################
+    
+    ##################
+    # Default init_wfs
+    if init_wfs is None:
+        init_wfs = []
+        for i,lab in enumerate(labels):
+            wfshape = tuple([H.shape[j] for j in lab]) # The shape of this factor 
+            wf = np.ones(wfshape, dtype = np.float64)  # Uniform initial wavefuncion
+            init_wfs.append(wf)
+    ##################
+    # Continue with init_wfs processing
+    # 1) Explicitly normalize each factor 
+    try:
+        for i in range(len(init_wfs)):
+            init_wfs[i] = init_wfs[i] / np.sqrt( np.sum(init_wfs[i] ** 2))
+    except:
+        raise ValueError("Invalid init_wfs")
+    ##################
+    
+    ##################
+    # Parse target vector
+    if target is None: # Default: [0, 0, 0  ... for each factor]
+        target = np.zeros((len(labels),) ,dtype = np.uint16)
+    #
+    target = np.array(target) 
+    if len(target) != len(labels):
+        raise ValueError("target array has an unexpected size")
+    #
+    ##################
+    
+    ########################
+    # Parse sorting strategy 
+    if sorting == 'energy':
+        pass  # OK
+    else:
+        raise ValueError("Unexpected sorting string")
+    ########################
+    
+    ########################
+    #
+    # Begin SCF iterations
+    #
+    cnt = 0 
+    wfs = [wf for wf in init_wfs]
+    e_scf = np.inf #dummy start value
+    vwfs = [None for i in range(len(init_wfs))] # The complete virtual wfs
+    ve = [None for i in range(len(init_wfs))]   # The complete SCF 1-mode energies
+    
+    while cnt < maxiter:
+        #
+        # Perform an SCF sweep for each wavefunction factor
+        #
+        for i in range(len(wfs)):
+            
+            # Construct the TensorNetwork for the bra / ket,
+            # which includes all factors except the i**th
+            bra_tensors = [wfs[j] for j in range(len(wfs)) if j != i]
+            # Construct the labels for the TensorNetwork
+            # This requires mapping 0,1,2,... -> -1,-2,-3,...
+            bra_labels = [[ (-l-1) for l in labels[j]] for j in range(len(labels)) if j != i]
+            
+            bra = tensor.TensorNetwork(bra_tensors, bra_labels)
+            ket = bra # Same on each side 
+            
+            # Calculate the effective Hamiltonian 
+            Heff = H.contract(tensor.interleaveNetworks(bra, ket))
+           
+            nd = len(Heff.shape) # The number of axes of Heff
+            nh = np.prod(Heff.shape[::2])
+            # nh = the square side length of matricized Heff
+            
+            # Reshape and diagonalize Heff 
+            h = np.transpose(Heff, list(range(0,nd,2)) + list(range(1,nd,2)))
+            h = h.reshape((nh,nh))
+            w,u = np.linalg.eigh(h) 
+            # Currently no sorting to perform, 'energy' is default 
+            wfs[i] = (u[:,target[i]]).reshape(wfs[i].shape)
+            vwfs[i] = (u.T).reshape((nh,) + wfs[i].shape)
+            ve[i] = w 
+        
+        # After one sweep through each factor, calculate the scf energy
+        #
+        e = w[target[-1]]  # the current scf energy 
+        err = np.abs(e - e_scf) 
+        if printlevel > 0 :
+            print(f"SCF iteration {cnt:d} ... E = {e:+10.6e} ... delta = {err:10.6e}")
+        e_scf = e 
+        cnt += 1 
+        
+        # Check for convergence or max 
+        if err < tol: 
+            if printlevel > 0:
+                print("SCF convergence reached.")
+            break # Exit SCF loop 
+    #########################################
+    #
+    if cnt >= maxiter:
+        print(f"Warning: SCF loop reached maxiter = {maxiter:d} iterations"
+              " and exited!")
+    
+    return e_scf, wfs, ve, vwfs
+    
+def thermalSCF(H, beta, labels = None, init_density = None,
+               tol = 1e-10, maxiter = 100, printlevel = 0):
+    """
+    Calculate the thermal self-consistent field via the
+    Bogolyubov free energy variational principle for the 
+    Hamiltonian TensorOperator `H`.
+
+    Parameters
+    ----------
+    H : TensorOperator
+        The Hamiltonian as a tensor operator in the primitive basis 
+        representation.
+    beta : scalar
+        The value of :math:`\\beta = 1/kT`.
+    labels : list of lists, optional
+        Each element of list is a list of labels one factor of the product
+        wavefunction. The labels 0, 1, 2, ... correspond to the axes 
+        of `H`. The default is [[0], [1], [2], ...]
+    init_density : list of ndarrays, optional
+        The initial thermal density operator for each factor.
+    tol : float, optional
+        The SCF free energy convergence tolerance. The default is 1e-10.
+    maxiter : int, optional
+        The maximum number of SCF iterations. The default is 100.
+    printlevel : int, optional
+        Output print level. The default is 0.
+        
+    Returns
+    -------
+    F_scf : float
+        The thermal SCF free energy.
+    rhos : list of ndarrays
+        The thermal SCF density operators.
+    ve : list of ndarrays
+        ve[i] are the 1-mode SCF energies for factor i.
+    vwfs : list of ndarrays
+        vwfs[i] is the array of virtual SCF wavefunctions for factor i
+
+
+    """
+    
+    ##################
+    # Default labels: [ [0], [1], [2], ... for each axis of shape]
+    if labels is None:
+        labels = [[i] for i in range(len(H.shape))]
+    ##################
+    # Check that each label is used once
+    if list(np.unique(sum(labels,[]))) != [i for i in range(len(H.shape))]:
+        raise ValueError("labels must use 0, 1, 2, ... once each")
+    ##################
+    
+    ##################
+    # Check beta
+    if beta < 0:
+        raise ValueError("beta must be non-negative")
+    
+    ##################
+    # Default init_density
+    # Use high-temperature limit --> identity
+    if init_density is None:
+        init_density = []
+        for i,lab in enumerate(labels):
+            wfshape = tuple([H.shape[j] for j in lab]) # The shape of this factor's wavefunction
+            N = np.prod(wfshape) # The total primitive dimension of this factor
+            rho = np.eye(N).reshape(wfshape+wfshape) # Identity operator
+            init_density.append(rho)
+    ##################
+    # Continue with init_density processing
+    # Explicitly normalize each density operator to unit trace
+    #
+    try:
+        for i in range(len(init_density)):
+            lab = [j+1 for j in range(len(labels[i]))] 
+            trace = np.einsum(init_density[i], lab + lab, optimize = True) 
+            init_density[i] = init_density[i] / trace 
+    except:
+        raise ValueError("Invalid init_density")
+    #
+    # Note that the rho matrices have their axes ordered as
+    # rho_ijk,i'j'k'...
+    # where i and i', refer to the same degree of freedom.
+    #
+    # This is different than the (implicit) index order of the
+    # TensorOperator Hamiltonian, which is H_ii',jj',kk',...
+    #
+    ##################
+    
+    
+    ########################
+    #
+    # Begin thermal SCF iterations
+    #
+    cnt = 0 
+    rhos = [rho for rho in init_density]
+    F_scf = np.inf #dummy start value
+    vwfs = [None for i in range(len(init_density))] # The complete virtual wfs
+    ve = [None for i in range(len(init_density))]   # The complete SCF 1-mode energies
+    
+    while cnt < maxiter:
+        #
+        # Perform an SCF sweep for each rho factor
+        #
+        for i in range(len(rhos)):
+            
+            # Construct the TensorNetwork for the direct product
+            # thermal density operator which includes all factors except the i**th
+            rho_tensors = [rhos[j] for j in range(len(rhos)) if j != i]
+            # Construct the labels for the TensorNetwork
+            rho_labels = [ ([-2*k - 1 for k in lab] + [-2*k - 2 for k in lab])
+                          for lab in labels]
+            # Construct the TensorNetwork representing the direct product
+            # of all rho factors
+            rho = tensor.TensorNetwork(rho_tensors, rho_labels)
+            
+            # Calculate the thermally averaged effective Hamiltonian 
+            Heff = H.contract(rho)
+            
+            
+            nd = len(Heff.shape) # The number of axes of Heff
+            nh = np.prod(Heff.shape[::2])
+            # nh = the square side length of matricized Heff
+            
+            # Reshape and diagonalize Heff 
+            h = np.transpose(Heff, list(range(0,nd,2)) + list(range(1,nd,2)))
+            h = h.reshape((nh,nh))
+            w,u = np.linalg.eigh(h) 
+            
+            # Construct 1-group thermal density operator
+            # and the new free energy
+            rhos[i],F = calcRho(w,u,beta).reshape(rhos[i].shape) 
+            
+            vwfs[i] = (u.T).reshape((nh,) + rhos[i].shape[:len(rhos[i].shape)])
+            ve[i] = w 
+        
+        # After a full sweep through each factor, 
+        # check the convergence of the free energy
+        err = np.abs(F - F_scf) 
+        if printlevel > 0 :
+            print(f"SCF iteration {cnt:d} ... F = {F:+10.6e} ... delta = {err:10.6e}")
+        F_scf = F 
+        cnt += 1 
+        
+        # Check for convergence or max 
+        if err < tol: 
+            if printlevel > 0:
+                print("Thermal SCF convergence reached.")
+            break # Exit SCF loop 
+    #########################################
+    #
+    if cnt >= maxiter:
+        print(f"Warning: SCF loop reached maxiter = {maxiter:d} iterations"
+              " and exited!")
+
+    return F_scf, rhos, ve, vwfs
+
+def calcRho(w,u,beta):
+    """ Calculate the normalized thermal density operator,
+        :math:`\\rho = \\exp[-\\beta H]`
+        
+    Parameters
+    ----------
+    w : (n,) ndarray
+        The energy eigenvalues of :math:`H`.
+    u : (n,n) ndarray
+        The orthonormal eigenvectors of :math:`H`.
+    beta : scalar
+        The value of :math:`\\beta = 1/kT`. If `beta` is
+        equal to ``np.inf``, then only the lowest energy
+        eigenvectors is used. Behavior is undefined for
+        exactly degenerate ground state.
+    
+    Returns
+    -------
+    rho : (n,n) ndarray
+        The thermal density operator, :math:`\\rho`, normalized to unit trace,
+        :math:`\\mathrm{Tr}[\\rho] = 1`.
+    F : scalar
+        The Helmholtz free energy. 
+    """
+    
+    # Sort eigensystem by energy first 
+    I = np.argsort(w)
+    w = w[I]
+    u = u[:,I]
+    n = len(w)
+    E0 = w[0] # The lowest energy 
+    
+    if np.isposinf(beta): # Positive infinity 
+        rho = np.multiply.outer(u[:,0], u[:,0]) 
+        F = E0
+        # As u[:,0] is already normalized to unity, 
+        # so is the trace of rho
+    else:
+        # beta is finite 
+        rho = np.zeros((n,n))
+        Zbar = 0.0   # The partition function, relative to exp(-beta * E0) 
+        for i in range(n):
+            factor = np.exp(-beta * (w[i] - E0))
+            rho += factor * np.multiply.outer(u[:,i], u[:,i]) 
+            Zbar += factor 
+        
+        rho /= Zbar # Normalize the trace of rho 
+        
+        F = -Zbar / beta + E0
+    
+    return rho, F
     
 def config_table(maxf, n, sort = True, fun = None, index_range = None, minf = None):
     """
