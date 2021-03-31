@@ -274,9 +274,9 @@ def thermalSCF(H, beta, labels = None, init_density = None,
             # thermal density operator which includes all factors except the i**th
             rho_tensors = [rhos[j] for j in range(len(rhos)) if j != i]
             # Construct the labels for the TensorNetwork
-            rho_labels = [ ([-2*k - 1 for k in lab] + [-2*k - 2 for k in lab])
-                          for lab in labels]
-            # Construct the TensorNetwork representing the direct product
+            rho_labels = [ ([-2*k - 1 for k in labels[j]] + [-2*k - 2 for k in labels[j]])
+                          for j in range(len(rhos)) if j != i]
+            # Construct the TensorNetwork representing the dirct product
             # of all rho factors
             rho = tensor.TensorNetwork(rho_tensors, rho_labels)
             
@@ -294,14 +294,24 @@ def thermalSCF(H, beta, labels = None, init_density = None,
             w,u = np.linalg.eigh(h) 
             
             # Construct 1-group thermal density operator
-            # and the new free energy
-            rhos[i],F = calcRho(w,u,beta).reshape(rhos[i].shape) 
+            R,_ = calcRho(w,u,beta) # R is matricized
+            rhos[i] = R.reshape(rhos[i].shape)
             
-            vwfs[i] = (u.T).reshape((nh,) + rhos[i].shape[:len(rhos[i].shape)])
+            vwfs[i] = (u.T).reshape((nh,) + rhos[i].shape[:len(rhos[i].shape)//2])
             ve[i] = w 
         
         # After a full sweep through each factor, 
         # check the convergence of the free energy
+        F0 = _calcF0(ve, beta)  
+        Ebar = 0.0 
+        for e in ve:
+            ebar = _calcEthermal(e,beta) # should all be equal when converged
+            Ebar += ebar
+        Ebar /= len(ve) 
+        #
+        #
+        F = F0 - (len(ve) - 1.0) * Ebar
+        
         err = np.abs(F - F_scf) 
         if printlevel > 0 :
             print(f"SCF iteration {cnt:d} ... F = {F:+10.6e} ... delta = {err:10.6e}")
@@ -329,7 +339,7 @@ def calcRho(w,u,beta):
     ----------
     w : (n,) ndarray
         The energy eigenvalues of :math:`H`.
-    u : (n,n) ndarray
+    u : (...,n) ndarrays
         The orthonormal eigenvectors of :math:`H`.
     beta : scalar
         The value of :math:`\\beta = 1/kT`. If `beta` is
@@ -339,7 +349,7 @@ def calcRho(w,u,beta):
     
     Returns
     -------
-    rho : (n,n) ndarray
+    rho : (...,...) ndarray
         The thermal density operator, :math:`\\rho`, normalized to unit trace,
         :math:`\\mathrm{Tr}[\\rho] = 1`.
     F : scalar
@@ -349,29 +359,60 @@ def calcRho(w,u,beta):
     # Sort eigensystem by energy first 
     I = np.argsort(w)
     w = w[I]
-    u = u[:,I]
-    n = len(w)
+    u = u[...,I]
     E0 = w[0] # The lowest energy 
     
+    uT = np.moveaxis(u,-1,0) # move the eigen index to front for "u^T"
+    
     if np.isposinf(beta): # Positive infinity 
-        rho = np.multiply.outer(u[:,0], u[:,0]) 
+        #rho = np.multiply.outer(u[:,0], u[:,0]) 
+        rho = np.tensordot(u[...,0:1],uT[0:1,...], axes = 1)
         F = E0
         # As u[:,0] is already normalized to unity, 
         # so is the trace of rho
     else:
         # beta is finite 
-        rho = np.zeros((n,n))
-        Zbar = 0.0   # The partition function, relative to exp(-beta * E0) 
-        for i in range(n):
-            factor = np.exp(-beta * (w[i] - E0))
-            rho += factor * np.multiply.outer(u[:,i], u[:,i]) 
-            Zbar += factor 
-        
-        rho /= Zbar # Normalize the trace of rho 
-        
-        F = -Zbar / beta + E0
+        # Calculate the Boltzmann factors relative to exp(-beta * E0)
+        z = np.exp(-beta * (w - E0)) # strictly >= 1.0 
+        Zbar = np.sum(z)  # The partition function relative to exp(-beta * E0)
+        rho = np.tensordot(u , np.tensordot(np.diag(z),  uT, axes = 1),
+                           axes = 1) / Zbar
+        F = (-np.log(Zbar) / beta) + E0 # The Helmholtz free energy : -kT * log(Z)
     
     return rho, F
+
+def _calcF0(ve,beta):
+    
+    F0 = 0.0
+    for e in ve:
+        F0 += e[0] - (_calcLogZBar(e,beta) / beta)
+    return F0 
+
+def _calcLogZBar(e, beta):
+    """ e : ndarray of energies """
+    
+    if np.isposinf(beta):
+        return 1.0 # Ignores possible degeneracy !!! 
+    
+    e = np.sort(e)
+    e0 = e[0] 
+    zbar_minus_one = 0.0
+    for i in range(1,len(e)):
+        zbar_minus_one += np.exp(-beta * (e[i]-e0))
+    return np.log1p(zbar_minus_one) 
+
+def _calcEthermal(e, beta):
+    """ e : ndarray of energies """
+    
+    e = np.sort(e)
+    e0 = e[0]
+    
+    if np.isposinf(beta):
+        return e0
+    
+    wgt = np.exp(-beta * (e-e0))
+    ebar = np.sum( e * wgt) / np.sum(wgt) 
+    return ebar
     
 def config_table(maxf, n, sort = True, fun = None, index_range = None, minf = None):
     """
@@ -591,3 +632,196 @@ def Heff_ci_mp2(Hcfg, ci_max, mp2_max = None, neff = None, fun = None,
             
     
     return Heff 
+
+def scfStability(Hcfg, target_cfg = None):
+    """
+    Calculate the stability of a mean field solution
+    using the configuration representation Hamiltonian.
+
+    Parameters
+    ----------
+    Hcfg : ConfigurationOperator
+        Hamiltonian in the SCF modal configuration
+        representation
+    target_cfg : array_like
+        The target configuration. If None, this is assumed
+        to be [0, 0, ...]
+
+    Returns
+    -------
+    w : ndarray
+        The eigenvalues of the SCF stability matrix
+    u : ndarray
+        The eigenvectors of the SCF stability matrix
+        
+    """
+    
+    shape = Hcfg.shape # The configuration dimensions
+    nf = len(shape)    # The number of factors
+    
+    if target_cfg is None:
+        target_cfg = [0 for i in range(nf)]
+    target_cfg = np.array(target_cfg) 
+    
+    # A list of lists for the blocks of the D2L second-order
+    # sensitivity matrix
+    D2L = [[None for n in range(nf)] for m in range(nf)]
+    
+    print("----------------------")
+    print("SCF stability analysis")
+    print("----------------------")
+    
+    # Calculate the reference energy (the Lagrange multiplier)
+    #
+    lam_ref = Hcfg.block(target_cfg, target_cfg)[0,0]
+    #
+    # 
+    # Calculate the diagonal blocks of D2L
+    #
+    for n in range(nf):
+        S_cfgs = singlesConfigs(target_cfg, n, shape[n], exclude=True)
+        Lam_n = Hcfg.block(S_cfgs, ket_configs = 'diagonal')
+        D2L[n][n] = np.diag(Lam_n - lam_ref)
+        
+    #
+    #
+    # Calculate the off-diagonal blocks of D2L
+    for n in range(nf):
+        for m in range(n):
+            # n > m 
+            Sn = singlesConfigs(target_cfg, n, shape[n], exclude = True)
+            Sm = singlesConfigs(target_cfg, m, shape[m], exclude = True)
+            D  = doublesConfigs(target_cfg, (n,m), (shape[n], shape[m]), exclude = True)
+            
+            print(f"Block ({n:d},{m:d}):")
+            # Calculate the D/0 term
+            tic = time.perf_counter(); print(" D0 term ... ", end = "")
+            HD0 = Hcfg.block(D, target_cfg)
+            toc = time.perf_counter(); print(f"{toc-tic:.3f} s")
+            # Calculate the S/S term
+            tic = time.perf_counter(); print(" SS term ... ", end = "")
+            HSS = Hcfg.block(Sn, Sm)
+            toc = time.perf_counter(); print(f"{toc-tic:.3f} s")
+            
+            D2L[n][m] = HD0.reshape((shape[n]-1, shape[m]-1)) + HSS 
+            
+            D2L[m][n] = D2L[n][m].copy().T 
+    #
+    # D2L is complete 
+    rows = [np.concatenate(tuple(row), axis = 1) for row in D2L]
+    D2L = np.concatenate(tuple(rows), axis = 0)
+    
+    # Calculate the eigenvalues of D2L
+    w,u = np.linalg.eigh(D2L)
+    
+    print("")
+    print("The lowest stability eigenvalues are:")
+    for i in range(min(len(w),5)):
+        print(f" w[{i:d}] = {w[i]:+.4f}")
+    
+    return w,u
+        
+def singlesConfigs(config, i, ni, exclude=False):
+    """
+    Calculate singly excited configurations.
+
+    Parameters
+    ----------
+    config : 1-d array_like
+        The reference configuration.
+    i : int
+        The index to excite.
+    ni : int
+        The dimension of index `i`.
+    exclude : boolean, optional
+        Exclude the reference configuration `config` from the
+        singly excited list. The default is False.
+
+    Returns
+    -------
+    ndarray
+        The singly excited configurations for index `i`.
+
+    """
+    
+    config = np.array(config) 
+    if i < 0 or i >= len(config):
+        raise ValueError("Invalid index `i`")
+    
+    if exclude:
+        ncfg = ni - 1
+    else: 
+        ncfg = ni
+        
+    singles = np.tile(config, (ncfg, 1)) 
+    
+    if exclude:
+        for k in range(ni):
+            if k < config[i]:
+                singles[k,i] = k 
+            elif k == config[i]:
+                pass  # Do not include reference configuration
+            else: # k > config[i]
+                singles[k-1,i] = k 
+    else:
+        for k in range(ni):
+            singles[k,i] = k 
+    
+    return singles 
+
+
+def doublesConfigs(config, ij, ninj, exclude=False):
+    """
+    Calculate doubly excited configurations.
+
+    Parameters
+    ----------
+    config : 1-d array_like
+        The reference configuration.
+    ij : tuple
+        A tuple (i,j) with the two indices to excite.
+    ninj : tuple
+        A tuple (ni,nj) with the dimensions of the two indices to excite.
+    exclude : boolean, optional
+        Exclude the reference and singly excited configurations from the
+        doubly excited list. The default is False.
+
+    Returns
+    -------
+    ndarray
+        The doubly excited configurations.
+
+    """    
+    
+    # Unpack arguments
+    i,j = ij
+    ni,nj = ninj
+
+    config = np.array(config) 
+    if i < 0 or i >= len(config):
+        raise ValueError("Invalid index `ij`[0]")
+    if j < 0 or j >= len(config):
+        raise ValueError("Invalid index `ij`[1]")
+    if i == j :
+        raise ValueError("`ij` elements must be distinct")
+    
+    if exclude:
+        ncfg = (ni - 1) * (nj - 1)  # strict doubles only
+    else: 
+        ncfg = ni * nj # ref, singles and doubles
+        
+    doubles = np.tile(config, (ncfg, 1)) 
+    
+    idx = 0 
+    for k in range(ni):
+        if exclude and k == config[i]:
+            continue
+        for l in range(nj):
+            if exclude and l == config[j]:
+                continue 
+            doubles[idx,i] = k 
+            doubles[idx,j] = l 
+            idx += 1
+
+    
+    return doubles   
