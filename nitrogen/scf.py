@@ -682,6 +682,10 @@ def simple_MP2(Hcfg, mp2_max, target = None, excitation_fun = None, printlevel =
     Hi0 = Hcfg.block(cfg_mp2, ket_configs = cfg_target)[:,0] 
     #
     if printlevel >= 1:
+        print("")
+        print("-----------------------")
+        print( " Simple MP2 energy")
+        print(f" Target = {cfg_target[0]}")
         print("-----------------------")
         print(f" E0 + E1 = {E0:10.4f}") # Zeroth + first-order energy
     #
@@ -698,12 +702,13 @@ def simple_MP2(Hcfg, mp2_max, target = None, excitation_fun = None, printlevel =
     if printlevel >= 1: # Print contribution report 
         idx = np.argsort(-np.abs(c1))
         print("")
-        print("---------------------------------")
-        print(" MP2 report            ")
-        print("---------------------------------")
+        print("-------------------------------------")
+        print(" MP2 report  (c1 ; e2 )           ")
+        print("-------------------------------------")
         for i in idx[:10]:
-            print(f"{cfg_mp2[i]} ... {c1[i]:10.2E}  ;  {e2[i]:10.2E} ")
-        print("---------------------------------")
+            with np.printoptions(formatter={'int':'{:2d}'.format}):
+                print(f"{cfg_mp2[i]} ... {c1[i]:10.2E}  ;  {e2[i]:10.2E} ")
+        print("-------------------------------------")
     
     return E0 + E2 
     #
