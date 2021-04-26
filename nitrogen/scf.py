@@ -633,6 +633,82 @@ def Heff_ci_mp2(Hcfg, ci_max, mp2_max = None, neff = None, fun = None,
     
     return Heff 
 
+def simple_MP2(Hcfg, mp2_max, target = None, excitation_fun = None, printlevel = 1):
+    """
+    Simple single-state second-order perturbation theory 
+
+    Parameters
+    ----------
+    Hcfg : ConfigurationOperator
+        The configuration representation Hamiltonian.
+    mp2_max : scalar
+        The maximum excitation of the perturbative block.
+    target : array_like, optional
+        The target configuration. The default is [0, 0, ...] 
+    excitation_fun : function, optional
+        The configuration excitation function. If None, then the sum
+        of configuration indices is used. See :func:`~nitrogen.scf.config_table`.
+    printlevel : int, optional
+        Printed output level. The default is 1. 
+
+    Returns
+    -------
+    e2 : float
+        The MP2 energy 
+
+    """
+    
+    #################################
+    # First, calculate the configurations that define
+    # perturbative space
+    index_range = Hcfg.shape
+    n = len(index_range)    
+    cfg = config_table(mp2_max, n, fun = excitation_fun, index_range = index_range) 
+    #
+    # Now locate the position of the target configuration
+    #
+    if target is None:
+        target = [0 for i in range(n)]
+    target = np.array(target) 
+    istarget = (cfg == target).all(axis=1)
+    # 
+    cfg_mp2 = cfg[~istarget] 
+    cfg_target = cfg[istarget] 
+    #
+    # Calculate zeroth-order energies
+    E0 = Hcfg.block(cfg_target, ket_configs = 'diagonal')[0]
+    Ei = Hcfg.block(cfg_mp2, ket_configs = 'diagonal')
+    # Calculate off-diagonal block
+    Hi0 = Hcfg.block(cfg_mp2, ket_configs = cfg_target)[:,0] 
+    #
+    if printlevel >= 1:
+        print("-----------------------")
+        print(f" E0 + E1 = {E0:10.4f}") # Zeroth + first-order energy
+    #
+    c1 = Hi0 / (E0 - Ei) # First-order amplitudes
+    e2 = np.abs(Hi0)**2 / (E0 - Ei) # Second-order energy corrections
+    E2 = np.sum(e2) 
+    # 
+    #
+    if printlevel >= 1:
+        print(f" E2      = {E2:10.4f}")
+        print("-----------------------")
+        print(f" Total E = {E0+E2 : 10.4f}") 
+    
+    if printlevel >= 1: # Print contribution report 
+        idx = np.argsort(-np.abs(c1))
+        print("")
+        print("---------------------------------")
+        print(" MP2 report            ")
+        print("---------------------------------")
+        for i in idx[:10]:
+            print(f"{cfg_mp2[i]} ... {c1[i]:10.2E}  ;  {e2[i]:10.2E} ")
+        print("---------------------------------")
+    
+    return E0 + E2 
+    #
+    ##################################
+
 def scfStability(Hcfg, target_cfg = None):
     """
     Calculate the stability of a mean field solution
