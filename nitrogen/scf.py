@@ -686,6 +686,7 @@ def simple_MP2(Hcfg, mp2_max, target = None, excitation_fun = None, printlevel =
         print("-----------------------")
         print( " Simple MP2 energy")
         print(f" Target = {cfg_target[0]}")
+        print(f" N(MP2) = {cfg_mp2.shape[0]}")
         print("-----------------------")
         print(f" E0 + E1 = {E0:10.4f}") # Zeroth + first-order energy
     #
