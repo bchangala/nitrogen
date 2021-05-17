@@ -924,7 +924,69 @@ class PolyFactor(DFun):
         # Return result
         return adf2array([res],out)
         
+class PolyPower(DFun):
     
+    def __init__(self, terms):
+        """
+        Parameters
+        ----------
+        terms : list of lists
+            Each element of terms is a list corresponding
+            to one term in a summation. Each term is itself
+            a list of 2 elements. The first element is a 
+            list of integer powers and the second is a scalar coefficient.
+            For example, the term element [[0,3,1], 0.5] corresponds
+            to x0**0 * x1**3 * x2**1 * 0.5.
+        """
+        
+        nterms = len(terms) # May not be zero 
+        
+        if nterms == 0:
+            raise ValueError('At least one term must be included')
+        
+        max_degree = 0 
+        
+        for i in range(nterms):
+            term = terms[i] 
+            pows = term[0]
+            max_degree = max(max(pows), max_degree)
+    
+        nx = len(terms[0][0]) 
+        
+        
+        super().__init__(self._fpolypow, nf = 1, nx = nx, maxderiv = None,
+                         zlevel = max_degree)
+        self.terms = terms 
+        
+    def _fpolypow(self, X, deriv = 0, out = None, var = None):
+        
+        x = X2adf(X, deriv, var) # x[0], x[1], x[2] are adf objects for each variable
+        
+        # Pre-compute the powers of each variable 
+        xpow = [] 
+        for i in range(self.nx):
+            xipow = [ adf.const_like(1.0, x[i])]
+            for j in range(self.zlevel): # zlevel = max_degree 
+                xipow.append(xipow[-1] * x[i]) 
+            xpow.append(xipow)
+        # xpow[i][j] = x[i] ** j 
+            
+        
+        res = 0*x[0] 
+        
+        for term in self.terms :
+            
+            pows = term[0]    # the list of powers
+            coeff = term[1]   # the coefficient 
+            
+            temp = adf.const_like(1.0, x[0]) 
+            for i in range(len(pows)):
+                temp = temp * xpow[i][pows[i]] 
+            
+            res += coeff * temp 
+        
+        # Return result
+        return adf2array([res],out)   
     
 def _composite_maxderiv(maxA,maxB):
     """
