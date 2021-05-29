@@ -19,7 +19,7 @@ from . import pes
 from . import tensor 
 from . import scf 
 
-__version__ = '2.0.dev3'
+__version__ = '2.0'
 
 import numpy as np 
 

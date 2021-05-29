@@ -522,7 +522,7 @@ def config_table(maxf, n, sort = True, fun = None, index_range = None, minf = No
     
             
         
-def Heff_ci_mp2(Hcfg, ci_max, mp2_max = None, neff = None, fun = None,
+def Heff_ci_mp2(Hcfg, ci_max, mp2_max = None, neff = None, excitation_fun = None,
                 printlevel = 1):
     """
     Calculate hybrid VCI + VMP2 effective Hamiltonian 
@@ -539,7 +539,7 @@ def Heff_ci_mp2(Hcfg, ci_max, mp2_max = None, neff = None, fun = None,
     neff : int, optional
         The size of the effective Hamiltonian. If None (default), then the
         entire variational space will be used.
-    fun : function, optional
+    excitation_fun : function, optional
         The configuration excitation function. If None, then the sum
         of configuration indices is used. See :func:`~nitrogen.scf.config_table`.
     printlevel : int, optional
@@ -558,12 +558,12 @@ def Heff_ci_mp2(Hcfg, ci_max, mp2_max = None, neff = None, fun = None,
     index_range = Hcfg.shape
     n = len(index_range)
     
-    cfg0 = config_table(ci_max, n, fun = fun, index_range = index_range) 
+    cfg0 = config_table(ci_max, n, fun = excitation_fun, index_range = index_range) 
     
     if mp2_max is None:
         cfg1 = np.empty((0, n))
     else:
-        cfg1 = config_table(mp2_max, n, fun = fun, index_range = index_range, 
+        cfg1 = config_table(mp2_max, n, fun = excitation_fun, index_range = index_range, 
                             minf = ci_max)
     if neff is None:
         neff = cfg0.shape[0]
@@ -574,6 +574,10 @@ def Heff_ci_mp2(Hcfg, ci_max, mp2_max = None, neff = None, fun = None,
     #
     # cfg0 contains the variational space
     # cfg1 contains the perturbative space
+    print( "-------------------------------")
+    print(f"Size of Block 0 = {cfg0.shape[0]:d}")
+    print(f"Size of Block 1 = {cfg1.shape[0]:d}")
+    print( "-------------------------------")
     ##################################
     
     ##################################
@@ -670,6 +674,8 @@ def simple_MP2(Hcfg, mp2_max, target = None, excitation_fun = None, printlevel =
     if target is None:
         target = [0 for i in range(n)]
     target = np.array(target) 
+    if len(target) != cfg.shape[1]:
+        raise ValueError("Target array has unexpected length.")
     istarget = (cfg == target).all(axis=1)
     # 
     cfg_mp2 = cfg[~istarget] 
@@ -714,6 +720,234 @@ def simple_MP2(Hcfg, mp2_max, target = None, excitation_fun = None, printlevel =
     return E0 + E2 
     #
     ##################################
+    
+def Heff_aci_mp2(Hcfg, target_cfgs, mp2_max, tol = 1e-1, excitation_fun = None,
+                 max_iter = 20, target_char_tol = 0.20):
+    """
+    Iterative-adaptive CI effective Hamiltonian with second-order 
+    corrections.
+
+    Parameters
+    ----------
+    Hcfg : ConfigurationOperator
+        Hamiltonian in the SCF modal configuration representation.
+    target_cfgs : array_like
+        The target configurations.
+    mp2_max : scalar
+        The maximum excitation of the perturbative corrections.
+    tol : float, optional
+        The first-order mixing coefficient threshold for inclusion
+        in the iterative variational block. The default is 1e-1.
+    excitation_fun : function, optional
+        The configuration excitation function. If None, then the sum
+        of configuration indices is used. See :func:`~nitrogen.scf.config_table`.
+    max_iter : int, optional
+        The maximum number of iterations. The default is 20.
+    target_char_tol : float, optional
+        The minimum required target state character to be used
+        for iterative expansion stage. The default is 0.20.
+
+    Returns
+    -------
+    Heff : ndarray
+        The effective Hamiltonian 
+
+    """
+    
+    print("------------------")
+    print("Iterative CI-MP2  ")
+    print("------------------")
+    
+    #################################
+    # First, calculate the configurations that define
+    # the initial variational and perturbative blocks
+    index_range = Hcfg.shape
+    n = len(index_range) # The number of indices
+    
+    #################################
+    # Format the initial target space
+    # 1) target_cfgs will be a permanent record of the desired
+    #    target configurations
+    #
+    # 2) cfg0 is a running list of the adaptive CI space 
+    #    The first `ntarget` entries are always the target space
+    # 
+    # 3) cfg1 is a running list of the adaptive MP2 space 
+    target_cfgs = np.array(target_cfgs).reshape((-1,n)) 
+    ntarget = target_cfgs.shape[0] # The number of targets
+    cfg0 = target_cfgs.copy()
+    #
+    # Calculate the initial perturbative space
+    cfg1 = config_table(mp2_max, n, fun = excitation_fun, index_range = index_range)
+    # Remove all target configurations from initial perturbative space
+    for i in range(cfg0.shape[0]): 
+        istarget = (cfg1 == cfg0[i]).all(axis=1)
+        cfg1 = cfg1[~istarget] 
+    #
+    # cfg0 contains the variational space
+    # cfg1 contains the perturbative space
+    print( "-------------------------------")
+    print(f"Size of initial CI space = {cfg0.shape[0]:d}")
+    print(f"Size of initial MP2 space = {cfg1.shape[0]:d}")
+    print(f"Mixing tolerance = {tol:E}")
+    print(f"Target threshold = {target_char_tol:E}")
+    print( "-------------------------------")
+    ##################################
+    
+    #
+    # Initialize the CI diagonal block and CI-MP2 off-diagonal block
+    print("Initializing ...")
+    tic = time.perf_counter(); print("Calculating H00: ", end = "")
+    H00 = Hcfg.block(cfg0, ket_configs = 'symmetric') 
+    toc = time.perf_counter(); print(f"{toc-tic:.3f} s")
+    #
+    # Calculate the perturbative block
+    tic = time.perf_counter(); print("Calculating H10: ", end = "")
+    H10 = Hcfg.block(cfg1, ket_configs = cfg0)
+    toc = time.perf_counter(); print(f"{toc-tic:.3f} s")
+    # and its energies
+    tic = time.perf_counter(); print("Calculating E1: ", end = "")
+    E1 = Hcfg.block(cfg1, ket_configs = 'diagonal') 
+    toc = time.perf_counter(); print(f"{toc-tic:.3f} s")
+    
+    cnt = 0 # The iteration count 
+
+    while True:
+        print("------------------")
+        print(f"Iteration {cnt+1:d}")
+        print("")
+        
+        ##################################
+        # At the start of each loop, we have a valid H00, H10, and E1
+        #
+        # 1) Diagonalize H00
+        # 2) Mark all eigenvectors as ``target-like'' that
+        #    have sufficient overlap with target_cfgs.
+        # 3) Mark all configurations in MP2 space that have sufficient
+        #    mixing coefficient with any single target-like
+        #    
+        #    3a) If none or max_iter reached, then exit 
+        #
+        # 4) Add these configurations to the CI space; compute
+        #    the necessary additions to the H10 block 
+        
+        # 1) 
+        w,U = np.linalg.eigh(H00) 
+        
+        # 2)
+        is_target_like = np.sum(U[:ntarget,:]**2, axis=0) >= target_char_tol 
+        if np.sum(is_target_like) < 1:
+            raise ValueError("Error: There are no CI eigenvectors with " + 
+                             "sufficient target character.")
+        
+        # 3)
+        # Transform H10 to H10' (i.e. w.r.t. the CI eigenvectors)
+        H10p =  H10 @ U
+        # Compute first-order amplitudes
+        Delta = np.reshape(w,(1,-1)) - np.reshape(E1, (-1,1))
+        # (note that Delta is len(w) x len(E1) in shape via broadcasting)
+        c1 = H10p / Delta # First-order amplitudes
+        # flag any configurations with sufficient mixing to any target-like state
+        add_to_ci = np.max(np.absolute(c1[:,is_target_like]),axis = 1) >= tol 
+        
+        if sum(add_to_ci) == 0:
+            print("There are zero configurations to add. Exiting loop.")
+            break
+        if cnt >= max_iter:
+            print("Warning: max_iter reached! Exiting loop.")
+            break 
+        #
+        # 4) Add new configurations to CI space 
+        #
+        new_cfg0 = cfg1[add_to_ci,:]   # New configs to add to CI space
+        old_cfg1 = cfg1[~add_to_ci,:]  # Configs to keep in MP2 space 
+        print(f"{sum(add_to_ci):d} config(s) are being added to the "+
+              "CI space:")
+        print("-------------------------")
+        print(new_cfg0)
+        print("-------------------------")
+        
+        
+        tic = time.perf_counter(); print("Calculating new blocks: ", end = "")
+        # The new H0 is built up as
+        # 
+        #  H00_old | Ha.T
+        #  ---------------
+        #    Ha    | Hb
+        #
+        H00_old = H00.copy() 
+        Ha = H10[add_to_ci,:] 
+        Hb = Hcfg.block(new_cfg0, ket_configs = 'symmetric') 
+        
+        H00 = np.block( [[H00_old, Ha.T], [Ha, Hb]] ).copy()
+        
+        # The new H10 is built up as 
+        # 
+        #  Hc     |  Hd
+        Hc = H10[~add_to_ci,:]
+        Hd = Hcfg.block(old_cfg1, ket_configs = new_cfg0) 
+        
+        H10 = np.block( [[Hc,Hd]]).copy()
+        
+        # The new E1 is just a cut
+        E1 = E1[~add_to_ci].copy() 
+        
+        toc = time.perf_counter(); print(f"{toc-tic:.3f} s")
+        
+        #
+        # H00, H10, and E1 are now correct for the
+        # new CI space
+        #
+        # Update cfg0 and cfg lists
+        cfg0 = np.concatenate((cfg0, new_cfg0), axis = 0)
+        cfg1 = old_cfg1.copy() 
+        
+        cnt += 1
+        ###########################################
+        
+        
+    #########################################################
+    # Perform final MP2 correction to effective CI Hamiltonian
+    # via diagonalize-then-perturb 
+    # 
+    print("-----------------------")
+    print("Calculating final Heff-")
+    print(f"The final CI space contains {H00.shape[0]:d} configuration(s).")
+    
+    w,U = np.linalg.eigh(H00)
+    
+    is_target_like = np.sum(U[:ntarget,:]**2, axis=0) >= target_char_tol 
+    if np.sum(is_target_like) < 1:
+        raise ValueError("Error: There are no CI eigenvectors with " + 
+                         "sufficient target character.")
+    nh = np.sum(is_target_like)
+    print(f"There are {nh:d} target-like state(s).")
+    print("----------------------")  
+    
+    w = w[is_target_like]    # Use only target-like CI eigenvectors
+    U = U[:,is_target_like]  #  "   " 
+    
+    H10p = H10 @ U
+    
+    deltaE = np.subtract.outer(E1, w) 
+    # deltaE[i,j] equals E1[i] - w0[j]
+    #
+    ideltaE = 1.0 / deltaE # the energy denominator 
+    
+    Heff = np.diag(w) # The zeroth order Hamiltonian is the variational block
+                      # It has been diagonalized, so there is no off-diagonal
+                      # zeroth- or first-order contribution.
+    for i in range(len(w)):
+        for j in range(i+1):
+            # Calculate the second-order contribution
+            # to Heff[i,j]
+            
+            h2 = np.sum(-0.5 * H10p[:,i] * H10p[:,j] * (ideltaE[:,i] + ideltaE[:,j]))
+            Heff[i,j] += h2
+            if i != j:
+                Heff[j,i] += h2 
+    
+    return Heff  
 
 def scfStability(Hcfg, target_cfg = None):
     """
