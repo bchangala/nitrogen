@@ -22,5 +22,7 @@ setuptools.setup(
 	python_requires = '>=3.6',
     install_requires=['numpy>=1.19',
                       'scipy>=1.4.1',
-                      'matplotlib>=3.1,<3.3'] # Incompatibility issue with 3.3
+                      'matplotlib>=3.1,<3.3',  # Incompatibility issue with 3.3
+                      'scikit-image'
+                      ]
 )
