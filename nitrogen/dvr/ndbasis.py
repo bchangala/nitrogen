@@ -10,6 +10,7 @@ sub-classes.
 :class:`~nitrogen.dvr.SinCosBasis`             A sine-cosine (real Fourier) basis
 :class:`~nitrogen.dvr.LegendreLMCosBasis`      Associated Legendre polynomials.
 :class:`~nitrogen.dvr.RealSphericalHBasis`     Real spherical harmonics.
+:class:`~nitrogen.dvr.Real2DHOBasis`           Two-dimensional harmonic osc. basis.
 =============================================  =================================
 
 """
@@ -416,7 +417,7 @@ class Real2DHOBasis(NDBasis):
     See :class:`~nitrogen.special.Real2DHO`.
     
     Quadrature is performed with a direct product of 
-    a Gauss-Laguerre-tyupe grid over :math:`r` and a uniform Fourier
+    a Gauss-Laguerre-type grid over :math:`r` and a uniform Fourier
     grid over :math:`\\phi`.
              
     Attributes
