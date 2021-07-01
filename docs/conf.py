@@ -33,6 +33,7 @@ release = version
 extensions = ['sphinx.ext.napoleon',
               'sphinx.ext.intersphinx',
               'sphinx.ext.doctest',
+              'matplotlib.sphinxext.plot_directive'
               ]
 autoclass_content = 'both'
 

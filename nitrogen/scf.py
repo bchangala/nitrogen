@@ -1,6 +1,6 @@
 """
 nitrogen.scf
--------------
+------------
 
 General self-consistent field methods.
 

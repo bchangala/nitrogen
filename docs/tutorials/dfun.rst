@@ -350,12 +350,16 @@ analytically, but they differ in the order with which numerical derivatives are
 handled and combined. This can lead to corresponding differences in performance,
 depending on the number of input and output variables of each function. 
 
-Fixed argument functions
-~~~~~~~~~~~~~~~~~~~~~~~~
+Fixed argument and merged output functions
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 A special sub-class, :class:`~nitrogen.dfun.FixedInputDFun`, is used to 
 implement :class:`~nitrogen.dfun.DFun` objects with fixed input arguments,
 which is a special case of composition.
+
+The output values of a multiple :class:`~nitrogen.dfun.DFun` objects can be 
+merged into a single functions with the :class:`~nitrogen.dfun.MergedDFun`
+sub-class.
 
 Jacobians, Hessians, and optimization
 -------------------------------------

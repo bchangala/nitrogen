@@ -9,6 +9,7 @@ PES name        Description
 ==============  ==================================================
 H2O_PJT1996     Water. Cartesian coordinates H--O--H.
 H2O_dummy       Water. Cartesian coordinates H--O--H.
+H3+_MBB1986     H3 cation. Cartesian coordinates.
 ==============  ==================================================
 
 
