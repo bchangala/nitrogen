@@ -5,7 +5,7 @@ Implements the NDBasis base class and common
 sub-classes.
 
 =============================================  =================================
-:class:`~nitrogen.ndbasis.NDBasis` sub-class   Description
+:class:`~nitrogen.dvr.NDBasis` sub-class       Description
 ---------------------------------------------  --------------------------------- 
 :class:`~nitrogen.dvr.SinCosBasis`             A sine-cosine (real Fourier) basis
 :class:`~nitrogen.dvr.LegendreLMCosBasis`      Associated Legendre polynomials.
@@ -24,6 +24,25 @@ class NDBasis:
     
     A generic multi-dimensional finite basis representation
     supporting quadrature integration/transformation.
+    :class:`NDBasis` objects define a set of :math:`N_b` basis functions,
+    :math:`\\phi_i(\\vec{x})`, :math:`i = 0,\ldots,N_b - 1`, where 
+    :math:`\\vec{x}` is an :math:`n_d`-dimensional coordinate vector. Matrix elements
+    with these functions are defined with respect to a weighted integral,
+    
+    .. math::
+       
+      \langle \phi_i \\vert \phi_j \\rangle = \int d\\vec{x}\,\Omega(\\vec{x}) \\phi_i(\\vec{x}) \\phi_j(\\vec{x}),
+     
+    where :math:`\\Omega(\\vec{x})` is the weight function (:attr:`NDBasis.wgtfun`).
+    
+    These integrals can be approximated with a quadrature over :math:`N_q`
+    (possibly scattered) grid points :math:`\\vec{x}_k`,
+    
+    .. math::
+        
+       \int d\\vec{x}\, \\Omega(\\vec{x}) f(\\vec{x}) \\approx \sum_{k=0}^{N_q-1} w_k f(\\vec{x}_k),
+    
+    where :math:`w_k` are the quadrature weights (:attr:`NDBasis.wgt`). 
     
     Attributes
     ----------
@@ -137,11 +156,11 @@ class NDBasis:
         """ The default implemention of
         the FBR to quadrature transformation"""
         
-        U = self.bas.T # An (Nq,Nb) array 
+        UT = self.bas.T # An (Nq,Nb) array 
         
         # Apply the FBR-to-grid transformation
         # to the axis
-        w = np.tensordot(U,v, axes = (1,axis) )
+        w = np.tensordot(UT,v, axes = (1,axis) )
         w = np.moveaxis(w, 0, axis)
         
         # Broadcast the wgt's
@@ -320,6 +339,7 @@ class RealSphericalHBasis(NDBasis):
     :math:`\\Phi_\ell^m(\\theta,\\phi) = F_\ell^m(\\theta)f_m(\\phi)`.
     See :class:`~nitrogen.special.RealSphericalH`.
     
+    The integration weight function is :math:`\\Omega(\\theta,\\phi) = \\sin(\\theta)`.
     Quadrature is performed with a direct product of 
     a Gauss-Legendre grid over :math:`\\theta` and a uniform Fourier
     grid over :math:`\\phi`.

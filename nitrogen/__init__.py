@@ -18,6 +18,7 @@ from . import constants
 from . import pes
 from . import tensor 
 from . import scf 
+from . import special
 
 __version__ = '2.1.dev0' 
 
