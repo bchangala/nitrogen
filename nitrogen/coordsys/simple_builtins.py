@@ -3,7 +3,7 @@ import nitrogen.autodiff.forward as adf
 import nitrogen.dfun as dfun
 import numpy as np
 
-__all__ = ['Valence3','CartesianN','LinearTrans']
+__all__ = ['Valence3','CartesianN','LinearTrans','Polar']
 
 class Valence3(CoordSys):
     """
@@ -314,5 +314,87 @@ class LinearTrans(CoordTrans):
         diag += "   ║        ║ \n"
         diag += "   ╚═╤══════╝ \n"
         diag +=f"     │Q {sQ:<5s} \n"
+        
+        return diag
+
+
+class Polar(CoordSys):
+    """
+    Polar coordinates :math:`(r,\\phi)` in two dimensions.
+    
+    .. math::
+       x &= r \\cos\\phi 
+       y &= r \\sin\\phi 
+     
+    Attributes
+    ----------
+    
+    angle : {'deg','rad'}
+        The angular unit.
+    
+    """
+    
+    def __init__(self, angle = 'deg'):
+        
+        """
+        Create a new Polar coordinate system object.
+        
+        Parameters
+        ----------
+        angle : {'deg', 'rad'}, optional
+            The angular unit, degrees or radians. The default is 'deg'.
+        
+        """
+        
+        name = "Polar"
+        Qstr = ["r", "phi"]
+        Xstr = ["x", "y"]
+        
+        super().__init__(self._csPolar_q2x, nQ = 2,
+                         nX = 2, name = name, 
+                         Qstr = Qstr, Xstr = Xstr,
+                         maxderiv = None, isatomic = False,
+                         zlevel = None)
+        
+        if angle == 'deg' or angle == 'rad':
+            self.angle = angle  # 'deg' or 'rad'
+        else:
+            raise ValueError('angle must be ''deg'' or ''rad''.')
+    
+    def _csPolar_q2x(self, Q, deriv = 0, out = None, var = None):
+        
+        # Use adf routines to compute derivatives
+        #
+        q = dfun.X2adf(Q, deriv, var)
+        # q[0] is r, q[1] = phi (in deg or rad)
+        
+        if self.angle == 'rad':
+            x = q[0] * adf.cos(q[1])
+            y = q[0] * adf.sin(q[1])
+        else: # degree
+            deg2rad = np.pi/180.0
+            x = q[0] * adf.cos(deg2rad * q[1])
+            y = q[0] * adf.sin(deg2rad * q[1])
+        
+        return dfun.adf2array([x,y], out) 
+    
+    def __repr__(self):
+        return f'Polar(angle = {self.angle!r})'
+    
+    def diagram(self):
+        
+        # using U+250X box and U+219X arrows
+        diag = ""
+        
+        sQ =f"[{self.nQ:d}]"
+        sX =f"[{self.nX:d}]"
+        
+        diag += "     │↓              ↑│        \n"
+        diag +=f"     │Q {sQ:<5s}  {sX:>5s} X│        \n"
+        diag += "   ╔═╪════════════════╪═╗      \n"
+        diag += "   ║ ╰────────────────╯ ║      \n"
+        diag += "   ║  (r,phi) -> (x,y)  ║      \n"
+        diag += "   ║       Polar        ║      \n"
+        diag += "   ╚════════════════════╝      \n"
         
         return diag
