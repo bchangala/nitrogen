@@ -926,7 +926,7 @@ class Real2DHO(dfun.DFun):
     ----------
     v : ndarray
         The :math:`v` quantum numbers, where
-        :math:`v = 2n + \\ell`.
+        :math:`v = 2n + \\vert \\ell \\vert`.
     ell : ndarray
         The :math:`\\ell` quantum numbers.
     n : ndarray

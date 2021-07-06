@@ -439,12 +439,14 @@ class Real2DHOBasis(NDBasis):
     Quadrature is performed with a direct product of 
     a Gauss-Laguerre-type grid over :math:`r` and a uniform Fourier
     grid over :math:`\\phi`.
+    
+    The integration weight function is :math:`\\Omega(r,\\phi) = r`.
              
     Attributes
     ----------
     v : ndarray
         The :math:`v` quantum numbers, where
-        :math:`v = 2n + \\ell`.
+        :math:`v = 2n + \\vert \\ell \\vert`.
     ell : ndarray
         The :math:`\\ell` quantum numbers.
     n : ndarray

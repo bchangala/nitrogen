@@ -1264,7 +1264,7 @@ def nderiv(deriv, nvar):
     k = min(deriv, nvar)
     return adf.ncktab(n,k)[n,k]
 
-def sym2invdet(S, deriv, nvar):
+def sym2invdet(S, deriv, nvar, logdet = False):
     """
     Calculate the inverse and determinant
     of a symmetric matrix. If S is real,
@@ -1282,6 +1282,9 @@ def sym2invdet(S, deriv, nvar):
         The maximum derivative order.
     nvar : int
         The number of independent variables.
+    logdet : boolean, optional
+        If True, the natural logarithm of the determinant
+        is returned instead. The default is False.
 
     Returns
     -------
@@ -1290,7 +1293,8 @@ def sym2invdet(S, deriv, nvar):
         in packed storage with shape (nd, nS, ...)
     det : ndarray
         The derivative array for det(S), with 
-        shape (nd, ...)
+        shape (nd, ...). (This equals ln(det(S)) if
+        `logdet` is True.)
 
     """
     
@@ -1320,17 +1324,36 @@ def sym2invdet(S, deriv, nvar):
     #    Stored in Spacked
     adf.chol_sp(Spacked, out = Spacked)
     
+    ############################################
     # 2) Compute the determinant
     #    This is the product of the squares of the diagonal entries
-    k = 0
-    for i in range(N):
-        if i == 0:
-            det = Spacked[k] 
-        else:
-            det = det * Spacked[k]
-        k = k + (i+2)
-    det = det * det
-    # det now equals the determinant of S
+    if logdet == False: # Calculate the normal determinant (default)
+        k = 0
+        for i in range(N):
+            if i == 0:
+                det = Spacked[k] 
+            else:
+                det = det * Spacked[k]
+            k = k + (i+2)
+        det = det * det
+        # det now equals the determinant of S
+        
+    else: # logdet == True, calculate the logarithm of the determinant instead 
+        # 
+        # The determinant is the product of the squares
+        # of the diagonal entries. The logarithm of the 
+        # determinant is thus twice the sum of
+        # logarithms of the diagonal entries.
+        k = 0
+        for i in range(N):
+            if i == 0:
+                det = adf.log(Spacked[k])
+            else:
+                det = det + adf.log(Spacked[k])
+            k = k + (i+2) 
+        det = 2.0 * det 
+    #
+    ############################################
     
     # 3) Compute the inverse of the Cholesky decomposition
     #    This overwrites Spacked
@@ -1345,8 +1368,7 @@ def sym2invdet(S, deriv, nvar):
         # S[:, i, ...] <-- Spacked[i].d
         np.copyto(iS[:,i], Spacked[i].d)
     
-    # S now contains the inverse of the original matrix
-    # 
-    # finally, return the ln(det) derivative array
+    # iS now contains the inverse of the original matrix
+    # and det the determinant (or log of det)
     #
     return iS, det.d.copy()

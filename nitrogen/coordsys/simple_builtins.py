@@ -398,3 +398,86 @@ class Polar(CoordSys):
         diag += "   ╚════════════════════╝      \n"
         
         return diag
+    
+class Cylindrical(CoordSys):
+    """
+    Cylindirical coordinates :math:`(r,\\phi, z)` in three dimensions.
+    
+    .. math::
+       x &= r \\cos\\phi 
+       y &= r \\sin\\phi 
+     
+    Attributes
+    ----------
+    
+    angle : {'deg','rad'}
+        The angular unit.
+    
+    """
+    
+    def __init__(self, angle = 'deg'):
+        
+        """
+        Create a new Cylindrical coordinate system object.
+        
+        Parameters
+        ----------
+        angle : {'deg', 'rad'}, optional
+            The angular unit, degrees or radians. The default is 'deg'.
+        
+        """
+        
+        name = "Cylindrical"
+        Qstr = ["r", "phi", "z"]
+        Xstr = ["x", "y", "z"]
+        
+        super().__init__(self._csCylindrical_q2x, nQ = 3,
+                         nX = 3, name = name, 
+                         Qstr = Qstr, Xstr = Xstr,
+                         maxderiv = None, isatomic = False,
+                         zlevel = None)
+        
+        if angle == 'deg' or angle == 'rad':
+            self.angle = angle  # 'deg' or 'rad'
+        else:
+            raise ValueError('angle must be ''deg'' or ''rad''.')
+    
+    def _csCylindrical_q2x(self, Q, deriv = 0, out = None, var = None):
+        
+        # Use adf routines to compute derivatives
+        #
+        q = dfun.X2adf(Q, deriv, var)
+        # q[0] is r, q[1] = phi (in deg or rad), q[2] = z
+        
+        if self.angle == 'rad':
+            x = q[0] * adf.cos(q[1])
+            y = q[0] * adf.sin(q[1])
+        else: # degree
+            deg2rad = np.pi/180.0
+            x = q[0] * adf.cos(deg2rad * q[1])
+            y = q[0] * adf.sin(deg2rad * q[1])
+        # z = z
+        z = q[2] 
+        
+        return dfun.adf2array([x,y,z], out) 
+    
+    def __repr__(self):
+        return f'Cylindrical(angle = {self.angle!r})'
+    
+    def diagram(self):
+        
+        # using U+250X box and U+219X arrows
+        diag = ""
+        
+        sQ =f"[{self.nQ:d}]"
+        sX =f"[{self.nX:d}]"
+        
+        diag += "     │↓              ↑│        \n"
+        diag +=f"     │Q {sQ:<5s}  {sX:>5s} X│        \n"
+        diag += "   ╔═╪════════════════╪═╗      \n"
+        diag += "   ║ ╰────────────────╯ ║      \n"
+        diag += "   ║ (r,phi,z)->(x,y,z) ║      \n"
+        diag += "   ║    Cylindrical     ║      \n"
+        diag += "   ╚════════════════════╝      \n"
+        
+        return diag

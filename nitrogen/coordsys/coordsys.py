@@ -304,9 +304,10 @@ class CoordSys(dfun.DFun):
         rvar : str, optional
             The body-fixed axes inlcuded in the rotational block of g.
             If None, then all axes will be used in order. The default is None.
-        mode : {'bodyframe'}
-            Calculation mode. 'bodyframe' calculates the standard g tensor
-            for a rotating molecule (CoordSys must be *atomic*).
+        mode : {'bodyframe','simple'}
+            Calculation mode. 'bodyframe' (default) calculates the standard g tensor
+            for a rotating molecule (CoordSys must be *atomic*). 'simple' 
+            assumes a rectangular (Cartesian) space-fixed embedding.
 
         Returns
         -------
