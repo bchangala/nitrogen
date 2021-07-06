@@ -3,7 +3,8 @@ import nitrogen.autodiff.forward as adf
 import nitrogen.dfun as dfun
 import numpy as np
 
-__all__ = ['Valence3','CartesianN','LinearTrans','Polar']
+__all__ = ['Valence3','CartesianN','LinearTrans','Polar','Cylindrical',
+           'Spherical']
 
 class Valence3(CoordSys):
     """
