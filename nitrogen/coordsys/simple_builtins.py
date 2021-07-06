@@ -481,3 +481,97 @@ class Cylindrical(CoordSys):
         diag += "   ╚════════════════════╝      \n"
         
         return diag
+    
+class Spherical(CoordSys):
+    """
+    Spherical coordinates :math:`(r,\\theta,\\phi)` in three dimensions.
+    
+    .. math::
+       x &= r \\sin\\theta\\cos\\phi 
+       y &= r \\sin\\theta\\sin\\phi 
+       z &= r \\cos\\theta
+     
+    Attributes
+    ----------
+    
+    angle : {'deg','rad'}
+        The angular unit.
+    
+    """
+    
+    def __init__(self, angle = 'deg'):
+        
+        """
+        Create a new Spherical coordinate system object.
+        
+        Parameters
+        ----------
+        angle : {'deg', 'rad'}, optional
+            The angular unit, degrees or radians. The default is 'deg'.
+        
+        """
+        
+        name = "Spherical"
+        Qstr = ["r", "theta", "phi"]
+        Xstr = ["x", "y", "z"]
+        
+        super().__init__(self._csSpherical_q2x, nQ = 3,
+                         nX = 3, name = name, 
+                         Qstr = Qstr, Xstr = Xstr,
+                         maxderiv = None, isatomic = False,
+                         zlevel = None)
+        
+        if angle == 'deg' or angle == 'rad':
+            self.angle = angle  # 'deg' or 'rad'
+        else:
+            raise ValueError('angle must be ''deg'' or ''rad''.')
+    
+    def _csSpherical_q2x(self, Q, deriv = 0, out = None, var = None):
+        
+        # Use adf routines to compute derivatives
+        #
+        q = dfun.X2adf(Q, deriv, var)
+        # q[0] is r, q[1] = theta, q[2] = phi
+        
+        
+        
+        if self.angle == 'rad':
+            sintheta = adf.sin(q[1])
+            costheta = adf.cos(q[1])
+            sinphi = adf.sin(q[2])
+            cosphi = adf.cos(q[2])
+        else: # degree
+            deg2rad = np.pi/180.0
+            sintheta = adf.sin(deg2rad * q[1])
+            costheta = adf.cos(deg2rad * q[1])
+            sinphi = adf.sin(deg2rad * q[2])
+            cosphi = adf.cos(deg2rad * q[2])
+     
+        r = q[0] 
+        
+        x = r * sintheta * cosphi 
+        y = r * sintheta * sinphi 
+        z = r * costheta
+        
+        return dfun.adf2array([x,y,z], out) 
+    
+    def __repr__(self):
+        return f'Spherical(angle = {self.angle!r})'
+    
+    def diagram(self):
+        
+        # using U+250X box and U+219X arrows
+        diag = ""
+        
+        sQ =f"[{self.nQ:d}]"
+        sX =f"[{self.nX:d}]"
+        
+        diag += "     │↓              ↑│        \n"
+        diag +=f"     │Q {sQ:<5s}  {sX:>5s} X│        \n"
+        diag += "   ╔═╪════════════════╪═╗      \n"
+        diag += "   ║ ╰────────────────╯ ║      \n"
+        diag += "   ║(r,th,phi)->(x,y,z) ║      \n"
+        diag += "   ║     Spherical      ║      \n"
+        diag += "   ╚════════════════════╝      \n"
+        
+        return diag
