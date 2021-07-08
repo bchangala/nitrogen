@@ -356,7 +356,7 @@ class Monomial(dfun.DFun):
     
     def _monomial(self, X, deriv = 0, out = None, var = None):
         """ evaluation function """
-        raise NotImplementedError("NONO")
+        
         nd,nvar = dfun.ndnvar(deriv, var, self.nx)
         if out is None:
             base_shape = X.shape[1:]
@@ -367,7 +367,7 @@ class Monomial(dfun.DFun):
         for i in range(1, self.nx):
             res = res * adf.powi(x[i], self.pows[i])
             
-        dfun.adf2array(res, out)
+        dfun.adf2array([res], out)
         return out 
     
 class RealSphericalH(dfun.DFun):

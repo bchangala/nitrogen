@@ -302,8 +302,9 @@ class CoordSys(dfun.DFun):
             The coordinates included in the vibrational block of g.
             If None, then all coordinates will be used in order. The default is None.
         rvar : str, optional
-            The body-fixed axes inlcuded in the rotational block of g.
+            The body-fixed axes included in the rotational block of g.
             If None, then all axes will be used in order. The default is None.
+            This only applied to `mode` = 'bodyframe'.
         mode : {'bodyframe','simple'}
             Calculation mode. 'bodyframe' (default) calculates the standard g tensor
             for a rotating molecule (CoordSys must be *atomic*). 'simple' 

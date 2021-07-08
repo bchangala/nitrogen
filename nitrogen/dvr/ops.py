@@ -174,3 +174,28 @@ def opO_coeff(x, Olist, c = None):
         
             
     return y
+
+def opO(x, O, axis):
+    """
+    Apply matrix operator O to a single axis
+    
+    Parameters
+    ----------
+    x : ndarray
+        Input grid
+    O : ndarray
+        An (m,n) matrix
+    axis : int
+        The axis O acts on. x.shape[axis] must equal n.
+        
+    Returns
+    -------
+    y: ndarray
+        The result array, with y.shape[axis] equal to m.
+
+    """
+    
+    y = np.tensordot(O, x, axes = (1,axis) )
+    y = np.moveaxis(y, 0, axis) 
+    
+    return y 

@@ -100,6 +100,68 @@ def dvr2grid(dvrs):
     
     return Q
 
+def bases2grid(bases):
+    """
+    Create direct product grids from a list of DVRs and
+    NDBasis objects.
+
+    Parameters
+    ----------
+    bases : list
+        Each element is a DVR or NDBasis object or a 
+        fixed-value scalar.
+
+    Returns
+    -------
+    grid : ndarray
+        
+
+    """
+    
+    grids = [] 
+    qshape = []
+    nq = 0
+    
+    index_of_coord = []
+    
+    for i,bas in enumerate(bases):
+        
+        if isinstance(bas, dvr.DVR):
+            grids.append(bas.grid)
+            qshape.append(bas.num)
+            nq += 1
+            index_of_coord.append(i)
+            
+        elif isinstance(bas, dvr.NDBasis):
+            for j in range(bas.nd) :
+                grids.append(bas.qgrid[j])
+                index_of_coord.append(i)
+            qshape.append(bas.Nq)
+            nq += bas.nd
+        else: 
+            grids.append(bas)
+            qshape.append(1) 
+            nq += 1    
+            index_of_coord.append(i)
+            
+    Qi = []
+    for i in range(nq):
+        # The i**th coordinate
+        # spans the j**th index (axis)
+        j = index_of_coord[i] 
+        
+        newshape = [1]*len(qshape)
+        newshape[j] = qshape[j]
+        newshape = tuple(newshape) 
+        gi = np.reshape(grids[i], newshape) 
+        
+        Qi.append(np.broadcast_to(gi, qshape))
+        
+    Q = np.stack(Qi, axis = 0) 
+    
+    return Q
+    
+
 def plot(dvrs, fun, labels = None,
             ls = 'k.-', mode2d = 'surface', isovalue = None):
     """
