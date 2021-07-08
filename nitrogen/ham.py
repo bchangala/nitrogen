@@ -683,16 +683,24 @@ class GenSFHam(LinearOperator):
     A general space-fixed frame Hamiltonian using
     mixed DVR-FBR basis sets.
     
-    The kinetic energy operator is constructed via
+    The kinetic energy operator (KEO) is constructed via
     the general curvilinear Laplacian
     for the coordinate system (`cs`) and the
-    integration volume element defined by the 
-    basis set functions (`bases`). 
+    integration volume element :math:`\\rho` defined by the 
+    basis set functions (`bases`). KEO matrix elements equal
     
-    The necessary boundary conditions on the basis
-    set functions are not checked explicitly. The user
-    must use appropriate basis sets to ensure that
-    matrix elements are evaluated correctly.
+    ..  math::
+        
+        \\int dq\\, \\rho \\Psi' (\\hat{T} \\Psi) = \\frac{\\hbar^2}{2} \\int dq\\, \\rho  (\\tilde{\\partial}_k \\Psi') G^{kl} (\\tilde{\\partial}_l \\Psi)
+    
+    where :math:`\\tilde{\\partial}_k = \\partial_k + \\frac{1}{2} \\tilde{\\Gamma}_k`,
+    :math:`\\tilde{\\Gamma}_k = (\\partial_k \\Gamma) / \\Gamma`, 
+    :math:`\\Gamma = \\rho / g^{1/2}`, and :math:`g` is the determinant
+    of the coordinate system metric tensor. This form of the KEO assumes
+    certain surface terms arising from integration-by-parts
+    are zero. The necessary boundary conditions on the basis
+    set functions to ensure this are not checked explicitly. *The user
+    must use appropriate basis sets.*
     
     """
     
@@ -714,7 +722,7 @@ class GenSFHam(LinearOperator):
             no PES is used.
         masses : array_like, optional
             The coordinate masses. If None (default), unit masses
-            are used. For *isatomic* `cs`, an array of length
+            are used. If `cs` is atomic, an array of length
             `cs.natoms` may be used to specify atomic masses.
         hbar : scalar, optional
             The value of :math:`\\hbar`. If None, the default value in 
