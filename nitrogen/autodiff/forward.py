@@ -1424,6 +1424,129 @@ def log(x, out = None):
             
     return adchain(df, x, out = out)
 
+def sinh(x, out = None):
+    """
+    Hyperbolic sine for :class:`adarray` objects.
+
+    Parameters
+    ----------
+    x : adarray
+        Input argument.
+
+    out : adarray, optional
+        Output location of result. `out` must have the same
+        properties as x. If None, a new adarray is allocated and
+        returned.
+
+    Returns
+    -------
+    adarray
+        Result.
+        
+    Examples
+    --------
+    >>> x = adf.sym(1.5, 0, 3, 1)
+    >>> adf.sinh(x).d
+    array([2.12927946, 2.35240962, 1.06463973, 0.39206827])
+
+    """
+    
+    xval = x.d[:1] # Value array of x
+    k = x.k
+    
+    df = np.ndarray( (k+1,)+x.d.shape[1:], dtype = xval.dtype)
+    
+    np.sinh(xval, out = df[:1])
+    
+    # The derivative of sinh is cosh
+    # and the derivative of cosh is sinh
+    if k >= 1:
+        np.cosh(xval, out = df[1:2])
+    
+    for i in range(2,k+1):
+        np.copyto(df[i:(i+1)], df[(i-2):(i-1)])
+            
+    return adchain(df, x, out = out)
+
+def cosh(x, out = None):
+    """
+    Hyperbolic cosine for :class:`adarray` objects.
+
+    Parameters
+    ----------
+    x : adarray
+        Input argument.
+
+    out : adarray, optional
+        Output location of result. `out` must have the same
+        properties as x. If None, a new adarray is allocated and
+        returned.
+
+    Returns
+    -------
+    adarray
+        Result.
+        
+    Examples
+    --------
+    >>> x = adf.sym(1.5, 0, 3, 1)
+    >>> adf.cosh(x).d
+    array([2.35240962, 2.12927946, 1.17620481, 0.35487991])
+
+    """
+    
+    xval = x.d[:1] # Value array of x
+    k = x.k
+    
+    df = np.ndarray( (k+1,)+x.d.shape[1:], dtype = xval.dtype)
+    
+    np.cosh(xval, out = df[:1])
+    
+    # The derivative of sinh is cosh
+    # and the derivative of cosh is sinh
+    if k >= 1:
+        np.sinh(xval, out = df[1:2])
+    
+    for i in range(2,k+1):
+        np.copyto(df[i:(i+1)], df[(i-2):(i-1)])
+            
+    return adchain(df, x, out = out)
+
+def tanh(x, out = None):
+    """
+    Hyperbolic tangent for :class:`adarray` objects.
+
+    Parameters
+    ----------
+    x : adarray
+        Input argument.
+
+    out : adarray, optional
+        Output location of result. `out` must have the same
+        properties as x. If None, a new adarray is allocated and
+        returned.
+
+    Returns
+    -------
+    adarray
+        Result.
+        
+    Examples
+    --------
+    >>> x = adf.sym(1.5, 0, 3, 1)
+    >>> adf.tanh(x).d
+    array([ 0.90514825,  0.18070664, -0.1635663 ,  0.0878162 ])
+
+    """
+    
+    sh = sinh(x)
+    ch = cosh(x)
+    
+    # tanh = sinh / cosh
+    
+    return div(sh, ch, out = out)
+
+
 def powi(x, i, out = None):
     """
     x**i for integer i
