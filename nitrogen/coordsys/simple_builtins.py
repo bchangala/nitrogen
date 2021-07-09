@@ -17,7 +17,7 @@ class Valence3(CoordSys):
     
     """
     
-    def __init__(self, name = 'Triatomic valence'):
+    def __init__(self, name = 'Triatomic valence', angle = 'rad'):
         
         """
         Create a new Valence3 object.
@@ -26,6 +26,8 @@ class Valence3(CoordSys):
         ----------
         name : str, optional
             The coordinate system name. The default is 'Triatomic valence'.
+        angle : {'rad', 'deg'}, optional
+            The degree units. The default is radians ('rad').
         
         """
         
@@ -34,6 +36,11 @@ class Valence3(CoordSys):
                          Qstr = ['r1', 'r2', 'theta'],
                          maxderiv = None, isatomic = True,
                          zlevel = None)
+        
+        if angle == 'rad' or angle == 'deg':
+            self.angle = angle 
+        else:
+            raise ValueError('angle must be rad or deg')
         
     def _csv3_q2x(self, Q, deriv = 0, out = None, var = None):
         """
@@ -79,6 +86,10 @@ class Valence3(CoordSys):
         out.fill(0) # Initialize out to 0
         
         # Calculate Cartesian coordinates
+        
+        if self.angle == 'deg':
+            q[2] = (np.pi / 180.0) * q[2]
+        
         np.copyto(out[:,2], (-q[0]).d ) # -r1
         np.copyto(out[:,7], (q[1] * adf.sin(q[2])).d ) #  r2 * sin(theta)
         np.copyto(out[:,8], (-q[1] * adf.cos(q[2])).d ) # -r2 * cos(theta)
@@ -86,7 +97,7 @@ class Valence3(CoordSys):
         return out
 
     def __repr__(self):
-        return f"Valence3({self.name!r})"
+        return f"Valence3({self.name!r},{self.name!r})"
     
     def diagram(self):
         # using U+250X box and U+219X arrows
