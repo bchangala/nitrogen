@@ -1044,3 +1044,425 @@ class GenSFHam(LinearOperator):
             x = x.copy() 
 
         return x 
+    
+class CollinearHam(LinearOperator):
+    """
+    A generalized radial Hamiltonian for collinear 
+    configurations for total angular momentum :math:`J`.
+    
+    The vibrational kinetic energy operator (KEO) is constructed via
+    the general curvilinear Laplacian
+    for the coordinate system (`cs`) and the
+    vibrational integration volume element :math:`\\rho` defined by the 
+    basis set functions (`bases`). KEO matrix elements equal
+    
+    ..  math::
+        
+        \\int dq\\, \\rho \\Psi' (\\hat{T} \\Psi) = \\frac{\\hbar^2}{2} \\int dq\\, \\rho  (\\tilde{\\partial}_k \\Psi') G^{kl} (\\tilde{\\partial}_l \\Psi)
+    
+    where :math:`\\tilde{\\partial}_k = \\partial_k + \\frac{1}{2} \\tilde{\\Gamma}_k`,
+    :math:`\\tilde{\\Gamma}_k = (\\partial_k \\Gamma) / \\Gamma`, 
+    :math:`\\Gamma = \\rho / (g_\\text{vib}^{1/2} I)`, 
+    :math:`g_\\text{vib}` is the determinant
+    of the vibrational block of the coordinate system metric tensor, and
+    :math:`I` is the moment of inertia. This form of the KEO assumes
+    certain surface terms arising from integration-by-parts
+    are zero. The necessary boundary conditions on the basis
+    set functions to ensure this are not checked explicitly. *The user
+    must use appropriate basis sets.*
+    
+    The total potential energy surface contains a centrifugal contribution
+    :math:`V_J = (\\hbar^2/2I) J(J+1)`, where :math:`J` is the total 
+    angular momentum quantum number.
+    
+    """
+    
+    def __init__(self, bases, cs, pes = None, masses = None, J = 0, hbar = None):
+        """
+
+        Parameters
+        ----------
+        bases : list
+            A list of :class:`~nitrogen.dvr.DVR` or
+            :class:`~nitrogen.dvr.NDBasis` basis sets for active
+            coordinates. Scalar elements will constrain the 
+            corresponding coordinate to that fixed value.
+        cs : CoordSys
+            The coordinate system.
+        pes : DFun or function, optional
+            The potential energy surface, V(q). This accepts the 
+            coordinates defined by `cs` as input. If None (default),
+            no PES is used.
+        masses : array_like, optional
+            The atomic masses. If None (default), unit masses
+            are used. 
+        J : int, optional
+            The total angular momentum quantum number :math:`J`. The
+            default value is 0.
+        hbar : scalar, optional
+            The value of :math:`\\hbar`. If None, the default value in 
+            standard NITROGEN units is used (``n2.constants.hbar``).
+
+        Notes
+        -----
+        The coordinate system must position all atoms along the body-fixed
+        :math:`z`-axis (accounting for the fixed values of constrained
+        coordinates). 
+        
+        """
+        
+        ###################################
+        # Construct a generic space-fixed 
+        # Hamiltonian
+        #
+        
+        ##########################################
+        # First, construct the total direct product
+        # grid
+        Q = nitrogen.dvr.bases2grid(bases)
+        # Q has as many axes as elements in bases, even
+        # for multi-dimensional basis sets (whose quadrature grid
+        # may not be a direct product structure). Fixed coordinates
+        # (with bases[i] equal to a scalar) have a singleton axis
+        # in Q.
+        
+        ##########################################
+        # Parse hbar and masses
+        #
+        if hbar is None:
+            hbar = nitrogen.constants.hbar 
+        
+        if not cs.isatomic:
+            raise ValueError("The coordinate system must be atomic.")
+        
+        if masses is None:
+            masses = [1.0] * cs.natoms
+
+        if len(masses) != cs.natoms:
+            raise ValueError("unexpected length of masses")
+        
+        ########################################
+        # Evaluate potential energy function on 
+        # quadrature grid 
+        if pes is None:
+            Vq = None # no PES to be used
+        else:
+            try: # Attempt DFun interface
+                Vq = pes.f(Q, deriv = 0)[0,0]
+            except:
+                Vq = pes(Q) # Attempt raw function
+        #
+        #
+        
+        ########################################
+        # Figure out which coordinates are active,
+        # the shape of the FBR direct-product basis,
+        # and which axis in the grid corresponds to 
+        # each coordinate        
+        axis_of_coord = [] # length = # of coord (cs.NQ)
+        fbr_shape = []     # length = # of bases 
+        NH = 1 
+        vvar = []  # The ordered list of active coordinates 
+        k = 0
+        for ax,b in enumerate(bases):
+            if isinstance(b, DVR): # A DVR basis is one-dimensional
+                vvar.append(k)
+                fbr_shape.append(b.num)
+                NH *= b.num 
+                axis_of_coord.append(ax) 
+                k +=1 
+            elif isinstance(b, NDBasis): # NDBasis is `nd` dimensional
+                for i in range(b.nd):
+                    vvar.append(k)
+                    axis_of_coord.append(ax)
+                    k += 1 
+                fbr_shape.append(b.Nb)
+                NH *= b.Nb
+            else: # a scalar, not active 
+                fbr_shape.append(1)
+                axis_of_coord.append(ax)
+                k += 1
+        
+        # FBR shape, including singleton non-active coordinates
+        fbr_shape = tuple(fbr_shape)  
+        
+        # Check that there is at least one active coordinate        
+        if len(vvar) == 0:
+            raise ValueError("there must be an active coordinate!") 
+        
+        ########################################
+        #
+        # Calculate coordinate system metric functions
+        # 
+        # Given a collinear geometry (which is assumed)
+        # g factors into a pure vibrational block
+        # and a rotational block. We only need the 
+        # (single) moment of inertia, I, from the rotational
+        # block. This equals the g_xx = g_yy matrix element
+        # (g_zz = 0). We will ultimately need the
+        # logarithmic derivatives of the quantity
+        # gvib^1/2 * I = (gvib * I^2)^1/2. We see that
+        # the quantity in gvib * I^2 is just the determinant
+        # of the full rovib g tensor excluding the z-axis
+        # row and column.
+        # 
+        # So first, we calculate this truncated g metric
+        # using rvar = 'xy'
+        g = cs.Q2g(Q, deriv = 1, mode = 'bodyframe', 
+                   vvar = vvar, rvar = 'xy', masses = masses)
+        #
+        # And then calculate its inverse and determinant
+        #
+        G,detg = nitrogen.dfun.sym2invdet(g, 1, len(vvar))
+        #
+        # G and detg contain the derivative arrays for G = inv(g) and det(g)
+        # where det(g) = det(gvib) I**2
+        # 
+        # We only need to keep the vibrational block of G.
+        # In packed storage, this is the first nv*(nv+1)/2 
+        # elements (where nv = len(vvar))
+        #
+        nv = len(vvar)
+        nG = (nv*(nv+1))//2 
+        G = G[0][:nG] # need only value; lower triangle row-order
+        #
+        # Calculate the log. deriv. of gvib * I**2
+        # Only do this for active coordinates (i.e. those in vvar) 
+        gI2tilde = detg[1:] / detg[0]
+        #
+        # We also need the moment of inertia for the 
+        # centrifugal potential
+        if J == 0:
+            Vc = None # No centrifugal potential
+        else:
+            nI = nG + nv
+            I = g[0][nI] # the moment of inertia (over quadrature grid)
+            Vc = (J * (J+1) * hbar**2 / 2.0)  / I
+        
+        
+        ########################################
+        #
+        # Calculate the logarithmic derivatives of
+        # the integration volume weight function 
+        # defined by the basis sets. Evaluate over the 
+        # quadrature grid Q.
+        # (only necessary for active coordinates)
+        rhotilde = [] 
+        k = 0
+        
+        for b in bases: #
+            if isinstance(b, DVR):
+                # All DVR objects have unit weight function,
+                # rho = 1.
+                # So rhotilde_k = 0
+                #
+                rhotilde.append(np.zeros(Q.shape[1:])) 
+                k += 1 
+            
+            elif isinstance(b, NDBasis):
+                #
+                # NDBasis objects provide their weight
+                # function with the DFun wgtfun()
+                # Evaluate wgtfun and its first derivatives
+                # over the quadrature grid. It only takes
+                # the coordinates belonging to this basis 
+                # set as arguments
+                #
+                rho = b.wgtfun.f(Q[k:(k+b.nd)], deriv = 1) 
+                # Note: using the *entire* quadrature grid is a big 
+                # waste of effort because most of the arrays are the same value
+                # One could slice-out the necessary coordinates and then
+                # broadcast them back out to the entire quadrature grid,
+                # but wgtfun is usually a simple, inexpensive function
+                # so this is not a bottle-neck.
+                #
+                for i in range(b.nd): # for each coordinate in the basis
+                    rhoi = rho[i+1][0] / rho[0][0] # calculate log. deriv.
+                    rhotilde.append(rhoi) 
+                    k += 1            
+            # else, inactive coordinate; no entry in rhotilde.
+            
+        rhotilde = np.stack(rhotilde, axis = 0) # active only 
+        
+        # Calculate Gammatilde, the log deriv of the ratio
+        # of the basis weight function and (gvib * I**2) ** 1/2
+        #
+        Gammatilde = rhotilde - 0.5 * gI2tilde  # active only
+        
+        ###################################
+        #
+        # Collect or construct the single
+        # derivative operators for every
+        # active coordinate.
+        # 
+        # Inactive coordinates will be included
+        # in the list via None.
+        #
+        # For DVR objects, the derivative operator
+        # is provided in the DVR representation
+        # via DVR.D
+        #
+        # For NDBasis objects, we will construct
+        # an effective operator that acts on the
+        # the quadrature representation:
+        #    1) it first transforms *back* to the 
+        #       FBR representation, and then
+        #    2) transform back to a quadrature
+        #       evaluated using the derivative
+        #       of the basis functions directly.
+        #
+        D = [] 
+        for b in bases:
+            if isinstance(b, DVR):
+                D.append(b.D) 
+            elif isinstance(b, NDBasis):
+                # Evaluate the derivative of the basis functions
+                # with respect to its coordinates on the basis set's
+                # quadrature grid
+                #
+                dbas = b.basisfun.jac(b.qgrid)
+                for i in range(b.nd):
+                    # For each coordinate in the basis set
+                    # 
+                    quad2fbr = b.bas * np.sqrt(b.wgt)
+                    dquad2fbr = dbas[:,i] * np.sqrt(b.wgt)
+                    D.append(  dquad2fbr.T @ quad2fbr )       
+            else:
+                # an inactive coordinate, include None
+                D.append(None)
+         
+
+        # Define the required LinearOperator attributes
+        self.shape = (NH,NH)
+        self.dtype = np.result_type(G, Gammatilde, Vq)
+        
+        # Additional attributes
+        self.NH = NH        # The size of the Hamiltonian matrix
+        self.bases = bases  # The basis sets
+        self.Vq = Vq        # The PES quadrature grid
+        self.Vc = Vc        # The centrifugal potential 
+        self.G = G          # The inverse vibrational metric
+        self.Gammatilde = Gammatilde # The pseudo-potential terms
+        self.D = D          # The derivative operators 
+        self.hbar = hbar    # The value of hbar.    
+        self.fbr_shape = fbr_shape # The shape of the mixed DVR-FBR product basis 
+        self.axis_of_coord = axis_of_coord # Grid axis of each coordinate
+        self.J = J          # The total angular momentum
+        
+        return 
+    
+    def _matvec(self, x):
+        """ The matrix-vector product function
+        
+        Input: x, 1D array
+        
+        """
+        
+        # Reshape x to a direct-product array
+        # in the mixed DVR-FBR representation
+        #
+        x = np.reshape(x, self.fbr_shape) 
+        
+        # Convert x to from the mixed DVR-FBR
+        # representation to the quadrature
+        # representation
+        xq = self._to_quad(x) 
+        # Make a vector in the quadrature
+        # representation to accumulate results
+        yq = np.zeros_like(xq) 
+        
+        ##################################
+        # Potential energy operator
+        #
+        if self.Vq is not None:
+            yq += self.Vq * xq # diagonal product in quad. representation
+        #
+        if self.Vc is not None:
+            yq += self.Vc * xq # centrifugal potential
+        #
+        #
+        
+    
+        ##################################
+        # Kinetic energy operator
+        # 
+        lactive = 0
+        nd = len(self.D) # The number of coordinates (including inactive)
+        for l in range(nd):
+            # calculate dtilde_l acting on wavefunction,
+            # result in the quadrature representation 
+            
+            if self.D[l] is None:
+                continue # an in-active coordinate, no derivative to compute
+            
+            # Apply the derivative matrix to the appropriate index
+            dl_x = dvrops.opO(xq, self.D[l], self.axis_of_coord[l]) 
+            #
+            # dtilde_l is the sum of the derivative 
+            # and one-half Gammatilde_l
+            #
+            dtilde_l = dl_x + 0.5 * self.Gammatilde[lactive] * xq
+            
+            
+            kactive = 0 
+            for k in range(nd):
+                
+                if self.D[k] is None:
+                    continue # inactive
+                
+                # Get the packed-storage index for 
+                # G^{kactive, lactive}
+                idx = nitrogen.linalg.packed.IJ2k(kactive,lactive)
+                
+                # Apply G^kl 
+                Gkl_dl = self.G[idx] * dtilde_l
+                
+                # Now finish with (dtilde_k)
+                # and put results in quadrature representation
+                #
+                # include the final factor of -hbar**2 / 2
+                yq += self.hbar**2 * 0.25 * self.Gammatilde[kactive] * Gkl_dl 
+                yq += self.hbar**2 * 0.50 * dvrops.opO(Gkl_dl, self.D[k].T, self.axis_of_coord[k]) 
+                
+                kactive += 1 
+                
+            lactive += 1
+        
+        # yq contains the complete 
+        # matrix-vector result in the quadrature representation
+        #
+        # Convert this back to the mixed FBR-DVR representation
+        # and reshape back to a 1-D vector
+        #
+        y = self._to_fbr(yq)
+        return np.reshape(y, (-1,))
+        
+    def _to_quad(self, x, force_copy = False):
+        
+        """ convert the mixed FBR representation
+        array to the quadrature array
+        """
+        for i,b in enumerate(self.bases):
+            # i**th axis
+            if isinstance(b, NDBasis):
+                x = b.fbrToQuad(x, i)
+        
+        if force_copy:
+            x = x.copy() 
+
+        return x 
+
+    def _to_fbr(self, x, force_copy = False):
+        
+        """ convert the quadrature array to 
+        the mixed FBR representation array 
+        """
+        for i,b in enumerate(self.bases):
+            # i**th axis
+            if isinstance(b, NDBasis):
+                x = b.quadToFbr(x, i)
+        
+        if force_copy:
+            x = x.copy() 
+
+        return x 
