@@ -678,7 +678,7 @@ class Polar2D(LinearOperator):
         
         return tx + vx 
 
-class GenSFHam(LinearOperator):
+class GeneralSpaceFixed(LinearOperator):
     """
     A general space-fixed frame Hamiltonian using
     mixed DVR-FBR basis sets.
@@ -1045,7 +1045,7 @@ class GenSFHam(LinearOperator):
 
         return x 
     
-class CollinearHam(LinearOperator):
+class Collinear(LinearOperator):
     """
     A generalized radial Hamiltonian for collinear 
     configurations for total angular momentum :math:`J`.
