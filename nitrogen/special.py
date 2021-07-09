@@ -2,11 +2,11 @@
 nitrogen.special
 ----------------
 
-Special math and basis functions 
+Special math and basis functions implemented 
 as differentiable DFun objects.
 
 ==============================================   ====================================================
-Function                                         Description
+**Function**                                     **Description**
 ----------------------------------------------   ----------------------------------------------------
 :class:`~nitrogen.special.SinCosDFun`            Real sine-cosine basis.
 :class:`~nitrogen.special.LegendreLMCos`         Associated Legendre functions with cosine argument.
@@ -15,6 +15,8 @@ Function                                         Description
 :class:`~nitrogen.special.RadialHO`              Radial harmonic oscillator eigenfunctions in :math:`d` dimensions.
 :class:`~nitrogen.special.BesselJ`               Bessel functions of the first kind, :math:`J_{\\nu}(x)`.
 :class:`~nitrogen.special.Real2DHO`              Real 2-D isotropic harmonic oscillator wavefunctions.
+:class:`~nitrogen.special.Sin`                   Sine.
+:class:`~nitrogen.special.Monomial`              A monomial :math:`x^p y^q z^r \cdots`.
 ==============================================   ====================================================
 
 """
