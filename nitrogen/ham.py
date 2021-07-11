@@ -1049,9 +1049,8 @@ class Collinear(LinearOperator):
         """
         
         ###################################
-        # Construct a generic space-fixed 
-        # Hamiltonian
-        #
+        # Construct a body-frame Hamiltonian
+        # for a collinear molecule.
         
         ##########################################
         # First, construct the total direct product
@@ -1341,3 +1340,417 @@ class Collinear(LinearOperator):
         
         return np.reshape(y, (-1,))
         
+class NonLinear(LinearOperator):
+    """
+    A general curvilinear rovibrational Hamiltonian
+    for non-linear molecules with total angular momentum :math:`J`.
+    
+    The vibrational kinetic energy operator (KEO) is constructed via
+    the general curvilinear Laplacian for the body-fixed coordinate system 
+    (`cs`) and the vibrational integration volume element :math:`\\rho` defined by the 
+    basis set functions (`bases`). KEO matrix elements equal
+    
+    ..  math::
+        
+        \\langle r', \\Psi' \\vert \\hat{T} \\vert r, \\Psi \\rangle &= \\frac{\\hbar^2}{2} \\langle r' \\vert r \\rangle \\int dq\\, \\rho  (\\tilde{\\partial}_k \\Psi') G^{kl} (\\tilde{\\partial}_l \\Psi) 
+    
+        &\\qquad + \\frac{1}{2} \\langle r' \\vert J_\\alpha J_\\beta \\vert r \\rangle \\int dq\\, \\rho G^{\\alpha \\beta} \\Psi' \\Psi 
+        
+        &\\qquad - \\frac{\\hbar}{2} \\langle r' \\vert i J_\\alpha \\vert r \\rangle \\int dq\\, \\rho G^{\\alpha k} \\left[\\Psi'(\\tilde{\\partial}_k \\Psi)- (\\tilde{\\partial}_k \\Psi') \\Psi\\right]
+    
+    where :math:`\\tilde{\\partial}_k = \\partial_k + \\frac{1}{2} \\tilde{\\Gamma}_k`,
+    :math:`\\tilde{\\Gamma}_k = (\\partial_k \\Gamma) / \\Gamma`, 
+    :math:`\\Gamma = \\rho / (g^{1/2})`, 
+    :math:`g` is the determinant
+    of the full ro-vibrational metric tensor. This form of the KEO assumes
+    certain surface terms arising from integration-by-parts
+    are zero. The necessary boundary conditions on the basis
+    set functions to ensure this are not checked explicitly. *The user
+    must use appropriate basis sets.*
+    
+    """
+    
+    def __init__(self, bases, cs, pes = None, masses = None, J = 0, hbar = None):
+        """
+
+        Parameters
+        ----------
+        bases : list
+            A list of :class:`~nitrogen.dvr.DVR` or
+            :class:`~nitrogen.dvr.NDBasis` basis sets for active
+            coordinates. Scalar elements will constrain the 
+            corresponding coordinate to that fixed value.
+        cs : CoordSys
+            The coordinate system.
+        pes : DFun or function, optional
+            The potential energy surface, V(q). This accepts the 
+            coordinates defined by `cs` as input. If None (default),
+            no PES is used.
+        masses : array_like, optional
+            The atomic masses. If None (default), unit masses
+            are used. 
+        J : int, optional
+            The total angular momentum quantum number :math:`J`. The
+            default value is 0.
+        hbar : scalar, optional
+            The value of :math:`\\hbar`. If None, the default value in 
+            standard NITROGEN units is used (``n2.constants.hbar``).
+        
+        """
+        
+        ###################################
+        # Construct a generic body-fixed
+        # Hamiltonian for a non-linear molecule.
+        
+        ##########################################
+        # First, construct the total direct product
+        # grid
+        Q = nitrogen.dvr.bases2grid(bases)
+        # Q has as many axes as elements in bases, even
+        # for multi-dimensional basis sets (whose quadrature grid
+        # may not be a direct product structure). Fixed coordinates
+        # (with bases[i] equal to a scalar) have a singleton axis
+        # in Q.
+        
+        ##########################################
+        # Parse hbar and masses
+        #
+        if hbar is None:
+            hbar = nitrogen.constants.hbar 
+        
+        if not cs.isatomic:
+            raise ValueError("The coordinate system must be atomic.")
+        
+        if masses is None:
+            masses = [1.0] * cs.natoms
+
+        if len(masses) != cs.natoms:
+            raise ValueError("unexpected length of masses")
+        
+        ########################################
+        # Evaluate potential energy function on 
+        # quadrature grid 
+        if pes is None:
+            Vq = None # no PES to be used
+        else:
+            try: # Attempt DFun interface
+                Vq = pes.f(Q, deriv = 0)[0,0]
+            except:
+                Vq = pes(Q) # Attempt raw function
+        #
+        #
+        
+        ########################################
+        # Figure out which coordinates are active,
+        # the shape of the FBR direct-product basis,
+        # and which axis in the grid corresponds to 
+        # each coordinate        
+        axis_of_coord = [] # length = # of coord (cs.NQ)
+        fbr_shape = []     # length = # of bases 
+        NV = 1 
+        vvar = []  # The ordered list of active coordinates 
+        k = 0
+        for ax,b in enumerate(bases):
+            if isinstance(b, DVR): # A DVR basis is one-dimensional
+                vvar.append(k)
+                fbr_shape.append(b.num)
+                NV *= b.num 
+                axis_of_coord.append(ax) 
+                k +=1 
+            elif isinstance(b, NDBasis): # NDBasis is `nd` dimensional
+                for i in range(b.nd):
+                    vvar.append(k)
+                    axis_of_coord.append(ax)
+                    k += 1 
+                fbr_shape.append(b.Nb)
+                NV *= b.Nb
+            else: # a scalar, not active 
+                fbr_shape.append(1)
+                axis_of_coord.append(ax)
+                k += 1
+        
+        # FBR shape, including singleton non-active coordinates
+        fbr_shape = tuple(fbr_shape)  
+        
+        NJ = 2*J + 1 # The number of rotational wavefunctions 
+        NH = NJ * NV # The total dimension of the Hamiltonian 
+        
+        # Check that there is at least one active coordinate        
+        if len(vvar) == 0:
+            raise ValueError("there must be an active coordinate!") 
+        
+        ########################################
+        #
+        # Calculate coordinate system metric functions
+        # 
+        g = cs.Q2g(Q, deriv = 1, mode = 'bodyframe', 
+                   vvar = vvar, rvar = 'xyz', masses = masses)
+        #
+        # And then calculate its inverse and determinant
+        #
+        G,detg = nitrogen.dfun.sym2invdet(g, 1, len(vvar))
+        #
+        # G and detg contain the derivative arrays for G = inv(g) and det(g)
+        # 
+        # If J = 0, then we only need to keep the vibrational block of G.
+        # In packed storage, this is the first nv*(nv+1)/2 
+        # elements (where nv = len(vvar))
+        #
+        if J == 0:
+            nv = len(vvar)
+            nG = (nv*(nv+1))//2 
+            G = G[0][:nG] # need only value; lower triangle row-order
+        else:
+            G = G[0]      # keep all elements
+        
+        #
+        # Calculate the log. deriv. of g
+        gtilde = detg[1:] / detg[0]
+        #
+        
+        ########################################
+        #
+        # Calculate the logarithmic derivatives of
+        # the integration volume weight function 
+        # defined by the basis sets. Evaluate over the 
+        # quadrature grid Q.
+        # (only necessary for active coordinates)
+        rhotilde = [] 
+        k = 0
+        
+        for b in bases: #
+            if isinstance(b, DVR):
+                # All DVR objects have unit weight function,
+                # rho = 1.
+                # So rhotilde_k = 0
+                #
+                rhotilde.append(np.zeros(Q.shape[1:])) 
+                k += 1 
+            
+            elif isinstance(b, NDBasis):
+                #
+                # NDBasis objects provide their weight
+                # function with the DFun wgtfun()
+                # Evaluate wgtfun and its first derivatives
+                # over the quadrature grid. It only takes
+                # the coordinates belonging to this basis 
+                # set as arguments
+                #
+                rho = b.wgtfun.f(Q[k:(k+b.nd)], deriv = 1) 
+                # Note: using the *entire* quadrature grid is a big 
+                # waste of effort because most of the arrays are the same value
+                # One could slice-out the necessary coordinates and then
+                # broadcast them back out to the entire quadrature grid,
+                # but wgtfun is usually a simple, inexpensive function
+                # so this is not a bottle-neck.
+                #
+                for i in range(b.nd): # for each coordinate in the basis
+                    rhoi = rho[i+1][0] / rho[0][0] # calculate log. deriv.
+                    rhotilde.append(rhoi) 
+                    k += 1            
+            # else, inactive coordinate; no entry in rhotilde.
+            
+        rhotilde = np.stack(rhotilde, axis = 0) # active only 
+        
+        # Calculate Gammatilde, the log deriv of the ratio
+        # of the basis weight function rho and g**1/2
+        #
+        Gammatilde = rhotilde - 0.5 * gtilde  # active only
+        
+        ###################################
+        #
+        # Collect or construct the single
+        # derivative operators for every
+        # vibrational coordinate.
+        # 
+        D = nitrogen.dvr.collectBasisD(bases)
+         
+        ####################################
+        #
+        # Construct the angular momentum operators 
+        # in the real-Wang representation
+        # (i.e. matrix elements of i*J are purely real)
+        iJ = nitrogen.angmom.iJbf_wr(J)      # iJ = (x,y,z)
+        iJiJ = nitrogen.angmom.iJiJbf_wr(J)  # iJiJ[a][b] = [a,b]_+ anticommutator
+
+        # Define the required LinearOperator attributes
+        self.shape = (NH,NH)
+        self.dtype = np.result_type(G, Gammatilde, Vq)
+        
+        # Additional attributes
+        self.NH = NH        # The size of the Hamiltonian matrix
+        self.bases = bases  # The basis sets
+        self.Vq = Vq        # The PES quadrature grid
+        self.G = G          # The inverse vibrational metric
+        self.Gammatilde = Gammatilde # The pseudo-potential terms
+        self.D = D          # The derivative operators 
+        self.hbar = hbar    # The value of hbar.    
+        self.fbr_shape = fbr_shape # The shape of the mixed DVR-FBR product basis 
+        self.axis_of_coord = axis_of_coord # Grid axis of each coordinate
+        self.J = J          # The total angular momentum
+        self.iJ = iJ        # The angular momentum operators
+        self.iJiJ = iJiJ    #  " " 
+        self.nact = len(vvar) # The number of active coordinates 
+        
+        return  
+    
+    def _matvec(self, x):
+        """ The matrix-vector product function
+        
+        Input: x, 1D array
+        
+        """
+        
+        # Reshape x to a direct-product array
+        # in the mixed DVR-FBR representation
+        # The first axis spans the rotational wavefunctions,
+        # and the remaining span the vibrational mixed DVR-FBR
+        # grid, which has shape self.fbr_shape
+        #
+        J = self.J 
+        NJ = 2*J + 1 
+        nact = self.nact # The number of active coordinates 
+        hbar = self.hbar # hbar 
+        
+        x = np.reshape(x, (NJ,) + self.fbr_shape) 
+        
+        # Convert x to from the mixed DVR-FBR
+        # representation to the quadrature
+        # representation
+        # (Prepend the list of bases with a dummy element,
+        #  so that the rotational index is left unchanged)
+        xq = nitrogen.dvr._to_quad([None] + self.bases, x)
+        # Make a vector in the quadrature
+        # representation to accumulate results
+        yq = np.zeros_like(xq) 
+        
+        ##################################
+        # Potential energy operator
+        #
+        if self.Vq is not None:
+            # The PES is diagonal in the rotational index
+            for r in range(NJ):
+                yq[r] += self.Vq * xq[r]
+        #
+    
+        ##################################
+        # Kinetic energy operator
+        # 
+        #
+        # 1) Pure vibrational kinetic energy
+        #    Diagonal in rotational index
+        
+        nd = len(self.D) # The number of coordinates (including inactive)
+        for r in range(NJ):
+            # Rotational block `r`
+            lactive = 0
+            for l in range(nd):
+                # calculate dtilde_l acting on wavefunction,
+                # result in the quadrature representation 
+                
+                if self.D[l] is None:
+                    continue # an in-active coordinate, no derivative to compute
+                
+                # Apply the derivative matrix to the appropriate index
+                dl_x = dvrops.opO(xq[r], self.D[l], self.axis_of_coord[l]) 
+                #
+                # dtilde_l is the sum of the derivative 
+                # and one-half Gammatilde_l
+                #
+                dtilde_l = dl_x + 0.5 * self.Gammatilde[lactive] * xq[r]
+                
+                
+                kactive = 0 
+                for k in range(nd):
+                    
+                    if self.D[k] is None:
+                        continue # inactive
+                    
+                    # Get the packed-storage index for 
+                    # G^{kactive, lactive}
+                    idx = nitrogen.linalg.packed.IJ2k(kactive,lactive)
+                    
+                    # Apply G^kl 
+                    Gkl_dl = self.G[idx] * dtilde_l
+                    
+                    # Now finish with (dtilde_k)
+                    # and put results in quadrature representation
+                    #
+                    # include the final factor of -hbar**2 / 2
+                    yq[r] += hbar**2 * 0.25 * self.Gammatilde[kactive] * Gkl_dl 
+                    yq[r] += hbar**2 * 0.50 * dvrops.opO(Gkl_dl, self.D[k].T, self.axis_of_coord[k]) 
+                    
+                    kactive += 1
+                    
+                lactive += 1
+        #
+        if J > 0:
+            # Rotational and ro-vibrational terms are zero unless
+            # J > 0
+            #
+            # 2) Pure rotational kinetic energy
+            #
+            #  -hbar**2/4  *  [iJa/hbar, iJb/hbar]_+  *  G^ab 
+            #
+            for a in range(3):
+                for b in range(3):
+                    # G^ab term
+                    ab_idx = nitrogen.linalg.packed.IJ2k(nact + a, nact + b) 
+                    Gab = self.G[ab_idx] 
+                            
+                    for rp in range(NJ):
+                        for r in range(NJ):
+                            # <rp | ... | r > rotational block
+                            rot_me = self.iJiJ[a][b][rp,r] # the rotational matrix element
+                            
+                            if rot_me == 0:
+                                continue # a zero rotational matrix element
+                            
+                            # otherwise, add contribution from
+                            # effective inverse inertia tensor
+                            yq[rp] += (rot_me * (-hbar**2) * 0.25) * (Gab * xq[r])
+                            
+            #
+            # 3) Rotation-vibration coupling
+            #
+            # -hbar**2 / 2 iJa/hbar * G^ak [psi' (dtildek psi) - (dtildek psi') psi]
+            
+            for a in range(3):
+                for rp in range(NJ):
+                    for r in range(NJ):
+                        rot_me = self.iJ[a][rp,r] # the rotational matrix element  
+                        if rot_me == 0:
+                            continue 
+                        
+                        kactive = 0 
+                        for k in range(nd):
+                            #
+                            # Vibrational coordinate k
+                            #
+                            if self.D[k] is None:
+                                    continue # an in-active coordinate, no derivative to compute
+                            
+                            # calculate index of G^ak
+                            ak_idx = nitrogen.linalg.packed.IJ2k(nact + a, kactive)
+                            Gak = self.G[ak_idx] 
+                            
+                            # First, do the psi' (dtilde_k psi) term
+                            dk_x = dvrops.opO(xq[r], self.D[k], self.axis_of_coord[k]) 
+                            dtilde_k = dk_x + 0.5 * self.Gammatilde[kactive] * xq[r]
+                            yq[rp] += (rot_me * (-hbar**2) * 0.50) * Gak * dtilde_k
+                            
+                            # Now, do the -(dtilde_k psi') * psi term
+                            yq[rp] += (rot_me * (+hbar**2) * 0.25) * self.Gammatilde[kactive] * Gak * xq[r] 
+                            yq[rp] += (rot_me * (+hbar**2) * 0.50) * dvrops.opO(Gak * xq[r], self.D[k].T, self.axis_of_coord[k])
+                            
+                            kactive += 1
+        
+        # yq contains the complete 
+        # matrix-vector result in the quadrature representation
+        #
+        # Convert this back to the mixed FBR-DVR representation
+        # and reshape back to a 1-D vector
+        # (Prepend a dummy basis to keep rotational index unchanged)
+        y = nitrogen.dvr._to_fbr([None] + self.bases, yq)
+        
+        return np.reshape(y, (-1,))
