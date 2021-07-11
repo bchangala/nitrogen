@@ -877,43 +877,8 @@ class GeneralSpaceFixed(LinearOperator):
         #
         # Collect or construct the single
         # derivative operators for every
-        # active coordinate.
-        # 
-        # Inactive coordinates will be included
-        # in the list via None.
-        #
-        # For DVR objects, the derivative operator
-        # is provided in the DVR representation
-        # via DVR.D
-        #
-        # For NDBasis objects, we will construct
-        # an effective operator that acts on the
-        # the quadrature representation:
-        #    1) it first transforms *back* to the 
-        #       FBR representation, and then
-        #    2) transform back to a quadrature
-        #       evaluated using the derivative
-        #       of the basis functions directly.
-        #
-        D = [] 
-        for b in bases:
-            if isinstance(b, DVR):
-                D.append(b.D) 
-            elif isinstance(b, NDBasis):
-                # Evaluate the derivative of the basis functions
-                # with respect to its coordinates on the basis set's
-                # quadrature grid
-                #
-                dbas = b.basisfun.jac(b.qgrid)
-                for i in range(b.nd):
-                    # For each coordinate in the basis set
-                    # 
-                    quad2fbr = b.bas * np.sqrt(b.wgt)
-                    dquad2fbr = dbas[:,i] * np.sqrt(b.wgt)
-                    D.append(  dquad2fbr.T @ quad2fbr )       
-            else:
-                # an inactive coordinate, include None
-                D.append(None)
+        # coordinate.
+        D = nitrogen.dvr.collectBasisD(bases)
          
 
         # Define the required LinearOperator attributes
@@ -948,7 +913,8 @@ class GeneralSpaceFixed(LinearOperator):
         # Convert x to from the mixed DVR-FBR
         # representation to the quadrature
         # representation
-        xq = self._to_quad(x) 
+        xq = nitrogen.dvr._to_quad(self.bases, x)
+        
         # Make a vector in the quadrature
         # representation to accumulate results
         yq = np.zeros_like(xq) 
@@ -1012,38 +978,9 @@ class GeneralSpaceFixed(LinearOperator):
         # Convert this back to the mixed FBR-DVR representation
         # and reshape back to a 1-D vector
         #
-        y = self._to_fbr(yq)
+        y = nitrogen.dvr._to_fbr(self.bases, yq)
         return np.reshape(y, (-1,))
         
-    def _to_quad(self, x, force_copy = False):
-        
-        """ convert the mixed FBR representation
-        array to the quadrature array
-        """
-        for i,b in enumerate(self.bases):
-            # i**th axis
-            if isinstance(b, NDBasis):
-                x = b.fbrToQuad(x, i)
-        
-        if force_copy:
-            x = x.copy() 
-
-        return x 
-
-    def _to_fbr(self, x, force_copy = False):
-        
-        """ convert the quadrature array to 
-        the mixed FBR representation array 
-        """
-        for i,b in enumerate(self.bases):
-            # i**th axis
-            if isinstance(b, NDBasis):
-                x = b.quadToFbr(x, i)
-        
-        if force_copy:
-            x = x.copy() 
-
-        return x 
     
 class Collinear(LinearOperator):
     """
@@ -1293,43 +1230,9 @@ class Collinear(LinearOperator):
         #
         # Collect or construct the single
         # derivative operators for every
-        # active coordinate.
+        # vibrational coordinate.
         # 
-        # Inactive coordinates will be included
-        # in the list via None.
-        #
-        # For DVR objects, the derivative operator
-        # is provided in the DVR representation
-        # via DVR.D
-        #
-        # For NDBasis objects, we will construct
-        # an effective operator that acts on the
-        # the quadrature representation:
-        #    1) it first transforms *back* to the 
-        #       FBR representation, and then
-        #    2) transform back to a quadrature
-        #       evaluated using the derivative
-        #       of the basis functions directly.
-        #
-        D = [] 
-        for b in bases:
-            if isinstance(b, DVR):
-                D.append(b.D) 
-            elif isinstance(b, NDBasis):
-                # Evaluate the derivative of the basis functions
-                # with respect to its coordinates on the basis set's
-                # quadrature grid
-                #
-                dbas = b.basisfun.jac(b.qgrid)
-                for i in range(b.nd):
-                    # For each coordinate in the basis set
-                    # 
-                    quad2fbr = b.bas * np.sqrt(b.wgt)
-                    dquad2fbr = dbas[:,i] * np.sqrt(b.wgt)
-                    D.append(  dquad2fbr.T @ quad2fbr )       
-            else:
-                # an inactive coordinate, include None
-                D.append(None)
+        D = nitrogen.dvr.collectBasisD(bases)
          
 
         # Define the required LinearOperator attributes
@@ -1366,7 +1269,7 @@ class Collinear(LinearOperator):
         # Convert x to from the mixed DVR-FBR
         # representation to the quadrature
         # representation
-        xq = self._to_quad(x) 
+        xq = nitrogen.dvr._to_quad(self.bases, x)
         # Make a vector in the quadrature
         # representation to accumulate results
         yq = np.zeros_like(xq) 
@@ -1434,35 +1337,7 @@ class Collinear(LinearOperator):
         # Convert this back to the mixed FBR-DVR representation
         # and reshape back to a 1-D vector
         #
-        y = self._to_fbr(yq)
+        y = nitrogen.dvr._to_fbr(self.bases, yq)
+        
         return np.reshape(y, (-1,))
         
-    def _to_quad(self, x, force_copy = False):
-        
-        """ convert the mixed FBR representation
-        array to the quadrature array
-        """
-        for i,b in enumerate(self.bases):
-            # i**th axis
-            if isinstance(b, NDBasis):
-                x = b.fbrToQuad(x, i)
-        
-        if force_copy:
-            x = x.copy() 
-
-        return x 
-
-    def _to_fbr(self, x, force_copy = False):
-        
-        """ convert the quadrature array to 
-        the mixed FBR representation array 
-        """
-        for i,b in enumerate(self.bases):
-            # i**th axis
-            if isinstance(b, NDBasis):
-                x = b.quadToFbr(x, i)
-        
-        if force_copy:
-            x = x.copy() 
-
-        return x 

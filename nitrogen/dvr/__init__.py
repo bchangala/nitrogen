@@ -417,4 +417,100 @@ def transferDVR(grid_old, dvrs_old, dvrs_new):
     grid_new = eval_old_on_new / wgt_new 
     
     return grid_new 
-        
+
+def _to_quad(bases, x, force_copy = False):
+    
+    """ convert the mixed FBR representation
+    array to the quadrature array
+    """
+    for i,b in enumerate(bases):
+        # i**th axis
+        try:
+            x = b.fbrToQuad(x, i)
+        except:
+            pass
+    
+    if force_copy:
+        x = x.copy() 
+
+    return x 
+
+def _to_fbr(bases, x, force_copy = False):
+    
+    """ convert the quadrature array to 
+    the mixed FBR representation array 
+    """
+    for i,b in enumerate(bases):
+        # i**th axis
+        try:
+            x = b.quadToFbr(x, i)
+        except:
+            pass
+    
+    if force_copy:
+        x = x.copy() 
+
+    return x 
+
+def collectBasisD(bases):
+    """
+    Collect derivative operators in quadrature
+    representation for a list of bases.
+
+    Parameters
+    ----------
+    bases : list
+        A list of DVR, NDBasis, or scalars.
+
+    Returns
+    -------
+    D : list
+        The derivative operators in the quadrature
+        representation for each coordinate in `bases`.
+        Scalar values (fixed coordinates) have an 
+        entry of None.
+
+    """
+    ###################################
+    #
+    # Collect or construct the single
+    # derivative operators for every
+    # active coordinate.
+    # 
+    # Inactive coordinates will be included
+    # in the list via None.
+    #
+    # For DVR objects, the derivative operator
+    # is provided in the DVR representation
+    # via DVR.D
+    #
+    # For NDBasis objects, we will construct
+    # an effective operator that acts on the
+    # the quadrature representation:
+    #    1) it first transforms *back* to the 
+    #       FBR representation, and then
+    #    2) transform back to a quadrature
+    #       evaluated using the derivative
+    #       of the basis functions directly.
+    #
+    D = [] 
+    for b in bases:
+        if isinstance(b, dvr.DVR):
+            D.append(b.D) 
+        elif isinstance(b, dvr.NDBasis):
+            # Evaluate the derivative of the basis functions
+            # with respect to its coordinates on the basis set's
+            # quadrature grid
+            #
+            dbas = b.basisfun.jac(b.qgrid)
+            for i in range(b.nd):
+                # For each coordinate in the basis set
+                # 
+                quad2fbr = b.bas * np.sqrt(b.wgt)
+                dquad2fbr = dbas[:,i] * np.sqrt(b.wgt)
+                D.append(  dquad2fbr.T @ quad2fbr )       
+        else:
+            # an inactive coordinate, include None
+            D.append(None)              
+    
+    return D 
