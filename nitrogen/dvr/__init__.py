@@ -514,3 +514,66 @@ def collectBasisD(bases):
             D.append(None)              
     
     return D 
+
+def calcRhoLogD(bases, Q):
+    """
+    Calculate the logarithmic derivative
+    of the basis set volume integration
+    function.
+
+    Parameters
+    ----------
+    bases : list
+        List of DVR, NDBasis, and scalars.
+    Q : ndarray
+        The coordinate values. `Q[i]` is an array
+        for the i**th coordinate.
+
+    Returns
+    -------
+    rhotilde : ndarray
+        `rhotilde[i]` is the logarithmic derivative
+        of :math:`\\rho` with respect to the `i`th 
+        **active** coordinate.
+
+    """
+    
+    rhotilde = [] 
+    k = 0
+    for b in bases: #
+        if isinstance(b, dvr.DVR):
+            # All DVR objects have unit weight function,
+            # rho = 1.
+            # So rhotilde_k = 0
+            #
+            rhotilde.append(np.zeros(Q.shape[1:])) 
+            k += 1 
+        
+        elif isinstance(b, dvr.NDBasis):
+            #
+            # NDBasis objects provide their weight
+            # function with the DFun wgtfun()
+            # Evaluate wgtfun and its first derivatives
+            # over the quadrature grid. It only takes
+            # the coordinates belonging to this basis 
+            # set as arguments
+            #
+            rho = b.wgtfun.f(Q[k:(k+b.nd)], deriv = 1) 
+            # Note: using the *entire* quadrature grid is a big 
+            # waste of effort because most of the arrays are the same value
+            # One could slice-out the necessary coordinates and then
+            # broadcast them back out to the entire quadrature grid,
+            # but wgtfun is usually a simple, inexpensive function
+            # so this is not a bottle-neck.
+            #
+            for i in range(b.nd): # for each coordinate in the basis
+                rhoi = rho[i+1][0] / rho[0][0] # calculate log. deriv.
+                rhotilde.append(rhoi) 
+                k += 1            
+        else:
+            # inactive coordinate; no entry in rhotilde.
+            k += 1 
+        
+    rhotilde = np.stack(rhotilde, axis = 0) # active only 
+    
+    return rhotilde 

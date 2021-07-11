@@ -830,42 +830,7 @@ class GeneralSpaceFixed(LinearOperator):
         # defined by the basis sets. Evaluate over the 
         # quadrature grid Q.
         # (only necessary for active coordinates)
-        rhotilde = [] 
-        k = 0
-        
-        for b in bases: #
-            if isinstance(b, DVR):
-                # All DVR objects have unit weight function,
-                # rho = 1.
-                # So rhotilde_k = 0
-                #
-                rhotilde.append(np.zeros(Q.shape[1:])) 
-                k += 1 
-            
-            elif isinstance(b, NDBasis):
-                #
-                # NDBasis objects provide their weight
-                # function with the DFun wgtfun()
-                # Evaluate wgtfun and its first derivatives
-                # over the quadrature grid. It only takes
-                # the coordinates belonging to this basis 
-                # set as arguments
-                #
-                rho = b.wgtfun.f(Q[k:(k+b.nd)], deriv = 1) 
-                # Note: using the *entire* quadrature grid is a big 
-                # waste of effort because most of the arrays are the same value
-                # One could slice-out the necessary coordinates and then
-                # broadcast them back out to the entire quadrature grid,
-                # but wgtfun is usually a simple, inexpensive function
-                # so this is not a bottle-neck.
-                #
-                for i in range(b.nd): # for each coordinate in the basis
-                    rhoi = rho[i+1][0] / rho[0][0] # calculate log. deriv.
-                    rhotilde.append(rhoi) 
-                    k += 1            
-            # else, inactive coordinate; no entry in rhotilde.
-            
-        rhotilde = np.stack(rhotilde, axis = 0) # active only 
+        rhotilde = nitrogen.dvr.calcRhoLogD(bases, Q)
         
         # Calculate Gammatilde, the log deriv of the ratio
         # of the basis weight function and the Euclidean metric
@@ -1183,42 +1148,7 @@ class Collinear(LinearOperator):
         # defined by the basis sets. Evaluate over the 
         # quadrature grid Q.
         # (only necessary for active coordinates)
-        rhotilde = [] 
-        k = 0
-        
-        for b in bases: #
-            if isinstance(b, DVR):
-                # All DVR objects have unit weight function,
-                # rho = 1.
-                # So rhotilde_k = 0
-                #
-                rhotilde.append(np.zeros(Q.shape[1:])) 
-                k += 1 
-            
-            elif isinstance(b, NDBasis):
-                #
-                # NDBasis objects provide their weight
-                # function with the DFun wgtfun()
-                # Evaluate wgtfun and its first derivatives
-                # over the quadrature grid. It only takes
-                # the coordinates belonging to this basis 
-                # set as arguments
-                #
-                rho = b.wgtfun.f(Q[k:(k+b.nd)], deriv = 1) 
-                # Note: using the *entire* quadrature grid is a big 
-                # waste of effort because most of the arrays are the same value
-                # One could slice-out the necessary coordinates and then
-                # broadcast them back out to the entire quadrature grid,
-                # but wgtfun is usually a simple, inexpensive function
-                # so this is not a bottle-neck.
-                #
-                for i in range(b.nd): # for each coordinate in the basis
-                    rhoi = rho[i+1][0] / rho[0][0] # calculate log. deriv.
-                    rhotilde.append(rhoi) 
-                    k += 1            
-            # else, inactive coordinate; no entry in rhotilde.
-            
-        rhotilde = np.stack(rhotilde, axis = 0) # active only 
+        rhotilde = nitrogen.dvr.calcRhoLogD(bases, Q)
         
         # Calculate Gammatilde, the log deriv of the ratio
         # of the basis weight function and (gvib * I**2) ** 1/2
@@ -1370,7 +1300,8 @@ class NonLinear(LinearOperator):
     
     """
     
-    def __init__(self, bases, cs, pes = None, masses = None, J = 0, hbar = None):
+    def __init__(self, bases, cs, pes = None, masses = None, J = 0, hbar = None,
+                 Vmax = None, Vmin = None):
         """
 
         Parameters
@@ -1395,7 +1326,8 @@ class NonLinear(LinearOperator):
         hbar : scalar, optional
             The value of :math:`\\hbar`. If None, the default value in 
             standard NITROGEN units is used (``n2.constants.hbar``).
-        
+        Vmax,Vmin : scalar, optional
+            Potential energy cut-off thresholds. The default is None.
         """
         
         ###################################
@@ -1437,6 +1369,13 @@ class NonLinear(LinearOperator):
                 Vq = pes.f(Q, deriv = 0)[0,0]
             except:
                 Vq = pes(Q) # Attempt raw function
+                
+            # Apply PES min and max cutoffs
+            if Vmax is not None:
+                Vq[Vq > Vmax] = Vmax 
+            if Vmin is not None:
+                Vq[Vq < Vmin] = Vmin 
+                
         #
         #
         
@@ -1515,42 +1454,7 @@ class NonLinear(LinearOperator):
         # defined by the basis sets. Evaluate over the 
         # quadrature grid Q.
         # (only necessary for active coordinates)
-        rhotilde = [] 
-        k = 0
-        
-        for b in bases: #
-            if isinstance(b, DVR):
-                # All DVR objects have unit weight function,
-                # rho = 1.
-                # So rhotilde_k = 0
-                #
-                rhotilde.append(np.zeros(Q.shape[1:])) 
-                k += 1 
-            
-            elif isinstance(b, NDBasis):
-                #
-                # NDBasis objects provide their weight
-                # function with the DFun wgtfun()
-                # Evaluate wgtfun and its first derivatives
-                # over the quadrature grid. It only takes
-                # the coordinates belonging to this basis 
-                # set as arguments
-                #
-                rho = b.wgtfun.f(Q[k:(k+b.nd)], deriv = 1) 
-                # Note: using the *entire* quadrature grid is a big 
-                # waste of effort because most of the arrays are the same value
-                # One could slice-out the necessary coordinates and then
-                # broadcast them back out to the entire quadrature grid,
-                # but wgtfun is usually a simple, inexpensive function
-                # so this is not a bottle-neck.
-                #
-                for i in range(b.nd): # for each coordinate in the basis
-                    rhoi = rho[i+1][0] / rho[0][0] # calculate log. deriv.
-                    rhotilde.append(rhoi) 
-                    k += 1            
-            # else, inactive coordinate; no entry in rhotilde.
-            
-        rhotilde = np.stack(rhotilde, axis = 0) # active only 
+        rhotilde = nitrogen.dvr.calcRhoLogD(bases, Q)
         
         # Calculate Gammatilde, the log deriv of the ratio
         # of the basis weight function rho and g**1/2
@@ -1668,10 +1572,11 @@ class NonLinear(LinearOperator):
                     
                     # Get the packed-storage index for 
                     # G^{kactive, lactive}
-                    idx = nitrogen.linalg.packed.IJ2k(kactive,lactive)
+                    kl_idx = nitrogen.linalg.packed.IJ2k(kactive,lactive)
+                    Gkl = self.G[kl_idx]
                     
                     # Apply G^kl 
-                    Gkl_dl = self.G[idx] * dtilde_l
+                    Gkl_dl = Gkl * dtilde_l
                     
                     # Now finish with (dtilde_k)
                     # and put results in quadrature representation
@@ -1694,6 +1599,16 @@ class NonLinear(LinearOperator):
             #
             for a in range(3):
                 for b in range(3):
+                    # Because both [iJa,iJb]_+ and G^ab
+                    # are symmetric with a <--> b, we only need 
+                    # to loop over half
+                    if (b > a):
+                        continue 
+                    if b == a:
+                        symfactor = 1.0  # on the diagonal, count once!
+                    else: # b < a 
+                        symfactor = 2.0  # count both (b,a) and (a,b)
+                    
                     # G^ab term
                     ab_idx = nitrogen.linalg.packed.IJ2k(nact + a, nact + b) 
                     Gab = self.G[ab_idx] 
@@ -1708,7 +1623,7 @@ class NonLinear(LinearOperator):
                             
                             # otherwise, add contribution from
                             # effective inverse inertia tensor
-                            yq[rp] += (rot_me * (-hbar**2) * 0.25) * (Gab * xq[r])
+                            yq[rp] += (symfactor * rot_me * (-hbar**2) * 0.25) * (Gab * xq[r])
                             
             #
             # 3) Rotation-vibration coupling
