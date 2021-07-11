@@ -15,9 +15,12 @@ class Valence3(CoordSys):
     The second atom is at the origin.
     The third atom is at :math:`(0, r_2 \sin\\theta, -r_2 \cos\\theta )`.
     
+    If `supplementary` then :math:`\\theta \\leftarrow \\pi - \\theta` is
+    used.
+    
     """
     
-    def __init__(self, name = 'Triatomic valence', angle = 'rad'):
+    def __init__(self, name = 'Triatomic valence', angle = 'rad', supplementary = False):
         
         """
         Create a new Valence3 object.
@@ -28,6 +31,8 @@ class Valence3(CoordSys):
             The coordinate system name. The default is 'Triatomic valence'.
         angle : {'rad', 'deg'}, optional
             The degree units. The default is radians ('rad').
+        supplementary : bool, optional
+            If True, then the angle supplement is used. The default is False.
         
         """
         
@@ -41,6 +46,8 @@ class Valence3(CoordSys):
             self.angle = angle 
         else:
             raise ValueError('angle must be rad or deg')
+            
+        self.supplementary = supplementary 
         
     def _csv3_q2x(self, Q, deriv = 0, out = None, var = None):
         """
@@ -88,7 +95,10 @@ class Valence3(CoordSys):
         # Calculate Cartesian coordinates
         
         if self.angle == 'deg':
-            q[2] = (np.pi / 180.0) * q[2]
+            q[2] = (np.pi / 180.0) * q[2] 
+        # q[2] is now in radians
+        if self.supplementary:
+            q[2] = np.pi - q[2] # theta <-- pi - theta 
         
         np.copyto(out[:,2], (-q[0]).d ) # -r1
         np.copyto(out[:,7], (q[1] * adf.sin(q[2])).d ) #  r2 * sin(theta)
@@ -335,7 +345,9 @@ class Polar(CoordSys):
     Polar coordinates :math:`(r,\\phi)` in two dimensions.
     
     .. math::
+        
        x &= r \\cos\\phi 
+       
        y &= r \\sin\\phi 
      
     Attributes
@@ -416,7 +428,9 @@ class Cylindrical(CoordSys):
     Cylindirical coordinates :math:`(r,\\phi, z)` in three dimensions.
     
     .. math::
+        
        x &= r \\cos\\phi 
+       
        y &= r \\sin\\phi 
      
     Attributes
@@ -499,8 +513,11 @@ class Spherical(CoordSys):
     Spherical coordinates :math:`(r,\\theta,\\phi)` in three dimensions.
     
     .. math::
+        
        x &= r \\sin\\theta\\cos\\phi 
+       
        y &= r \\sin\\theta\\sin\\phi 
+       
        z &= r \\cos\\theta
      
     Attributes
