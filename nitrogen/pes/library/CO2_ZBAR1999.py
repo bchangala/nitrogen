@@ -8,6 +8,8 @@ respect to a large number of experimental vibrational frequencies.
 Input: Cartesians in C--O--C order (Angstroms)
 Output: energy in cm^-1
 
+An offset of +135955.7886 cm^-1 is added to the surface
+
 References
 ----------
 
@@ -49,6 +51,8 @@ def Vfun(X, deriv = 0, out = None, var = None):
     v = VO1 * (f1(r1,r2,r3) + f2(r1,r2,r3)) + \
         V2CO(r1) + V2CO(r2) + V2OO(r3) + \
         V3OCO(r1,r2,r3)
+    
+    v += 135955.7886 # offset to put CO2 minimum near 0.0 
     
     return n2.dfun.adf2array([v], out)
 
