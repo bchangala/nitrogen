@@ -64,7 +64,8 @@ def curvVib(Q0, pes, cs, masses, mode = 'bodyframe'):
     Returns
     -------
     omega : ndarray
-        The harmonic frequencies (times :math:`\hbar`) 
+        The harmonic frequencies (times :math:`\hbar`).
+        Negative frequencies are returned for imaginary frequencies.
     nctrans : LinearTrans
         The normal coordinate transformation.
         
@@ -83,7 +84,8 @@ def curvVib(Q0, pes, cs, masses, mode = 'bodyframe'):
 
     w,U = np.linalg.eig(GF) # Diagonalize GF matrix
 
-    omega = constants.hbar * np.sqrt(w) # Calculate harmonic energies
+    omega = constants.hbar * np.sqrt(np.abs(w)) # Calculate harmonic energies
+    omega[w < 0] = -omega[w < 0] # Imaginary frequencies will be flagged as negative
     
     # Calculate the normal coordinate transformation matrix
     # for the "dimensionless normal coordinates" which are
