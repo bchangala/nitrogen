@@ -116,7 +116,7 @@ def eigstrp(H, k = 5, pad = 10, tol = 1e-10, maxiter = None, v0 = None,
         alpha = np.real(np.vdot(w, L[:,i]))  # Force real (should be anyway)
         T[i,i] = alpha
         if i > 0:
-            beta = np.vdot(w, L[:,i-1])
+            beta = np.real( np.vdot(w, L[:,i-1]) ) # !!! check that this is really real 
             T[i,i-1] = beta
             T[i-1,i] = beta
         
@@ -127,7 +127,7 @@ def eigstrp(H, k = 5, pad = 10, tol = 1e-10, maxiter = None, v0 = None,
         # Explicitly normalize first to help with finite precision errors
         w /= np.linalg.norm(w)
         for j in range(i+1):
-            c = np.vdot(w, L[:,j])
+            c = np.vdot(L[:,j], w)
             w -= c * L[:,j] # Sequential Gram-Schmidt orthogonalization
         # Renormalize and store in Lnext
         np.copyto(Lnext, w/np.linalg.norm(w))
@@ -155,12 +155,12 @@ def eigstrp(H, k = 5, pad = 10, tol = 1e-10, maxiter = None, v0 = None,
                 # If this is the first loop in the restart block,
                 # then we need to calculate the "arrowhead"
                 for j in range(i):
-                    beta = np.vdot(w, L[:,j])
+                    beta = np.real( np.vdot(w, L[:,j]) )
                     T[i,j] = beta
                     T[j,i] = beta
             else:
                 # This is a normal Lanczos step
-                beta = np.vdot(w, L[:,i-1])
+                beta = np.real( np.vdot(w, L[:,i-1]) ) 
                 T[i,i-1] = beta
                 T[i-1,i] = beta
             
@@ -170,11 +170,11 @@ def eigstrp(H, k = 5, pad = 10, tol = 1e-10, maxiter = None, v0 = None,
             # Calculate the next Lanczos vector
             w /= np.linalg.norm(w) # Normalize first
             for j in range(i+1):
-                c = np.vdot(w, L[:,j])
+                c = np.vdot(L[:,j], w)
                 w -= c * L[:,j] # Sequential Gram-Schmidt orthogonalization
             w /= np.linalg.norm(w) # Normalize first
             for j in range(i+1):
-                c = np.vdot(w, L[:,j])
+                c = np.vdot(L[:,j], w)
                 w -= c * L[:,j] # Sequential Gram-Schmidt orthogonalization
             # Renormalize and store in Lnext
             np.copyto(Lnext, w/np.linalg.norm(w))
@@ -217,6 +217,11 @@ def eigstrp(H, k = 5, pad = 10, tol = 1e-10, maxiter = None, v0 = None,
                 # tolerance, we will continue
                 if printlevel >= 1:
                     print(f"End of restart {restart_cnt:d}. {nconverged:d}/{k:d} Ritz values have converged.")
+                if printlevel >= 2:
+                    print("Current Ritz values:")
+                    for i in range(k):
+                        diff = evals[i]-evals_old[i]
+                        print(f"  {evals[i]:.6E}  ({+diff:.6E})")
             else:
                 # All eigenvalues have converged, exit the restart loop
                 print("Convergence reached in {:d} restarts ({:d} iterations).".format(restart_cnt, itercnt))
@@ -289,7 +294,7 @@ def bounds(H, k = 10, m = 3):
     
     # Initialize Lanczos steps
     f = H.matvec(v)
-    alpha = np.dot(f,v)
+    alpha = np.vdot(f,v)
     f -= alpha * v 
     
     T = np.zeros((k,k))
@@ -301,7 +306,7 @@ def bounds(H, k = 10, m = 3):
         v = f/beta 
         f = H.matvec(v) 
         f -= beta * v0
-        alpha = np.dot(f,v) 
+        alpha = np.vdot(f,v) 
         f -= alpha*v 
         T[j,j-1] = beta 
         T[j-1,j] = beta 

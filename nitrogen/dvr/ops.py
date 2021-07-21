@@ -199,3 +199,42 @@ def opO(x, O, axis):
     y = np.moveaxis(y, 0, axis) 
     
     return y 
+
+def opTensorO(x, Os):
+    """
+    Apply a sequence of matrix operators to each axis.
+
+    Parameters
+    ----------
+    x : ndarray
+        Input grid
+    Os : list of ndarray
+        The operator matrix for each axis. An entry of None
+        is the same as identity.
+
+    Returns
+    -------
+    y : ndarray
+        The result array.
+
+    """
+    
+    if len(Os) != x.ndim:
+        raise ValueError("len(Os) must equal x.ndim")
+    
+    y = x 
+    for i in range(len(Os)):
+        #
+        # Apply operator i to i**th axis of grid
+        #
+        if Os[i] is None:
+            continue 
+        
+        y = np.tensordot(Os[i], y, axes = (1,i) )
+        y = np.moveaxis(y, 0, i) 
+        
+    return y 
+        
+        
+        
+        

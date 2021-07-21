@@ -1536,7 +1536,8 @@ class NonLinear(LinearOperator):
             for r in range(NJ):
                 yq[r] += self.Vq * xq[r]
         #
-    
+        #
+        
         ##################################
         # Kinetic energy operator
         # 
@@ -1669,3 +1670,705 @@ class NonLinear(LinearOperator):
         y = nitrogen.dvr._to_fbr([None] + self.bases, yq)
         
         return np.reshape(y, (-1,))
+    
+    
+    
+class AzimuthalLinear(LinearOperator):
+    """
+    A  Hamiltonian for linear molecules
+    
+    notes
+    ------
+    azimuthal angles are declared with `azimuth`
+    [...,None, (0,-1) , (0,1), None, 1, 1, -1, None, ...]
+    one element for each *basis* entry
+     entry is (coord in this basis, scaling factor) 
+    
+    if angle is in radians
+    scaling factor should be +1, -1 for sense
+    if degrees, then scaling factor should be (180/pi, -180/pi) etc.
+    
+    
+    """
+    
+    def __init__(self, bases, cs, azimuth, pes = None, masses = None, J = 0, hbar = None,
+                 Vmax = None, Vmin = None, Voffset = None):
+        
+        # For each basis, get the azimuthal quantum number
+        # list 
+        
+        if len(azimuth) != len(bases):
+            raise ValueError("azimuth must be same length as bases")
+        
+        # There should be one entry of Ellipsis in the azimuth list
+        n = 0
+        ellipsis_idx = 0 # The basis index for the Ellipsis factor
+        for i,entry in enumerate(azimuth):
+            if entry is Ellipsis:
+                n += 1
+                ellipsis_idx = i
+        if n != 1:
+            raise ValueError("azimuth must contain exactly one Ellipsis")
+        
+        # bases[i] must be a callable 
+        if not callable(bases[ellipsis_idx]):
+            raise ValueError("The ... bases entry must be callable")
+        
+        az_m = []  # Entry for each basis factor
+        az_U = []  # Unitary transforms that convert from azimuthal 
+                   # representation to mixed DVR-FBR
+                   # (entries of None indicate identity)
+                   
+        # The signed-k (i.e. Condon-Shortley representation) rotational
+        # basis functions are first
+        #
+        az_m.append(np.arange(-J,J+1))  # signed-k rotational factor
+        az_U.append(None) #  Already in azimuthal representation 
+        
+        min_m = -J  # Keep track of Ellipsis quantum number range
+        max_m = J 
+        
+        for i in range(len(bases)):
+            if azimuth[i] is None: # This is not declared an azimuthal coordinate
+                try:
+                    az_m.append(np.array([0] * bases[i].num))
+                except:
+                    try:
+                        az_m.append(np.array([0] * bases[i].Nb))
+                    except:
+                        az_m.append(np.array([0]))
+                az_U.append(None) 
+            elif azimuth[i] is Ellipsis:
+                # This is the callable basis
+                az_m.append(Ellipsis) # Place holder 
+                az_U.append(None)     # Azimuthal representation is implied
+            else:
+                # This basis has been declared azimuthal
+                # Attempt to find its azimuthal representation
+                #
+                # If it has a D (derivative) operator, use that
+                try: 
+                    D = bases[i].D
+                except AttributeError:
+                    # there is no D, attempt quadrature instead 
+                    try:
+                        
+                        qgrid = bases[i].qgrid # the quadrature grid
+                        wgt = bases[i].wgt # the quadrature weights over qgrid 
+                    
+                        # calculate derivatives w.r.t. the azimuthal coordinate only
+                        dbas = bases[i].basisfun.f(qgrid,deriv=1, var = [azimuth[i][0]])
+                        
+                        f = dbas[0]
+                        df = dbas[1] # d/dr 
+                        
+                        D = (f * wgt) @ (df.T)  
+                        
+                    except:
+                        raise AttributeError(f"cannot get azimuthal representation for bases[{i:d}]")
+
+                w,u = np.linalg.eigh(-1j * D) 
+                w *= azimuth[i][1] # correct for right or left-handed sense
+                # u transforms a vector in the the azimuthal representation
+                # to the original FBR or DVR representation
+                
+                # in principle, w should be exact integer
+                # assuming a proper basis has been chosen
+                # (i.e. one that is closed under rotations of the azimuthal 
+                #  coordinate) 
+                w_int = np.rint(w).astype(np.int32) # round to nearest integer
+                if np.max(np.absolute(w_int - w)) > 1e-10:
+                    print("Warning: azimuthal quantum numbers are not quite integer!" + \
+                          " (or perhaps were rounded unexpectedly)")
+                
+                az_m.append(w_int) 
+                az_U.append(u) 
+                
+                min_m -= np.max(w_int)
+                max_m -= np.min(w_int)
+                
+        # Calculate the conjugate tranpose of each az_U
+        # This will transform from mixed DVR/FBR to azimuthal representation
+        #
+        az_UH = []
+        for U in az_U:
+            if U is None:
+                az_UH.append(None)
+            else:
+                az_UH.append(U.conj().T) # conjugate transpose  
+        
+        #
+        # We now need to determine what azimuthal quantum number range
+        # is necessary for the Ellipsis basis, which takes all the slack
+        #
+        # m = k - sum(all other m's)
+        #
+        # The largest value of m is max(k) - sum( min(other m's) )
+        # The smallest value is min(k) - sum(max(other m's)) 
+        #
+        # These have been kept track of with min_m and max_m above
+        ellipsis_range = np.arange(min_m, max_m + 1)
+        #
+        # For each m in this range, bases[ellipsis_idx](m) returns
+        # a basis specification. This may be a scalar, a DVR, or an NDBasis, etc.
+        #
+        # It is possible that a basis cannot be formed
+        ellipsis_bases = []
+        actual_ellipsis_range = []
+        for m in ellipsis_range:
+            try:
+                b = bases[ellipsis_idx](m) 
+                ellipsis_bases.append(b)
+                actual_ellipsis_range.append(m)
+            except:
+                print(f"Note: azimuthal basis m = {m:d} is being skipped.")
+    
+        ellipsis_range = actual_ellipsis_range 
+        if len(ellipsis_range) == 0:
+            raise ValueError("No Ellipsis bases could be formed!")
+        
+        bfirst = ellipsis_bases[0] 
+        size_of_ellipsis_m = []
+        #
+        # Check for consistency among the basis objects for every possible
+        # value of m, and collect the size of the sub-basis for each m
+        if np.isscalar(bfirst):
+            # A scalar, all values must be equal 
+            for i in range(len(ellipsis_bases)):
+                if bfirst != ellipsis_bases[i]:
+                    raise ValueError("For scalar Ellipsis basis, all values must be equal.")
+                size_of_ellipsis_m.append(1)
+        elif isinstance(bfirst, nitrogen.dvr.DVR):
+            # A DVR
+            for i in  range(len(ellipsis_bases)):
+                if bfirst.basis != ellipsis_bases[i].basis:
+                    raise ValueError("All Ellipsis bases must have the same DVR basis type.")
+                if not np.all(bfirst.grid == ellipsis_bases[i].grid):
+                    raise ValueError("All Ellipsis bases must have the same DVR grid.")
+                size_of_ellipsis_m.append(ellipsis_bases[i].num)
+        elif isinstance(bfirst, nitrogen.dvr.NDBasis):
+            # An NDBasis
+            for i in  range(len(ellipsis_bases)):
+                if not np.all(bfirst.qgrid == ellipsis_bases[i].qgrid):
+                    raise ValueError("All Ellipsis bases must have the same quadrature grid.")
+                if not np.all(bfirst.wgt == ellipsis_bases[i].wgt):
+                    raise ValueError("All Ellipsis bases must have the same quadrature weights.")
+                size_of_ellipsis_m.append(ellipsis_bases[i].Nb)
+        else: 
+            # An unrecognized type
+            raise ValueError("Unrecognized basis type for Ellipsis basis.")
+        #
+        #
+        
+        Nellip = sum(size_of_ellipsis_m) # The size of the concatenated ellipsis bases
+        
+        az_m[ellipsis_idx + 1] = np.repeat(ellipsis_range, np.array(size_of_ellipsis_m))
+        
+        az_grids = np.meshgrid(*az_m, indexing = 'ij') 
+        
+        total = az_grids[0] - sum(az_grids[1:]) # k - sum(m)
+        sing_val_mask = (total == 0) 
+        
+        svm_1d = np.reshape(sing_val_mask, (-1,)) 
+        NH = np.count_nonzero(svm_1d)  # the number of single-valued functions
+        
+        ########################################
+        # Figure out which coordinates are active,
+        # the shape of the FBR direct-product basis,
+        # and which axis in the grid corresponds to 
+        # each coordinate        
+        axis_of_coord = [] # length = # of coord (cs.nQ)
+        fbr_shape = []     # length = # of bases 
+        NV = 1 
+        vvar = []  # The ordered list of active coordinates 
+        k = 0
+        coord_k_is_ellip_coord = [None for i in range(cs.nQ)]
+        for ax,b in enumerate(bases):
+            
+            # The ellipsis bases are treated differently 
+            if ax == ellipsis_idx: 
+                b = bfirst 
+                if isinstance(b, DVR): # A DVR basis is one-dimensional
+                    vvar.append(k)
+                    #fbr_shape.append(b.num)
+                    #NV *= b.num 
+                    axis_of_coord.append(ax) 
+                    coord_k_is_ellip_coord[k] = 0
+                    k +=1 
+                elif isinstance(b, NDBasis): # NDBasis is `nd` dimensional
+                    for i in range(b.nd):
+                        vvar.append(k)
+                        axis_of_coord.append(ax)
+                        coord_k_is_ellip_coord[k] = i
+                        k += 1 
+                    #fbr_shape.append(b.Nb)
+                    #NV *= b.Nb
+                else: # a scalar, not active 
+                    #fbr_shape.append(1)
+                    axis_of_coord.append(ax)
+                    coord_k_is_ellip_coord[k] = 0
+                    k += 1  
+                fbr_shape.append(Nellip) # The size of this axis is the concatenated number of Ellipsis functions
+                NV *= Nellip 
+            else:
+                #
+                # A normal basis factor
+                #
+                if isinstance(b, DVR): # A DVR basis is one-dimensional
+                    vvar.append(k)
+                    fbr_shape.append(b.num)
+                    NV *= b.num 
+                    axis_of_coord.append(ax) 
+                    k +=1 
+                elif isinstance(b, NDBasis): # NDBasis is `nd` dimensional
+                    for i in range(b.nd):
+                        vvar.append(k)
+                        axis_of_coord.append(ax)
+                        k += 1 
+                    fbr_shape.append(b.Nb)
+                    NV *= b.Nb
+                else: # a scalar, not active 
+                    fbr_shape.append(1)
+                    axis_of_coord.append(ax)
+                    k += 1
+        
+        # FBR shape, including the concatenated ellipsis axis 
+        fbr_shape = tuple(fbr_shape)  
+        NJ = 2*J + 1 
+        NDP = NJ * NV # The size of the rot-vib direct product basis
+                      # (which contains all ellipsis basis functions, 
+                      #  not selected by which actually occur in the working basis)
+                      
+        
+        # Check that there is at least one active coordinate        
+        if len(vvar) == 0:
+            raise ValueError("there must be an active coordinate!") 
+            
+            
+        ################################################    
+        # Evaluate quadrature grid quantities
+        bases_quad = bases
+        # Use one representative Ellipsis basis. These must
+        # all have the same quadrature grid (or fixed value) anyway
+        #
+        bases_quad[ellipsis_idx] = ellipsis_bases[0] 
+        Q = nitrogen.dvr.bases2grid(bases_quad) 
+        
+        ########################################
+        # Evaluate potential energy function on 
+        # quadrature grid 
+        if pes is None:
+            Vq = None # no PES to be used
+        else:
+            try: # Attempt DFun interface
+                Vq = pes.f(Q, deriv = 0)[0,0]
+            except:
+                Vq = pes(Q) # Attempt raw function
+                
+            # Apply PES min and max cutoffs
+            if Vmax is not None:
+                Vq[Vq > Vmax] = Vmax 
+            if Vmin is not None:
+                Vq[Vq < Vmin] = Vmin     
+            
+            # Then apply offset 
+            if Voffset is not None:
+                Vq = Vq - Voffset 
+        #
+        #
+        ##########################################
+        # Parse hbar and masses
+        #
+        if hbar is None:
+            hbar = nitrogen.constants.hbar 
+        
+        if not cs.isatomic:
+            raise ValueError("The coordinate system must be atomic.")
+        
+        if masses is None:
+            masses = [1.0] * cs.natoms
+
+        if len(masses) != cs.natoms:
+            raise ValueError("unexpected length of masses")
+            
+        ########################################
+        #
+        # Calculate coordinate system metric functions
+        # 
+        g = cs.Q2g(Q, deriv = 1, mode = 'bodyframe', 
+                   vvar = vvar, rvar = 'xyz', masses = masses)
+        #
+        # And then calculate its inverse and determinant
+        #
+        G,detg = nitrogen.dfun.sym2invdet(g, 1, len(vvar))
+        #
+        # G and detg contain the derivative arrays for G = inv(g) and det(g)
+        # 
+        # If J = 0, then we only need to keep the vibrational block of G.
+        # In packed storage, this is the first nv*(nv+1)/2 
+        # elements (where nv = len(vvar))
+        #
+        if J == 0:
+            nv = len(vvar)
+            nG = (nv*(nv+1))//2 
+            G = G[0][:nG] # need only value; lower triangle row-order
+        else:
+            G = G[0]      # keep all elements
+        
+        #
+        # Calculate the log. deriv. of g
+        gtilde = detg[1:] / detg[0]
+        #
+        
+        ########################################
+        #
+        # Calculate the logarithmic derivatives of
+        # the integration volume weight function 
+        # defined by the basis sets. Evaluate over the 
+        # quadrature grid Q.
+        # (only necessary for active coordinates)
+        #
+        # We can use bases_quad, because the rho element for 
+        # the Ellipsis basis must be the same for each azimuthal component
+        rhotilde = nitrogen.dvr.calcRhoLogD(bases_quad, Q)
+        
+        # Calculate Gammatilde, the log deriv of the ratio
+        # of the basis weight function rho and g**1/2
+        #
+        Gammatilde = rhotilde - 0.5 * gtilde  # active only
+        
+        ###################################
+        #
+        # Collect or construct the single
+        # derivative operators for every
+        # vibrational coordinate.
+        # 
+        # Again, we use bases_quad *BUT* the entries for
+        # the Ellipsis basis coordinates will be invalid !!! 
+        D = nitrogen.dvr.collectBasisD(bases_quad)
+        #
+        # For the Ellipsis basis coordinates, we need to calculate
+        # derivatives for each block separately
+        D_ellipsis = [nitrogen.dvr.collectBasisD([b]) for b in ellipsis_bases]
+        # D_ellipsis[i][j] is the D operator for the j**th ellipsis coordinate of the i**th block
+        
+        
+        ####################################
+        #
+        # Construct the angular momentum operators 
+        # in the signed-k (i.e. Condon-Shortley) representation
+        #
+        # 
+        Jx,Jy,Jz = nitrogen.angmom.Jbf_cs(J)  # k ordering = -J, -J + 1, ... +J
+        iJ = (1j * Jx, 1j * Jy, 1j * Jz)
+        #
+        # Calculate the iJ, iJ anticommutator
+        iJiJ = tuple(tuple( iJ[a]@iJ[b] + iJ[b]@iJ[a] for b in range(3)) for a in range(3))
+        
+        # Define the required LinearOperator attributes
+        self.shape = (NH,NH)
+        self.dtype = np.result_type(1j)  # complex128 
+        
+        self.az_m = az_m
+        self.az_U = az_U 
+        self.az_UH = az_UH 
+        self.sing_val_mask = sing_val_mask 
+        self.fbr_shape = fbr_shape 
+        self.NDP = NDP 
+        self.NV = NV 
+        self.svm_1d = svm_1d 
+        self.J = J 
+        self.bases = bases 
+        self.ellipsis_bases = ellipsis_bases 
+        self.ellipsis_range = ellipsis_range 
+        self.size_of_ellipsis_m = size_of_ellipsis_m
+        self.ellipsis_idx = ellipsis_idx 
+        self.iJ = iJ
+        self.iJiJ = iJiJ
+        self.Vq = Vq 
+        self.D = D 
+        self.D_ellipsis = D_ellipsis 
+        self.axis_of_coord = axis_of_coord 
+        self.Gammatilde = Gammatilde 
+        self.G = G 
+        self.hbar = hbar 
+        self.nact = len(vvar) # The number of active coordinates 
+        self.coord_k_is_ellip_coord = coord_k_is_ellip_coord
+        
+        return 
+    
+    def _matvec(self, x):
+        
+        J = self.J 
+        NJ = 2*J + 1 
+        NH = self.shape[0] 
+        hbar = self.hbar
+        nact = self.nact
+        
+        x = x.reshape((NH,)) # reshape to (NH,) 
+        
+        # The working representation contains only a sub-set of 
+        # functions of the direct-product azimuthal representation
+        #
+        # 1) Convert the 1D vector in the working representation
+        # to a 1D vector in the direct-product azimuthal representation
+        x_dp = np.zeros((self.NDP,), dtype = np.complex128) 
+        x_dp[self.svm_1d] = x 
+        #
+        # Then reshape this into the direct-product azimuthal representation
+        # grid shape (`fbr_shape`)
+        # The leading axis is the signed-k rotational wavefunctions. The
+        # remaining axes are the mixed DVR/FBR grid shape
+        #
+        x_dp = np.reshape(x_dp, (NJ,) + self.fbr_shape) 
+        
+        #
+        # 2) Now transform from the declared azimuthal representations
+        # to the mixed DVR/FBR representation
+        #
+        x_fbr = nitrogen.dvr.ops.opTensorO(x_dp, self.az_U) 
+        
+        #
+        # 3) Now transform from the mixed representation to the
+        # quadrature representation. Each Ellipsis basis is treated 
+        # separately. They go to the same quadrature grid.
+        xq = 0
+        k = 0
+        
+        nellip_coord = len(self.D_ellipsis[0])
+        dxq_ellip = [0 for i in range(nellip_coord)]
+        # dxq_ellip[i] is the quad representation of the derivative with 
+        # respect to the i**th Ellipsis coordinate 
+        for i in range(len(self.ellipsis_range)):
+            # For each ellipsis basis
+            axis = self.ellipsis_idx + 1 # The location of the ellipsis basis
+                                         # (remember that rotations are first)
+            nblock = self.size_of_ellipsis_m[i] # the number of functions in this
+                                                # ellipsis block                            
+            x_fbr_block = np.take(x_fbr, np.arange(k,k+nblock), axis = axis)
+            
+            block_bases = [None] + self.bases
+            block_bases[axis] = self.ellipsis_bases[i] 
+            
+            xq_block = nitrogen.dvr._to_quad(block_bases, x_fbr_block)
+            
+            xq = xq + xq_block
+            
+            for j in range(nellip_coord):
+                if self.D_ellipsis[i][j] is not None:
+                    dj_xq_block = dvrops.opO(xq_block, self.D_ellipsis[i][j], self.ellipsis_idx + 1)
+                    dxq_ellip[j] += dj_xq_block
+            
+            k += nblock 
+        
+        # xq contains the quadrature representation of the input function
+        # dxq_ellip[i] contains the quadrature representation of the derivative
+        # of the input function w.r.t. the i**th Ellipsis coordinate. 
+        # If that is inactive, then dxq_ellip[i] is 0 
+        
+        #########################
+        # Initialize yq, the quadrature representation of the
+        # result
+        #
+        yq = np.zeros_like(xq)
+        yq_block = [np.zeros_like(xq) for m in self.ellipsis_range] # A block-specific
+        #                                                    contribution
+        #
+        #########################
+        # Potential energy operator
+        #
+        if self.Vq is not None:
+            for r in range(NJ):
+                yq[r] += self.Vq * xq[r] 
+        #########################
+        
+        #########################
+        #
+        # Kinetic energy operator 
+        #
+        # First, parts *not* involving the Ellipsis
+        # basis will be handled
+        
+        # 1) Pure vibrational kinetic energy
+        #    Diagonal in rotational index
+        
+        nd = len(self.D) # The number of coordinates (including inactive)
+        for r in range(NJ):
+            # Rotational block `r`
+            lactive = 0
+            for l in range(nd):
+                # calculate dtilde_l acting on wavefunction,
+                # result in the quadrature representation 
+                
+                
+                if self.D[l] is None:
+                    continue # an in-active coordinate, no derivative to compute
+                
+                if self.axis_of_coord[l] == self.ellipsis_idx:
+                    dl_x = dxq_ellip[self.coord_k_is_ellip_coord[l]][r] # the derivative w.r.t. correct Ellipsis coordinate
+                else:
+                    # Apply the derivative matrix to the appropriate index
+                    dl_x = dvrops.opO(xq[r], self.D[l], self.axis_of_coord[l]) 
+                #
+                # dtilde_l is the sum of the derivative 
+                # and one-half Gammatilde_l
+                #
+                dtilde_l = dl_x + 0.5 * self.Gammatilde[lactive] * xq[r]
+                
+                
+                kactive = 0 
+                for k in range(nd):
+                    
+                    if self.D[k] is None:
+                        continue # inactive
+                    
+                    # Get the packed-storage index for 
+                    # G^{kactive, lactive}
+                    kl_idx = nitrogen.linalg.packed.IJ2k(kactive,lactive)
+                    Gkl = self.G[kl_idx]
+                    
+                    # Apply G^kl 
+                    Gkl_dl = Gkl * dtilde_l
+                    
+                    # Now finish with (dtilde_k)
+                    # and put results in quadrature representation
+                    #
+                    # include the final factor of -hbar**2 / 2
+                    yq[r] += hbar**2 * 0.25 * self.Gammatilde[kactive] * Gkl_dl 
+                    
+                    if self.axis_of_coord[k] == self.ellipsis_idx:
+                        # Ellipsis coordinate, this is block specific 
+                        for m in range(len(self.ellipsis_range)):
+                            # Result for m**th block
+                            Dk_op = self.D_ellipsis[m][self.coord_k_is_ellip_coord[k]] 
+                            # !!! This should be rechecked for complex basis functions!!!
+                            yq_block[m][r] += hbar**2 * 0.50 * dvrops.opO(Gkl_dl, Dk_op.T, self.axis_of_coord[k])
+                    else:
+                        yq[r] += hbar**2 * 0.50 * dvrops.opO(Gkl_dl, self.D[k].T, self.axis_of_coord[k]) 
+                    
+                    kactive += 1
+                    
+                lactive += 1
+        #      
+        if J > 0:
+            # Rotational and ro-vibrational terms are zero unless
+            # J > 0
+            #
+            # 2) Pure rotational kinetic energy
+            #
+            #  -hbar**2/4  *  [iJa/hbar, iJb/hbar]_+  *  G^ab 
+            #
+            for a in range(3):
+                for b in range(3):
+                    # Because both [iJa,iJb]_+ and G^ab
+                    # are symmetric with a <--> b, we only need 
+                    # to loop over half
+                    if (b > a):
+                        continue 
+                    if b == a:
+                        symfactor = 1.0  # on the diagonal, count once!
+                    else: # b < a 
+                        symfactor = 2.0  # count both (b,a) and (a,b)
+                    
+                    # G^ab term
+                    ab_idx = nitrogen.linalg.packed.IJ2k(nact + a, nact + b) 
+                    Gab = self.G[ab_idx] 
+                            
+                    for rp in range(NJ):
+                        for r in range(NJ):
+                            # <rp | ... | r > rotational block
+                            rot_me = self.iJiJ[a][b][rp,r] # the rotational matrix element
+                            
+                            if rot_me == 0:
+                                continue # a zero rotational matrix element
+                            
+                            # otherwise, add contribution from
+                            # effective inverse inertia tensor
+                            yq[rp] += (symfactor * rot_me * (-hbar**2) * 0.25) * (Gab * xq[r])
+                            
+            #
+            # 3) Rotation-vibration coupling
+            #
+            # -hbar**2 / 2 iJa/hbar * G^ak [psi' (dtildek psi) - (dtildek psi') psi]
+            
+            for a in range(3):
+                for rp in range(NJ):
+                    for r in range(NJ):
+                        rot_me = self.iJ[a][rp,r] # the rotational matrix element  
+                        if rot_me == 0:
+                            continue 
+                        
+                        kactive = 0 
+                        for k in range(nd):
+                            #
+                            # Vibrational coordinate k
+                            #
+                            if self.D[k] is None:
+                                continue # an in-active coordinate, no derivative to compute
+                            
+                            # calculate index of G^ak
+                            ak_idx = nitrogen.linalg.packed.IJ2k(nact + a, kactive)
+                            Gak = self.G[ak_idx] 
+                            
+                            # First, do the psi' (dtilde_k psi) term
+                            if self.axis_of_coord[k] == self.ellipsis_idx:
+                                dk_x = dxq_ellip[self.coord_k_is_ellip_coord[k]][r] # the derivative w.r.t. correct Ellipsis coordinate
+                            else:   
+                                dk_x = dvrops.opO(xq[r], self.D[k], self.axis_of_coord[k]) 
+                            dtilde_k = dk_x + 0.5 * self.Gammatilde[kactive] * xq[r]
+                            yq[rp] += (rot_me * (-hbar**2) * 0.50) * Gak * dtilde_k
+                            
+                            # Now, do the -(dtilde_k psi') * psi term
+                            yq[rp] += (rot_me * (+hbar**2) * 0.25) * self.Gammatilde[kactive] * Gak * xq[r] 
+                            
+                            if self.axis_of_coord[k] == self.ellipsis_idx:
+                                # Ellipsis coordinate, this is block specific 
+                                for m in range(len(self.ellipsis_range)):
+                                    # Result for m**th block
+                                    Dk_op = self.D_ellipsis[m][self.coord_k_is_ellip_coord[k]] 
+                                    # !!! This should be rechecked for complex basis functions!!!
+                                    yq_block[m][rp] += (rot_me * (+hbar**2) * 0.50) * dvrops.opO(Gak * xq[r], Dk_op.T, self.axis_of_coord[k])
+                            else:
+                                yq[rp] += (rot_me * (+hbar**2) * 0.50) * dvrops.opO(Gak * xq[r], self.D[k].T, self.axis_of_coord[k])
+                            
+                            kactive += 1
+        
+        #######################################################
+        #
+        # 4) Convert from the quadrature representation to the
+        # mixed DVR/FBR representation
+        y_fbr = 0
+        k = 0
+        y_fbr_blocks = []
+        axis = self.ellipsis_idx + 1
+        for i in range(len(self.ellipsis_range)):
+            nblock = self.size_of_ellipsis_m[i]
+            block_bases = [None] + self.bases
+            block_bases[axis] = self.ellipsis_bases[i]
+            # project the quadrature representation 
+            # to the i**th ellipsis basis
+            y_fbr_block = nitrogen.dvr._to_fbr(block_bases, yq) # Block independent contribution 
+            y_fbr_block += nitrogen.dvr._to_fbr(block_bases, yq_block[i]) # Block-specific contribution 
+            
+            y_fbr_blocks.append(y_fbr_block)
+        
+        y_fbr = np.concatenate(y_fbr_blocks, axis = axis)
+        
+        
+        #
+        # 5) Transform from mixed DVR/FBR representation
+        # to the multi-valued azimuthal representation
+        # (Steps 4 and 5 could be combined like 2 and 3.)
+        y_dp = nitrogen.dvr.ops.opTensorO(y_fbr, self.az_UH)
+        
+        # 6) Extract the singled-valued basis function 
+        # coefficients from the multi-valued azimuthal
+        # representation. This is the final working representation
+        #
+        #
+        y = (np.reshape(y_dp,(-1,)))[self.svm_1d] 
+        
+        return y
+    
+    
+    

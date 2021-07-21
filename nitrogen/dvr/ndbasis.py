@@ -175,7 +175,7 @@ class NDBasis:
         """ The default implemention of
         the quadrature to FBR transformation"""
         
-        U = self.bas # An (Nb, Nq) array 
+        U = self.bas.conj() # An (Nb, Nq) array 
         
         # Broadcast the wgt's
         shape = [1] * w.ndim 

@@ -506,9 +506,9 @@ def collectBasisD(bases):
             for i in range(b.nd):
                 # For each coordinate in the basis set
                 # 
-                quad2fbr = b.bas * np.sqrt(b.wgt)
+                quad2fbr = b.bas.conj() * np.sqrt(b.wgt)
                 dquad2fbr = dbas[:,i] * np.sqrt(b.wgt)
-                D.append(  dquad2fbr.T @ quad2fbr )       
+                D.append(  dquad2fbr.T @ quad2fbr )
         else:
             # an inactive coordinate, include None
             D.append(None)              

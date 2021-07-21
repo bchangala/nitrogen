@@ -170,7 +170,7 @@ class LegendreLMCos(dfun.DFun):
         """
         
         if lmax < abs(m):
-            return ValueError("lmax must be >= |m|")
+            raise ValueError("lmax must be >= |m|")
         
         l = np.arange(abs(m), lmax+1)
         
