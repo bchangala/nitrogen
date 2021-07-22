@@ -1677,18 +1677,6 @@ class AzimuthalLinear(LinearOperator):
     """
     A  Hamiltonian for linear molecules
     
-    notes
-    ------
-    azimuthal angles are declared with `azimuth`
-    [...,None, (0,-1) , (0,1), None, 1, 1, -1, None, ...]
-    one element for each *basis* entry
-     entry is (coord in this basis, scaling factor) 
-    
-    if angle is in radians
-    scaling factor should be +1, -1 for sense
-    if degrees, then scaling factor should be (180/pi, -180/pi) etc.
-    
-    
     """
     
     def __init__(self, bases, cs, azimuth, pes = None, masses = None, J = 0, hbar = None,

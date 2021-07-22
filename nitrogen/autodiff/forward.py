@@ -6,6 +6,48 @@ This module implements a simple forward accumulation
 model for automatic differentiation. Its main object
 is the ``adarray`` class.
 
+Mathematical functions implemented include
+
+==============================================   ====================================================
+**Arithmetic and powers**                        **Description**
+----------------------------------------------   ----------------------------------------------------
+:func:`~nitrogen.autodiff.forward.add`           Addition, :math:`x + y`.
+:func:`~nitrogen.autodiff.forward.subtract`      Subtraction, :math:`x - y`.
+:func:`~nitrogen.autodiff.forward.mul`           Multiplication, :math:`x * y`.
+:func:`~nitrogen.autodiff.forward.div`           Division, :math:`x/y`.
+:func:`~nitrogen.autodiff.forward.powi`          Integer powers, :math:`x^i`.
+:func:`~nitrogen.autodiff.forward.powf`          Real (or complex) powers, :math:`x^p`.
+:func:`~nitrogen.autodiff.forward.sqrt`          Square root, :math:`\\sqrt{x}`.
+==============================================   ====================================================
+
+==============================================   ====================================================
+**Trigometric and hyperbolic**                   **Description**
+----------------------------------------------   ----------------------------------------------------
+:func:`~nitrogen.autodiff.forward.sin`           Sine, :math:`\\sin(x)`.
+:func:`~nitrogen.autodiff.forward.cos`           Subtraction, :math:`\\cos(x)`.
+:func:`~nitrogen.autodiff.forward.asin`          Inverse sine, :math:`\\arcsin(x)`.
+:func:`~nitrogen.autodiff.forward.acos`          Inverse cosine, :math:`\\arccos(x)`.
+:func:`~nitrogen.autodiff.forward.sinh`          Hyperbolic sine, :math:`\\sinh(x)`.
+:func:`~nitrogen.autodiff.forward.cosh`          Hyperbolic cosine, :math:`\\cosh(x)`.
+:func:`~nitrogen.autodiff.forward.tanh`          Hyperbolic tangent, :math:`\\tanh(x)`.
+==============================================   ====================================================
+
+==============================================   ====================================================
+**Exponents and logarithms**                     **Description**
+----------------------------------------------   ----------------------------------------------------
+:func:`~nitrogen.autodiff.forward.exp`           Exponential, :math:`\\exp(x)`.
+:func:`~nitrogen.autodiff.forward.log`           Natural logarithm, :math:`\\log(x)`.
+==============================================   ====================================================
+
+==============================================   ====================================================
+**Linear algebra**                               **Description**
+----------------------------------------------   ----------------------------------------------------
+:func:`~nitrogen.autodiff.forward.chol_sp`       Cholesky decomposition (symmetric, packed).
+:func:`~nitrogen.autodiff.forward.int_tp`        Triangular matrix inverse (packed).
+:func:`~nitrogen.autodiff.forward.llt_tp`        :math:`L L^T` for triangular matrix (packed).
+:func:`~nitrogen.autodiff.forward.ltl_tp`        :math:`L^T L` for triangular matrix (packed).
+==============================================   ====================================================
+
 """
 
 import numpy as np
@@ -1337,6 +1379,91 @@ def cos(x, out=None):
             df[i] = -df[i-2]
                     
     return adchain(df, x, out = out)
+
+def asin(x, out = None):
+    """
+    Arcsine for :class:`adarray` objects.
+
+    Parameters
+    ----------
+    x : adarray
+        Input, :math:`x \\in [-1,1]`
+    out : adarray, optional
+        Output location of result. `out` must have the same
+        properties as x. If None, a new adarray is allocated and
+        returned.
+
+    Returns
+    -------
+    adarray
+        Result. The real part lies in :math:`[-\\pi/2, \\pi/2]`.
+        
+    Examples
+    --------
+    >>> x = adf.sym(0.35, 0, 3, 1)
+    >>> adf.asin(x).d
+    array([0.3575711 , 1.06752103, 0.21289593, 0.28767379])
+
+    """
+    
+    xval = x.d[:1] # Value array of x 
+    k = x.k 
+    
+    df = np.ndarray( (k+1,)+x.d.shape[1:], dtype = xval.dtype)
+    
+    df[0] = np.arcsin(xval) 
+    
+    #
+    # The first derivative of arcsin(x) is 1/sqrt(1-x^2)
+    #
+    # We'll construct this now 
+    #
+    y = sym(xval, 0, k, 1)
+    z = powf(1.0 - y*y, -0.5) 
+    # z.d contains the **scaled** derivatives of 1/sqrt(1-x^2) w.r.t. x
+    #
+    scale = 1.0 
+    for i in range(1, k+1):
+        df[i] = z.d[i-1] * scale 
+        scale *= i 
+        
+    return adchain(df, x, out = out) 
+
+def acos(x, out = None):
+    """
+    Arccosine for :class:`adarray` objects.
+
+    Parameters
+    ----------
+    x : adarray
+        Input, :math:`x \\in [-1,1]`
+    out : adarray, optional
+        Output location of result. `out` must have the same
+        properties as x. If None, a new adarray is allocated and
+        returned.
+
+    Returns
+    -------
+    adarray
+        Result. The real part lies in :math:`[0,\\pi]`.
+        
+    Examples
+    --------
+    >>> x = adf.sym(0.35, 0, 3, 1)
+    >>> adf.acos(x).d
+    array([ 1.21322522, -1.06752103, -0.21289593, -0.28767379])
+
+    """
+    
+    #
+    # arccos(x) = pi/2 - arcsin(x)
+    #
+    
+    out = asin(x, out = out)  # Put arcsin(x) into place
+    out.d *= -1               # Multiply by -1
+    out.d[0] += np.pi/2       # Add pi/2 to value
+    
+    return out
       
 def exp(x, out = None):
     """
