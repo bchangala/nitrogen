@@ -871,7 +871,7 @@ class RadialHO(dfun.DFun):
         """
         
         if nmax < 0:
-            return ValueError("nmax must be >= 0")
+            raise ValueError("nmax must be >= 0")
          
         super().__init__(self._Rr, nf = nmax + 1, nx = 1,
                          maxderiv = None, zlevel = None)

@@ -5,13 +5,13 @@ from .hoDVR import _hoDVR,_hoDVRwfs
 from .sincDVR import _sincDVR,_sincDVRwfs
 
 from .ndbasis import NDBasis, SinCosBasis, LegendreLMCosBasis, RealSphericalHBasis, \
-    Real2DHOBasis
+    Real2DHOBasis, RadialHOBasis
 
 import numpy as np 
 
 __all__ = ['DVR', 
            'NDBasis','SinCosBasis', 'LegendreLMCosBasis',
-           'RealSphericalHBasis','Real2DHOBasis']
+           'RealSphericalHBasis','Real2DHOBasis','RadialHOBasis']
 
 class DVR:
     """

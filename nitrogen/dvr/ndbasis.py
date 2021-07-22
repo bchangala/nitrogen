@@ -11,6 +11,7 @@ sub-classes.
 :class:`~nitrogen.dvr.LegendreLMCosBasis`      Associated Legendre polynomials.
 :class:`~nitrogen.dvr.RealSphericalHBasis`     Real spherical harmonics.
 :class:`~nitrogen.dvr.Real2DHOBasis`           Two-dimensional harmonic osc. basis.
+:class:`~nitrogen.dvr.RadialHOBasis`           Radial HO basis in d dimensions.
 =============================================  =================================
 
 """
@@ -99,16 +100,17 @@ class NDBasis:
         
         
         if qgrid.shape != (self.nd, self.Nq):
-            return ValueError("qgrid is the wrong size!")
+            raise ValueError("qgrid is the wrong size!")
         if wgtfun is not None:
             if wgtfun.nx != basisfun.nx or wgtfun.nf != 1 :
-                return ValueError("invalid wgtfun")
+                raise ValueError("invalid wgtfun")
         if wgt.shape != (self.Nq,):
-            return ValueError("wgt is the wrong size!")
+            raise ValueError("wgt is the wrong size!")
         
         # Calculate the `bas` grid
         self.bas = basisfun.val(qgrid)
         
+        return 
         
     
     def fbrToQuad(self, v, axis = 0):
@@ -307,7 +309,7 @@ class LegendreLMCosBasis(NDBasis):
             The maximum `l` index.
         Nq : int, optional
             The number of quadrature points. The default
-            is lmax + 1.
+            is 2*lmax + 1.
 
         """
         
@@ -318,7 +320,7 @@ class LegendreLMCosBasis(NDBasis):
         # Construct the quadrature grid
         # and weights.
         if Nq is None: 
-            Nq = lmax + 1 # default quadrature grid size
+            Nq = 2*lmax + 1 # default quadrature grid size
         
         x,w = scipy.special.roots_legendre(Nq)
         qgrid = np.flip( np.arccos(x) ).reshape((1,Nq))
@@ -381,7 +383,7 @@ class RealSphericalHBasis(NDBasis):
             The maximum :math:`\ell` quantum number.
         Ntheta : int, optional
             The number of quadrature points over :math:`\\theta`.
-            The default is `lmax` + 1.
+            The default is 2*`lmax` + 1.
         Nphi : int, optional
             The number of quadrature points over :math:`\\phi`.
             The default is 2(mmax+1).
@@ -395,7 +397,7 @@ class RealSphericalHBasis(NDBasis):
         # Construct the quadrature grid
         # and weights.
         if Ntheta is None: 
-            Ntheta = max(basisfun.l) + 1 # default quadrature grid size
+            Ntheta = 2*max(basisfun.l) + 1 # default quadrature grid size
         if Nphi is None:
             Nphi = 2*(max(abs(basisfun.m)) + 1) 
         
@@ -468,7 +470,7 @@ class Real2DHOBasis(NDBasis):
     
     def __init__(self, vmax, rmax, ell = None, Nr = None, Nphi = None):
         """
-        Create a RealSphericalH basis.
+        Create a Real2DHO basis.
 
         Parameters
         ----------
@@ -554,3 +556,74 @@ class Real2DHOBasis(NDBasis):
     # routine that takes advantage of the separability
     # of the basis functions.
     #
+    
+class RadialHOBasis(NDBasis):
+    
+    """
+    A radial basis for a harmonic oscillator in :math:`d` dimensions.
+    """
+    
+    def __init__(self, vmax, rmax, ell, d = 2, Nr = None):
+        """
+        Create a RadialHO basis.
+
+        Parameters
+        ----------
+        vmax : int 
+            The number of basis functions is vmax - ell + 1. This is *not*
+            the conventional vibrational quantum number.
+        rmax : float
+            The radial extent of the basis.
+        ell : scalar
+            The generalized angular momentum quantum number.
+        d : int
+            The dimension, :math:`d`.
+        Nr : int, optional
+            The number of quadrature points over :math:`r`.
+            The default is `vmax` + 1.
+
+        """
+
+        #
+        # Construct the quadrature grid
+        # and weights.
+        nmax = vmax - ell 
+        if Nr is None: 
+            Nr = 2*vmax + 1 # default quadrature grid size
+        # r grid 
+        
+        #
+        # For dimensionality d, we should use a radial
+        # quadrature built on Laguerre polynomials 
+        # of order nu = d/2 - 1, which is the order 
+        # corresponding to the lambda = 0 angular momentum
+        # series. (nu = lambda + d/2 - 1)
+        #
+        x,wx = scipy.special.roots_genlaguerre(Nr, d/2 - 1) 
+        alpha = max(x) / rmax**2  # Determine the alpha scaling parameter
+                                  # needed to place the last radial grid point
+                                  # at rmax 
+        r_grid = np.sqrt(x/alpha)
+        r_wgt =  np.exp(x) * wx/2.0 * (alpha)**(-d/2)
+        
+        qgrid = r_grid.reshape((1,Nr))
+        wgt = r_wgt.reshape((Nr,))
+        
+        #
+        # Now that we know the value of alpha, we can
+        # construct the basis DFun
+        basisfun = special.RadialHO( nmax, abs(ell), d, alpha)
+        
+        
+        # Volume element = r**(d-1)
+        super().__init__(basisfun, special.Monomial([d-1]), qgrid, wgt) 
+        
+        self.nmax = nmax            # The convention vibrational quantum number
+        self.ell = ell              # The angular momentum quantum number
+        self.rmax = rmax            # The radial extent
+        self.alpha = basisfun.alpha # The corresponding alpha scaling parameter
+        self.d = d                  # The dimension 
+        # (private attributes)
+        self._nr = Nr               # The number of radial quadrature points
+
+        return
