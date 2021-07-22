@@ -1935,7 +1935,7 @@ class AzimuthalLinear(LinearOperator):
             
         ################################################    
         # Evaluate quadrature grid quantities
-        bases_quad = bases
+        bases_quad = [b for b in bases]
         # Use one representative Ellipsis basis. These must
         # all have the same quadrature grid (or fixed value) anyway
         #
