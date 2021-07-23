@@ -864,6 +864,117 @@ class MergedDFun(DFun):
     def __repr__(self):
         return f"MergedDFun({self.dfuns!r})"
            
+class PermutedDFun(DFun):
+    """
+    Permute the input or output order of a DFun
+    
+    Attributes
+    ----------
+    
+    df : DFun
+        The original DFun
+    in_order : ndarray
+        The new input order 
+    out_order : ndarray
+        The new output order
+    
+    """
+    
+    def __init__(self, df, in_order = None, out_order = None):
+        """
+        
+
+        Parameters
+        ----------
+        df : DFun
+            A DFun object.
+        in_order : array_like of int, optional
+            The new input order. If None (default), the original
+            input order is used. For example, [2, 0, 1] moves
+            the third input first, the first input second, and the
+            second input last.
+        out_order : array_like of int, optional
+            The new output order. If None (default), the original
+            output order is used.        
+
+        """
+        
+        nx = df.nx 
+        nf = df.nf 
+        
+        if in_order is None:
+            in_order = np.arange(nx)
+        else:
+            in_order = np.array(in_order)
+            
+        if out_order is None:
+            out_order = np.arange(nf)
+        else:
+            out_order = np.array(out_order)
+            
+        if not np.all(np.sort(in_order) == np.arange(nx)):
+            raise ValueError('invalid in_order')
+        if not np.all(np.sort(out_order) == np.arange(nf)):
+            raise ValueError('invalid out_order') 
+        
+        
+        super().__init__(self._fpermute, nf, nx, df.maxderiv, df.zlevel)
+        
+        self.df = df
+        self.in_order = in_order
+        self.out_order = out_order 
+        
+        
+        # create the reverse direction in_order 
+        reverse_in = [None for i in range(nx)]
+        for i in range(nx):
+            reverse_in[in_order[i]] = i
+        
+        self._reverse_in = np.array(reverse_in)
+        
+        return
+
+    def _fpermute(self, X, deriv = 0, out = None, var = None):
+        
+        #
+        # X is in the input variables in the new order
+        # Permute them back to the old order first
+        #
+        X_old = X[self._reverse_in]
+        
+        #
+        # var is the requested variables refering to new
+        # input labels. Translate this to old input labels
+        #
+        if var is None:
+            var = [i for i in self.nx] 
+        
+        var_old = [self.in_order[v]  for v in var]
+        
+        # 
+        # Evaluate original dfun 
+        #
+        out_old = self.df.f(X_old, deriv = deriv, out = None, var = var_old) 
+        
+        #
+        # Finally, re-order the output values **in-place**
+        # 
+        
+        # Set up output
+        nd,nvar = ndnvar(deriv, var, self.nx)
+        if out is None:
+            base_shape = X.shape[1:]
+            out = np.ndarray( (nd, self.nf) + base_shape, dtype = X.dtype)
+            
+        # Copy old output to new order 
+        for i in range(nf):
+            iold = self.out_order[i]
+            np.copyto(out[i:(i+1)], out_old[iold:(iold+1)])
+            
+        return out 
+    
+    def __repr__(self):
+        return f"PermutedDFun({self.df!r}, in_order = {self.in_order!r}, out_order = {self.out_order!r})"
         
 class PolyFactor(DFun):
     
