@@ -947,7 +947,7 @@ class PermutedDFun(DFun):
         # input labels. Translate this to old input labels
         #
         if var is None:
-            var = [i for i in self.nx] 
+            var = [i for i in range(self.nx)]
         
         var_old = [self.in_order[v]  for v in var]
         
@@ -967,9 +967,9 @@ class PermutedDFun(DFun):
             out = np.ndarray( (nd, self.nf) + base_shape, dtype = X.dtype)
             
         # Copy old output to new order 
-        for i in range(nf):
+        for i in range(self.nf):
             iold = self.out_order[i]
-            np.copyto(out[i:(i+1)], out_old[iold:(iold+1)])
+            np.copyto(out[:,i], out_old[:,iold])
             
         return out 
     
