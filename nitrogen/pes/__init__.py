@@ -87,6 +87,10 @@ def curvVib(Q0, pes, cs, masses, mode = 'bodyframe'):
     omega = constants.hbar * np.sqrt(np.abs(w)) # Calculate harmonic energies
     omega[w < 0] = -omega[w < 0] # Imaginary frequencies will be flagged as negative
     
+    sort_idx = np.argsort(omega)
+    omega = omega[sort_idx]
+    U = U[:,sort_idx] 
+    
     # Calculate the normal coordinate transformation matrix
     # for the "dimensionless normal coordinates" which are
     # normalized as V = 0.5 * omega * q^2
