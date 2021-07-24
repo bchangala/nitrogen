@@ -14,8 +14,7 @@ class ZMAT(CoordSys):
     """
     Z-matrix coordinate system.
     
-    Angles are in *degrees*, not radians. (This is a
-    different convention than NITROGEN 1.x.)
+    Angles are in *degrees* by default, not radians. 
     
     Attributes
     ----------
@@ -23,10 +22,11 @@ class ZMAT(CoordSys):
         A Z-matrix string that reproduces this ZMAT.
     angles : {'deg','rad'}
         The units (degrees or radians) used for angular coordinates.
+    supplementary
         
     """
     
-    def __init__(self, zmatrix, angles = 'deg'):
+    def __init__(self, zmatrix, angles = 'deg', supplementary = False):
         """
         Create a new ZMAT CoordSys.
         
@@ -37,6 +37,8 @@ class ZMAT(CoordSys):
         angles : {'deg','rad'}
             Angles are interpreted as degrees ('deg') or radians ('rad').
             The default is 'deg'.
+        supplementary : bool, optional
+            Use supplementary angles. The default is False.
 
         """
         
@@ -74,6 +76,7 @@ class ZMAT(CoordSys):
         self._coordID = coordID          # CS coordinate ID for each ZMAT coordinate
         self.zmat = zmat                 # New uniformized z-matrix string
         self.angles = angles             # Angle unit ('deg' or 'rad')
+        self.supplementary = supplementary # Use supplementary angles
         
     def _zmat_q2x(self, Q, deriv = 0, out = None, var = None):
         """
@@ -152,6 +155,10 @@ class ZMAT(CoordSys):
                         Ci[j] = Ci[j] * (np.pi/180.0) # convert deg to rad
                     else:
                         raise ValueError("Invalid angle units")
+                
+                if j == 1 and self.supplementary:
+                    # Convert from supplementary to interior angle
+                    Ci[j] = np.pi - Ci[j]
             
             # Now calculate the position of atom i, A[i]
             #
@@ -249,7 +256,7 @@ class ZMAT(CoordSys):
         return out
     
     def __repr__(self):
-        return f'ZMAT({self.zmat!r})'
+        return f'ZMAT({self.zmat!r}, angles = {self.angles!r}, supplementary = {self.supplementary!r})'
     
 
     def diagram(self): 
