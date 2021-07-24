@@ -38,6 +38,9 @@ class SinCosDFun(dfun.DFun):
        f_m(\\phi) &= 1/\sqrt{\pi} \sin(|m|\phi) &\ldots m < 0\\\\
        &= 1/\sqrt{2\pi}              &\ldots m = 0\\\\
        &= 1/\sqrt{\pi} \cos(m \phi)  &\ldots m > 0 
+       
+    If degree units are used, then the functions are renomalized
+    over :math:`[0^\\circ, 360^\\circ]`.
              
     Attributes
     ----------
@@ -59,6 +62,8 @@ class SinCosDFun(dfun.DFun):
             If scalar, the :math:`2|m|+1` basis functions with
             index :math:`\leq |m|` will be included. If array_like,
             then `m` lists all m-indices to be included.
+        angle : {'rad', 'deg'}
+            The angle unit. The default is 'rad'. 
 
         """
         
@@ -333,6 +338,8 @@ class Sin(dfun.DFun):
             out = np.ndarray( (nd, self.nf) + base_shape, dtype = X.dtype)
             
         theta = X[0]
+        kfact = 1.0 
+        
         for k in range(nd):
             #
             # The k^th derivative order
@@ -346,7 +353,9 @@ class Sin(dfun.DFun):
             else: # k % 4 == 3
                 y = -np.cos(theta)   
                 
-            np.copyto(out[k,0:1], y)
+            np.copyto(out[k,0:1], y / kfact)
+            
+            kfact *= (k + 1.0) 
             
         return out 
     
