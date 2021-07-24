@@ -208,6 +208,8 @@ class SinCosBasis(NDBasis):
     
     m : ndarray
         The m quantum number of each basis function.
+    angle : {'rad', 'deg'}
+        The angular unit. 
         
     See Also
     --------
@@ -215,7 +217,7 @@ class SinCosBasis(NDBasis):
     
     """
     
-    def __init__(self, m = 10, Nq = None):
+    def __init__(self, m = 10, Nq = None, angle = 'rad'):
         """
         A real sine-cosine Fourier basis.
 
@@ -230,11 +232,16 @@ class SinCosBasis(NDBasis):
         Nq : int, optional
             The number of quadrature points. The default
             is 2*(max(abs(`m`)) + 1)
+        angle : {'rad', 'deg'}
+            The angular unit. The default is 'rad'. 
 
         """
         
         # Create a DFun for the basis functions
-        basisfun = special.SinCosDFun(m)
+        basisfun = special.SinCosDFun(m, angle = angle)
+        
+        if angle != 'rad' and angle != 'deg':
+            raise ValueError('unexpected angular unit') 
         
         #
         # Construct the quadrature grid
@@ -247,14 +254,19 @@ class SinCosBasis(NDBasis):
         if Nq is None: 
             # Nq = 2*(mmax + 1)
             Nq = 2 * (max(abs(basisfun.m)) + 1) 
-            
-        qgrid = np.linspace(0,2*np.pi,Nq+1)[:-1]
-        qgrid = qgrid.reshape((1,Nq))
-        wgt = np.full((Nq,), 2*np.pi / Nq)
         
+        if angle == 'rad':
+            qgrid = np.linspace(0,2*np.pi,Nq+1)[:-1]
+            wgt = np.full((Nq,), 2*np.pi / Nq)
+        else: # angle == 'deg'
+            qgrid = np.linspace(0, 360.0,Nq+1)[:-1]
+            wgt = np.full((Nq,), 360.0 / Nq) 
+        
+        qgrid = qgrid.reshape((1,Nq))
         super().__init__(basisfun, None, qgrid, wgt) 
         
         self.m = basisfun.m  # The m quantum number list
+        self.angle = angle
         
         # For now, we will use the default
         # FBR/grid transformation routine for
