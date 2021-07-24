@@ -98,6 +98,9 @@ class SinCosDFun(dfun.DFun):
         pi = np.pi
         norm = pi if self._rad else 180.0
         phi = X 
+        
+        kfact = 1.0 # Running value of k! 
+        
         for k in range(nd):
             #
             # The k^th derivative order
@@ -137,7 +140,10 @@ class SinCosDFun(dfun.DFun):
                         y = -m**k * np.cos(m * phi)
                     else: # k % 4 == 3
                         y = +m**k * np.sin(m * phi)
-                    np.copyto(out[k:(k+1),i],y / np.sqrt(norm))        
+                    np.copyto(out[k:(k+1),i],y / np.sqrt(norm))
+                    
+            out[k:(k+1)] /= kfact
+            kfact *= (k+1.0) # Update k! 
         
         return out
 
