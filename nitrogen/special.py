@@ -610,9 +610,11 @@ class BesselJ(dfun.DFun):
         # multiple times. But this is not that expensive anyway,
         # so don't worry about the efficiency issue.
         #
+        kfact = 1.0 
         for k in range(nd):
-            dk = scipy.special.jvp(self.v, x, n = k)
+            dk = scipy.special.jvp(self.v, x, n = k) / kfact
             np.copyto(out[k:(k+1),0], dk)
+            kfact *= (k + 1.0) 
         
         return out 
     
