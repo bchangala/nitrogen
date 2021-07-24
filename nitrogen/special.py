@@ -970,10 +970,12 @@ class Real2DHO(dfun.DFun):
         The initial `vmax` parameter.
     alpha : float
         The radial scaling parameter, :math:`\\alpha`.
+    angle : {'rad', 'deg'}
+        The angular unit. 
     
     """
     
-    def __init__(self, vmax, alpha, ell = None):
+    def __init__(self, vmax, alpha, ell = None, angle = 'rad'):
         """
         Create a 2D harmonic oscillator basis.
         
@@ -991,6 +993,8 @@ class Real2DHO(dfun.DFun):
             then `ell` lists all (signed) :math:`\\ell` values to be included.
             A value of None is equivalent to `ell` = `vmax`. The default is 
             None.
+        angle : {'rad', 'deg'}
+            The cylindrical angle unit. The default is 'rad'. 
 
         """
         
@@ -1033,14 +1037,11 @@ class Real2DHO(dfun.DFun):
         # Save the alpha scaling parameter
         self.alpha = alpha 
         
-        # # Set up DFun's for the radial basis and the 
-        # # polar angular basis as separable factors 
-        # self.phi_basis = SinCosDFun(ell) # only supplies functions for index in `ell`
-        # radial_bases = []
-        # for ELL in ell: # Radial HO basis for each ELL in `ell`
-        #     nmax = round(np.floor(vmax-abs(ELL))/2)
-        #     radial_bases.append(RadialHO(nmax, ELL, d = 2, alpha = self.alpha))
-        # self.radial_bases = radial_bases
+        if angle == 'rad' or angle == 'deg':
+            self.angle = angle 
+            self._rad = True if angle == 'rad' else False 
+        else:
+            raise ValueError('unexpected angle unit') 
         
         
         return 
@@ -1056,7 +1057,7 @@ class Real2DHO(dfun.DFun):
         # Make adf objects for theta and phi 
         x = dfun.X2adf(X, deriv, var)
         r = x[0]        # Cylindrical radius
-        phi = x[1]      # Angular coordinate
+        phi = x[1] if self._rad else x[1] * np.pi/180.0      # Angular coordinate
         
         #########################################
         #
@@ -1074,13 +1075,22 @@ class Real2DHO(dfun.DFun):
         # Calculate the phi factors, f_ell(phi)
         sig_ell_uni = np.unique(self.ell) # list of unique signed ell
         fell = []
-        for sELL in sig_ell_uni:
-            if sELL == 0:
-                fell.append(adf.const_like(1/np.sqrt(2*np.pi), phi))
-            elif sELL < 0:
-                fell.append(1/np.sqrt(np.pi) * adf.sin(abs(sELL) * phi))
-            else: #sELL > 0
-                fell.append(1/np.sqrt(np.pi) * adf.cos(sELL * phi))
+        if self._rad: # Normalization assuming radians
+            for sELL in sig_ell_uni:
+                if sELL == 0:
+                    fell.append(adf.const_like(1/np.sqrt(2*np.pi), phi))
+                elif sELL < 0:
+                    fell.append(1/np.sqrt(np.pi) * adf.sin(abs(sELL) * phi))
+                else: #sELL > 0
+                    fell.append(1/np.sqrt(np.pi) * adf.cos(sELL * phi))
+        else: # Normalization for degrees
+            for sELL in sig_ell_uni:
+                if sELL == 0:
+                    fell.append(adf.const_like(1/np.sqrt(360.00), phi))
+                elif sELL < 0:
+                    fell.append(1/np.sqrt(180.0) * adf.sin(abs(sELL) * phi))
+                else: #sELL > 0
+                    fell.append(1/np.sqrt(180.0) * adf.cos(sELL * phi))
         #
         ##############################################
         
