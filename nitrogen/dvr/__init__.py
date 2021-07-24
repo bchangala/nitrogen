@@ -33,7 +33,7 @@ def gridshape(dvrs):
     Parameters
     ----------
     dvrs : list
-        Each element is a DVR object or a fixed-value
+        Each element is a GenericDVR object or a fixed-value
         scalar.
         
 
@@ -48,7 +48,7 @@ def gridshape(dvrs):
     
     for i in range(len(dvrs)):
         
-        if isinstance(dvrs[i], dvr.DVR): 
+        if isinstance(dvrs[i], dvr.GenericDVR): 
             # Grid coordinate
             shape.append(dvrs[i].num)
         else:
@@ -68,7 +68,7 @@ def dvr2grid(dvrs):
     Parameters
     ----------
     dvrs : list
-        Each element is a DVR object or a fixed-value
+        Each element is a GenericDVR object or a fixed-value
         scalar.
         
     Returns
@@ -83,7 +83,7 @@ def dvr2grid(dvrs):
     
     for i in range(len(dvrs)):
         
-        if isinstance(dvrs[i], dvr.DVR): 
+        if isinstance(dvrs[i], dvr.GenericDVR): 
             # Grid coordinate
             grids.append(dvrs[i].grid)
             vshape.append(dvrs[i].num)
@@ -108,7 +108,7 @@ def bases2grid(bases):
     Parameters
     ----------
     bases : list
-        Each element is a DVR or NDBasis object or a 
+        Each element is a GenericDVR or NDBasis object or a 
         fixed-value scalar.
 
     Returns
@@ -126,7 +126,7 @@ def bases2grid(bases):
     
     for i,bas in enumerate(bases):
         
-        if isinstance(bas, dvr.DVR):
+        if isinstance(bas, dvr.GenericDVR):
             grids.append(bas.grid)
             qshape.append(bas.num)
             nq += 1
@@ -170,7 +170,7 @@ def plot(dvrs, fun, labels = None,
     Parameters
     ----------
     dvrs : list
-        List of DVRs or fixed-value scalars.
+        List of GenericDVRs or fixed-value scalars.
     fun : function or array
         If function, f(Q) evaluates the vectorized grid function.
         If an array, then fun is the same size of the return of
@@ -327,10 +327,10 @@ def transferDVR(grid_old, dvrs_old, dvrs_new):
         A grid of coefficients for the old DVR direct-product grid,
         with shape dvr2grid(dvrs_old).shape[1:]
     dvrs_old: list
-        A list of DVRs and/or scalar values. This is the original
+        A list of GenericDVRs and/or scalar values. This is the original
         set of grids defining `grid_old`.
     dvrs_new : list
-        A list of DVRS and/or scalar values. This defines the 
+        A list of GenericDVRS and/or scalar values. This defines the 
         new direct product grid. Scalar elements in `dvrs_new` 
         must occur at the same position in `dvrs_old`, but their
         values are ignored.
@@ -357,12 +357,12 @@ def transferDVR(grid_old, dvrs_old, dvrs_new):
     
     for i in range(nd):
         
-        if isinstance(dvrs_old[i], dvr.DVR): 
+        if isinstance(dvrs_old[i], dvr.GenericDVR): 
             # Grid coordinate
             grids_old.append(dvrs_old[i].grid)
             vshape_old.append(dvrs_old[i].num)
             
-            if not isinstance(dvrs_new[i], dvr.DVR):
+            if not isinstance(dvrs_new[i], dvr.GenericDVR):
                 raise TypeError("DVR vs. scalar mis-match")
             else:
                 grids_new.append(dvrs_new[i].grid)
@@ -460,7 +460,7 @@ def collectBasisD(bases):
     Parameters
     ----------
     bases : list
-        A list of DVR, NDBasis, or scalars.
+        A list of GenericDVR, NDBasis, or scalars.
 
     Returns
     -------
@@ -495,7 +495,7 @@ def collectBasisD(bases):
     #
     D = [] 
     for b in bases:
-        if isinstance(b, dvr.DVR):
+        if isinstance(b, dvr.GenericDVR):
             D.append(b.D) 
         elif isinstance(b, dvr.NDBasis):
             # Evaluate the derivative of the basis functions
@@ -541,7 +541,7 @@ def calcRhoLogD(bases, Q):
     rhotilde = [] 
     k = 0
     for b in bases: #
-        if isinstance(b, dvr.DVR):
+        if isinstance(b, dvr.GenericDVR):
             # All DVR objects have unit weight function,
             # rho = 1.
             # So rhotilde_k = 0

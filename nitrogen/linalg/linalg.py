@@ -4,7 +4,8 @@ from scipy.sparse.linalg import aslinearoperator
 import scipy.fft 
 
 __all__ = ['eigstrp','aslinearoperator','bounds',
-           'chebauto', 'chebspec', 'chebwindow']
+           'chebauto', 'chebspec', 'chebwindow',
+           'full']
 
 def eigstrp(H, k = 5, pad = 10, tol = 1e-10, maxiter = None, v0 = None,
             rper = 20, P = None, pper = 1, printlevel = 0, eigval = 'smallest'):
@@ -83,6 +84,11 @@ def eigstrp(H, k = 5, pad = 10, tol = 1e-10, maxiter = None, v0 = None,
         raise NotImplementedError("Projection not yet supported.")
         vtype = np.result_type(H.dtype, P.dtype)
     
+    if printlevel >= 1:
+        print("--------------------------------")
+        print(" Starting thick-restart Lanczos ")
+        print("--------------------------------")
+    
     # Initialize starting vector v0
     if v0 is None:
         v0 = np.random.rand(n).astype(vtype)
@@ -116,7 +122,7 @@ def eigstrp(H, k = 5, pad = 10, tol = 1e-10, maxiter = None, v0 = None,
         alpha = np.real(np.vdot(w, L[:,i]))  # Force real (should be anyway)
         T[i,i] = alpha
         if i > 0:
-            beta = np.real( np.vdot(w, L[:,i-1]) ) # !!! check that this is really real 
+            beta = np.real( np.vdot(w, L[:,i-1]) ) # Force real (should be anyway)
             T[i,i-1] = beta
             T[i-1,i] = beta
         
@@ -666,3 +672,21 @@ def chebspec(H, K, v0 = None, window = 'gaussian', window_scale = 1.0,
     
     return np.flip(E), np.flip(G), np.flip(fwhm), C
     
+def full(H):
+    """
+    Return the full matrix of a LinearOperator
+
+    Parameters
+    ----------
+    H : LinearOperator
+        A matrix operator in LinearOperator form.
+
+    Returns
+    -------
+    Hfull : ndarray
+        The full, dense matrix.
+
+    """
+    
+    n = H.shape[0] # the matrix rank
+    return H.matmat(np.eye(n))

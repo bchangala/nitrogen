@@ -7,7 +7,7 @@ Hamiltonian construction routines.
 """
 
 import numpy as np
-from nitrogen.dvr import DVR
+from nitrogen.dvr import GenericDVR
 from nitrogen.dvr import NDBasis
 import nitrogen.dvr.ops as dvrops
 from nitrogen.dfun import sym2invdet
@@ -24,8 +24,8 @@ def hdpdvr_bfJ(dvrs, cs, pes, masses, Jlist = 0, Vmax = None, Vmin = None):
 
     Parameters
     ----------
-    dvrs : list of DVR objects and scalars
-        A list of :class:`nitrogen.dvr.DVR` basis set objects or
+    dvrs : list of GenericDVR objects and scalars
+        A list of :class:`nitrogen.dvr.GenericDVR` basis set objects or
         scalar numbers. The length of the list must be equal to
         the number of coordinates in `cs`. Scalar elements indicate
         a fixed value for that coordinate.
@@ -68,7 +68,12 @@ def hdpdvr_bfJ(dvrs, cs, pes, masses, Jlist = 0, Vmax = None, Vmin = None):
     
     for i in range(len(dvrs)):
         
-        if isinstance(dvrs[i], DVR): 
+        if np.isscalar(dvrs[i]):
+            grids.append(dvrs[i]) # scalar value
+            vshape.append(1)
+            Dlist.append(None)
+        else:
+            # Assume GenericDVR
             # Active coordinate
             vvar.append(i)
             grids.append(dvrs[i].grid)
@@ -76,11 +81,7 @@ def hdpdvr_bfJ(dvrs, cs, pes, masses, Jlist = 0, Vmax = None, Vmin = None):
             vshape.append(ni)
             NV *= ni
             Dlist.append(dvrs[i].D)
-        else:
-            # Inactive coordinate
-            grids.append(dvrs[i]) # scalar value
-            vshape.append(1)
-            Dlist.append(None)
+
             
     vshape = tuple(vshape)
     # To summarize:
@@ -256,8 +257,8 @@ class DirProdDvrCartN(LinearOperator):
 
         Parameters
         ----------
-        dvrs : list of DVR objects and/or scalars
-            A list of :class:`nitrogen.dvr.DVR` objects and/or
+        dvrs : list of GenericDVR objects and/or scalars
+            A list of :class:`nitrogen.dvr.GenericDVR` objects and/or
             scalar numbers. The length of the list must be equal to
             the number of coordinates, `nx`. Scalar elements indicate
             a fixed value for that coordinate.
@@ -301,7 +302,7 @@ class DirProdDvrCartN(LinearOperator):
                 grids.append(dvrs[i])
                 vshape.append(1)
                 D2list.append(None) 
-            else: # active, assume DVR object
+            else: # active, assume GenericDVR object
                 vvar.append(i)
                 grids.append(dvrs[i].grid)
                 ni = dvrs[i].num # length of this dimension 
@@ -406,8 +407,8 @@ class DirProdDvrCartNQD(LinearOperator):
         
         Parameters
         ----------
-        dvrs : list of DVR objects and/or scalars
-            A list of :class:`nitrogen.dvr.DVR` objects and/or
+        dvrs : list of GenericDVR objects and/or scalars
+            A list of :class:`nitrogen.dvr.GenericDVR` objects and/or
             scalar numbers. The length of the list must be equal to
             the number of coordinates, `nx`. Scalar elements indicate
             a fixed value for that coordinate.
@@ -710,7 +711,7 @@ class GeneralSpaceFixed(LinearOperator):
         Parameters
         ----------
         bases : list
-            A list of :class:`~nitrogen.dvr.DVR` or
+            A list of :class:`~nitrogen.dvr.GenericDVR` or
             :class:`~nitrogen.dvr.NDBasis` basis sets for active
             coordinates. Scalar elements will constrain the 
             corresponding coordinate to that fixed value.
@@ -784,7 +785,7 @@ class GeneralSpaceFixed(LinearOperator):
         vvar = []  # The ordered list of active coordinates 
         k = 0
         for ax,b in enumerate(bases):
-            if isinstance(b, DVR): # A DVR basis is one-dimensional
+            if isinstance(b, GenericDVR): # A DVR basis is one-dimensional
                 vvar.append(k)
                 fbr_shape.append(b.num)
                 NH *= b.num 
@@ -985,7 +986,7 @@ class Collinear(LinearOperator):
         Parameters
         ----------
         bases : list
-            A list of :class:`~nitrogen.dvr.DVR` or
+            A list of :class:`~nitrogen.dvr.GenericDVR` or
             :class:`~nitrogen.dvr.NDBasis` basis sets for active
             coordinates. Scalar elements will constrain the 
             corresponding coordinate to that fixed value.
@@ -1066,7 +1067,7 @@ class Collinear(LinearOperator):
         vvar = []  # The ordered list of active coordinates 
         k = 0
         for ax,b in enumerate(bases):
-            if isinstance(b, DVR): # A DVR basis is one-dimensional
+            if isinstance(b, GenericDVR): # A DVR basis is one-dimensional
                 vvar.append(k)
                 fbr_shape.append(b.num)
                 NH *= b.num 
@@ -1307,7 +1308,7 @@ class NonLinear(LinearOperator):
         Parameters
         ----------
         bases : list
-            A list of :class:`~nitrogen.dvr.DVR` or
+            A list of :class:`~nitrogen.dvr.GenericDVR` or
             :class:`~nitrogen.dvr.NDBasis` basis sets for active
             coordinates. Scalar elements will constrain the 
             corresponding coordinate to that fixed value.
@@ -1390,7 +1391,7 @@ class NonLinear(LinearOperator):
         vvar = []  # The ordered list of active coordinates 
         k = 0
         for ax,b in enumerate(bases):
-            if isinstance(b, DVR): # A DVR basis is one-dimensional
+            if isinstance(b, GenericDVR): # A DVR basis is one-dimensional
                 vvar.append(k)
                 fbr_shape.append(b.num)
                 NV *= b.num 
@@ -1826,11 +1827,11 @@ class AzimuthalLinear(LinearOperator):
                 if bfirst != ellipsis_bases[i]:
                     raise ValueError("For scalar Ellipsis basis, all values must be equal.")
                 size_of_ellipsis_m.append(1)
-        elif isinstance(bfirst, nitrogen.dvr.DVR):
+        elif isinstance(bfirst, nitrogen.dvr.GenericDVR):
             # A DVR
             for i in  range(len(ellipsis_bases)):
-                if bfirst.basis != ellipsis_bases[i].basis:
-                    raise ValueError("All Ellipsis bases must have the same DVR basis type.")
+                if not np.all(bfirst.D == ellipsis_bases[i].D):
+                    raise ValueError("All Ellipsis bases must have the same D operator.")
                 if not np.all(bfirst.grid == ellipsis_bases[i].grid):
                     raise ValueError("All Ellipsis bases must have the same DVR grid.")
                 size_of_ellipsis_m.append(ellipsis_bases[i].num)
@@ -1876,7 +1877,7 @@ class AzimuthalLinear(LinearOperator):
             # The ellipsis bases are treated differently 
             if ax == ellipsis_idx: 
                 b = bfirst 
-                if isinstance(b, DVR): # A DVR basis is one-dimensional
+                if isinstance(b, GenericDVR): # A DVR basis is one-dimensional
                     vvar.append(k)
                     #fbr_shape.append(b.num)
                     #NV *= b.num 
@@ -1902,7 +1903,7 @@ class AzimuthalLinear(LinearOperator):
                 #
                 # A normal basis factor
                 #
-                if isinstance(b, DVR): # A DVR basis is one-dimensional
+                if isinstance(b, GenericDVR): # A DVR basis is one-dimensional
                     vvar.append(k)
                     fbr_shape.append(b.num)
                     NV *= b.num 

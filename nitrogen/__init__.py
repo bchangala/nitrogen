@@ -85,4 +85,40 @@ def X2xyz(X, elements, filename = "out.xyz", comment = None):
                 file.write(f"{e:s}   {x:.15f} {y:.15f} {z:.15f} \n")
     # Done
     return 
-    
+
+def podvr(prim_dvr, npo, i, qref, cs, pes_fun, masses):
+    """
+    Construct a potential-optimized contracted DVR based on the
+    contrained body-fixed Hamiltonian.
+
+    Parameters
+    ----------
+    prim_dvr : GenericDVR
+        The primitive DVR.
+    npo : int
+        The number of contracted functions
+    i : int
+        The coordinate index to contract (w.r.t. `cs` and `qref` ordering).
+    qref : list of float
+        The reference geometry.
+    cs : CoordSys
+        The coordinate system.
+    pes_fun : DFun or function
+        The potential energy function
+    masses : list of float
+        The masses for the coordinate system.
+
+    Returns
+    -------
+    Contracted
+        A contracted DVR object.
+
+    """
+        
+    # Construct POs
+    dvrs = [a for a in qref]
+    dvrs[i] = prim_dvr 
+    h1 = ham.hdpdvr_bfJ(dvrs, cs, pes_fun, masses, Jlist = 0)
+    w,u = np.linalg.eigh(linalg.full(h1))
+
+    return dvrs[i].contract(u[:,:npo])

@@ -9,13 +9,103 @@ from .ndbasis import NDBasis, SinCosBasis, LegendreLMCosBasis, RealSphericalHBas
 
 import numpy as np 
 
-__all__ = ['DVR', 
+__all__ = ['GenericDVR','SimpleDVR', 
            'NDBasis','SinCosBasis', 'LegendreLMCosBasis',
            'RealSphericalHBasis','Real2DHOBasis','RadialHOBasis']
 
-class DVR:
+
+class GenericDVR:
     """
-    A 1D DVR basis class
+    A super-class for generic 1D DVRs.
+    
+    Attributes
+    ----------
+    num : int
+        The number of DVR grid points
+    grid : ndarray
+        The DVR grid points
+    D : ndarray
+        First derivative operator.
+    D2 : ndarray
+        Second derivative operator. 
+    
+    """
+    
+    def __init__(self, grid, D, D2):
+        
+        if grid.ndim != 1:
+            raise ValueError('grid must be 1-dimensional')
+        
+        num = len(grid) 
+        
+        if D.ndim != 2 or D.shape[0] != num or D.shape[1] != num:
+            raise ValueError('D must be (num,num) array')
+            
+        if D2.ndim != 2 or D2.shape[0] != num or D2.shape[1] != num:
+            raise ValueError('D2 must be (num,num) array')
+        
+        self.num = len(grid)
+        self.grid = grid 
+        self.D = D
+        self.D2 = D2
+        
+        return 
+    
+    def wfs(self, q):
+        """
+        Evaluate DVR basis wavefunctions.
+
+        Parameters
+        ----------
+        q : ndarray
+            A 1-D array of coordinate values.
+
+        Returns
+        -------
+        wfs : ndarray
+            An array of shape (`q`.size, :attr:`num`) containing
+            the values of the DVR wavefunctions evaluated at 
+            coordinate values `q`.
+
+        """
+        return self._wfs(q) 
+        
+    def _wfs(self, q):
+        
+        raise NotImplementedError("")
+    
+    def matchfun(self, f):
+        """
+        Calculate DVR coefficients to match a function at 
+        DVR grid points.
+
+        Parameters
+        ----------
+        f : function
+            The function to be matched.
+
+        Returns
+        -------
+        coeff : ndarray
+            A (`num`,1) array with the DVR basis function coefficients.
+
+        """
+        
+        # Calculate the values of the DVR basis functions
+        # at their respective grid-points
+        wgts = np.diag(self.wfs(self.grid))
+        
+        coeffs = (f(self.grid) / wgts).reshape((self.num,1))
+        
+        return coeffs 
+    
+    def contract(self, u):
+        return Contracted(u, self)
+
+
+class SimpleDVR(GenericDVR):
+    """
+    Simple, standard 1D DVRs.
     
     Attributes
     ----------
@@ -23,16 +113,8 @@ class DVR:
         The DVR grid starting value.
     stop : float
         The DVR grid stopping value.
-    num : int
-        The number of DVR grid points.
     basis : {'sinc','ho','fourier', 'legendre'}
         The DVR basis type.
-    grid : ndarray
-        The DVR grid points.
-    D : ndarray
-        First derivative operator in DVR representation.
-    D2 : ndarray
-        Second derivative operator in DVR representation.
     
     """
     
@@ -58,74 +140,90 @@ class DVR:
         if num < 2 :
             raise ValueError("num must be >= 2")
         
-        self.start = start 
-        self.stop = stop 
-        self.num = num 
-        self.basis = basis.lower()
+
+        basis = basis.lower()
         
-        if self.basis == 'sinc' : 
-            self.grid, self.D, self.D2 = _sincDVR(start, stop, num)
-            self.wfs = lambda q : _sincDVRwfs(q, self.start, self.stop, self.num)
-        elif self.basis == 'ho' : 
-            self.grid, self.D, self.D2 = _hoDVR(start, stop, num)
-            self.wfs = lambda q : _hoDVRwfs(q, self.start, self.stop, self.num)
-        elif self.basis == 'fourier' : 
-            self.grid, self.D, self.D2 = _fourDVR(start, stop, num)
-            self.wfs = lambda q : _fourDVRwfs(q, self.start, self.stop, self.num)
-        elif self.basis == 'legendre' : 
-            self.grid, self.D, self.D2 = _legDVR(start, stop, num)
-            self.wfs = lambda q : _legDVRwfs(q, self.start, self.stop, self.num)
+        if basis == 'sinc' : 
+            grid, D, D2 = _sincDVR(start, stop, num)
+            _wfs_fun = lambda q : _sincDVRwfs(q, start, stop, num)
+        elif basis == 'ho' : 
+            grid, D, D2 = _hoDVR(start, stop, num)
+            _wfs_fun = lambda q : _hoDVRwfs(q, start, stop, num)
+        elif basis == 'fourier' : 
+            grid, D, D2 = _fourDVR(start, stop, num)
+            _wfs_fun = lambda q : _fourDVRwfs(q, start, stop, num)
+        elif basis == 'legendre' : 
+            grid, D, D2 = _legDVR(start, stop, num)
+            _wfs_fun = lambda q : _legDVRwfs(q, start, stop, num)
         else:
             raise ValueError("basis type '{}' not recognized".format(basis))
-    
-    
-    def wfs(self, q):
-        """
-        Evaluate DVR basis wavefunctions.
-
-        Parameters
-        ----------
-        q : ndarray
-            A 1-D array of coordinate values.
-
-        Returns
-        -------
-        wfs : ndarray
-            An array of shape (`q`.size, :attr:`num`) containing
-            the values of the DVR wavefunctions evaluated at 
-            coordinate values `q`.
-
-        """
-        pass # This should be replaced by an instance method for a given DVR basis type
             
+        super().__init__(grid, D, D2)
 
-
-    def matchfun(self, f):
+        self.basis = basis
+        self.start = start 
+        self.stop = stop 
+        
+        self._wfs_fun = _wfs_fun
+        
+    def _wfs(self, q):
+        
+        return self._wfs_fun(q)
+        
+    
+class Contracted(GenericDVR):
+    """
+    A contracted basis DVR class (usually for PO-DVRs).
+    
+    Attributes
+    ----------
+    prim_dvr : GenericDVR
+        The primitive basis
+    W : ndarray
+        The transformation matrix from the contracted DVR
+        to the primitive DVR 
+    
+    """
+    
+    def __init__(self, U, prim_dvr):
         """
-        Calculate DVR coefficients to match a function at 
-        DVR grid points.
+        
 
         Parameters
         ----------
-        f : function
-            The function to be matched.
+        U : (n,m) ndarray
+            A unitary operator defining the contracted basis.
+            `n` is the size of the primitive basis. 
+            `m` is the size of the contracted basis. 
+        prim_dvr : GenericDVR
+            The primitive DVR
 
-        Returns
-        -------
-        coeff : ndarray
-            A (`num`,1) array with the DVR basis function coefficients.
 
         """
         
-        # Calculate the values of the DVR basis functions
-        # at their respective grid-points
-        wgts = np.diag(self.wfs(self.grid))
+        #
+        # Construct the coordinate operator in the 
+        # contracted basis 
+        Q = (U.conj().T * prim_dvr.grid) @ U 
+        q,u = np.linalg.eigh(Q)   # u takes a vector from the new DVR 
+                                  # to the contracted "fbr"
         
-        coeffs = (f(self.grid) / wgts).reshape((self.num,1))
+        q = np.reshape(q, (-1,))  # The new DVR grid 
         
-        return coeffs 
-
-
-
+        W = U @ u # w takes a vector from the new DVR to the old DVR 
+        
+        d = W.conj().T @ prim_dvr.D @ W
+        d2 = W.conj().T @ prim_dvr.D2 @ W
+        
+        super().__init__(q, d, d2) 
+        
+        self.prim_dvr = prim_dvr 
+        self.W = W 
     
+    def _wfs(self, q):
+        
+        f = self.prim_dvr.wfs(q) # f is (q.size, primitive num)
     
+        return f @ self.W 
+    
+        
