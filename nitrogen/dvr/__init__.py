@@ -558,7 +558,6 @@ def calcRhoLogD(bases, Q):
             # the coordinates belonging to this basis 
             # set as arguments
             #
-            rho = b.wgtfun.f(Q[k:(k+b.nd)], deriv = 1) 
             # Note: using the *entire* quadrature grid is a big 
             # waste of effort because most of the arrays are the same value
             # One could slice-out the necessary coordinates and then
@@ -566,10 +565,17 @@ def calcRhoLogD(bases, Q):
             # but wgtfun is usually a simple, inexpensive function
             # so this is not a bottle-neck.
             #
-            for i in range(b.nd): # for each coordinate in the basis
-                rhoi = rho[i+1][0] / rho[0][0] # calculate log. deriv.
-                rhotilde.append(rhoi) 
-                k += 1            
+            if b.wgtfun is not None: 
+                rho = b.wgtfun.f(Q[k:(k+b.nd)], deriv = 1) 
+                for i in range(b.nd): # for each coordinate in the basis
+                    rhoi = rho[i+1][0] / rho[0][0] # calculate log. deriv.
+                    rhotilde.append(rhoi) 
+                    k += 1       
+            else:
+                # If wgtfun is None, then the weight function is unity
+                for i in range(b.nd):
+                    rhotilde.append(np.zeros(Q.shape[1:]))
+                    k += 1 
         else:
             # inactive coordinate; no entry in rhotilde.
             k += 1 
