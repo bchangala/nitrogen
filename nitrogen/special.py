@@ -44,10 +44,12 @@ class SinCosDFun(dfun.DFun):
     
     m : ndarray
         The m-index of each basis function (i.e. each output value).
+    angle : {'rad', 'deg'}
+        The angular units.
              
     """
     
-    def __init__(self, m):
+    def __init__(self, m, angle = 'rad'):
         """
         Create sine-cosine basis functions.
 
@@ -67,11 +69,20 @@ class SinCosDFun(dfun.DFun):
             m = np.arange(-abs(m), abs(m)+1)
         else:
             m = np.array(m)
+            
+        if angle == 'rad':
+            rad = True
+        elif angle == 'deg':
+            rad = False
+        else:
+            raise ValueError('unexpected value of angle')
         
         super().__init__(self._fphi, nf = len(m), nx = 1,
                          maxderiv = None, zlevel = None)
         
         self.m = m 
+        self._rad = rad 
+        self.angle = angle 
         
         return 
     
@@ -85,6 +96,7 @@ class SinCosDFun(dfun.DFun):
             out = np.ndarray( (nd, self.nf) + base_shape, dtype = X.dtype)
             
         pi = np.pi
+        norm = pi if self._rad else 180.0
         phi = X 
         for k in range(nd):
             #
@@ -94,25 +106,29 @@ class SinCosDFun(dfun.DFun):
                 m = self.m[i] # The m-index of the basis function
                 if m < 0:
                     # 1/sqrt(pi) * sin(|m| * phi) 
+                    
+                    m = abs(m) if self._rad else abs(m) * pi/180.0 
+                    
                     if k % 4 == 0:
-                        y = +abs(m)**k * np.sin(abs(m) * phi)
+                        y = +m**k * np.sin(m * phi)
                     elif k % 4 == 1:
-                        y = +abs(m)**k * np.cos(abs(m) * phi)
+                        y = +m**k * np.cos(m * phi)
                     elif k % 4 == 2:
-                        y = -abs(m)**k * np.sin(abs(m) * phi)
+                        y = -m**k * np.sin(m * phi)
                     else: # k % 4 == 3
-                        y = -abs(m)**k * np.cos(abs(m) * phi)
-                    np.copyto(out[k:(k+1),i],y / np.sqrt(pi))
+                        y = -m**k * np.cos(m * phi)
+                    np.copyto(out[k:(k+1),i],y / np.sqrt(norm))
                               
                 elif m == 0:
                     # 1/sqrt(2*pi)
                     if k == 0: # Zeroth derivative
-                        out[0:1,i].fill(1.0 / np.sqrt(2*pi))
+                        out[0:1,i].fill(1.0 / np.sqrt(2*norm))
                     if k > 0 : # All higher derivatives
                         out[k:(k+1),i].fill(0.0)
                         
                 elif m > 0 :
                     # 1/sqrt(pi) * cos(m * phi) 
+                    m = m if self._rad else m * pi/180.0 
                     if k % 4 == 0:
                         y = +m**k * np.cos(m * phi)
                     elif k % 4 == 1:
@@ -121,9 +137,9 @@ class SinCosDFun(dfun.DFun):
                         y = -m**k * np.cos(m * phi)
                     else: # k % 4 == 3
                         y = +m**k * np.sin(m * phi)
-                    np.copyto(out[k:(k+1),i],y / np.sqrt(pi))        
+                    np.copyto(out[k:(k+1),i],y / np.sqrt(norm))        
         
-        return out 
+        return out
 
 
 class LegendreLMCos(dfun.DFun):  
