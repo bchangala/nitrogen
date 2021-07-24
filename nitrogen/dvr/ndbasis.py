@@ -470,6 +470,8 @@ class Real2DHOBasis(NDBasis):
     alpha : float
         The radial scaling parameter, :math:`\\alpha`, 
         corresponding to radial extent `R`.
+    angle : {'rad', 'deg'}
+        The angular units. 
         
     See Also
     --------
@@ -480,7 +482,7 @@ class Real2DHOBasis(NDBasis):
     
     """
     
-    def __init__(self, vmax, rmax, ell = None, Nr = None, Nphi = None):
+    def __init__(self, vmax, rmax, ell = None, Nr = None, Nphi = None, angle = 'rad'):
         """
         Create a Real2DHO basis.
 
@@ -504,6 +506,8 @@ class Real2DHOBasis(NDBasis):
         Nphi : int, optional
             The number of quadrature points over :math:`\\phi`.
             The default is :math:`2(\\ell_{max} + 1)`.
+        angle : {'rad', 'deg'} 
+            The angular unit. The default is 'rad'. 
 
         """
 
@@ -531,7 +535,7 @@ class Real2DHOBasis(NDBasis):
         #
         # Now that we know the value of alpha, we can
         # construct the basis DFun
-        basisfun = special.Real2DHO(vmax, alpha, ell)
+        basisfun = special.Real2DHO(vmax, alpha, ell, angle = angle)
         
         # Now that we have the basis set set up, 
         # we know what the maximum ell value is.
@@ -539,8 +543,12 @@ class Real2DHOBasis(NDBasis):
         if Nphi is None:
             Nphi = 2*(max(abs(basisfun.ell)) + 1) 
         # Calculate the phi quadrature grid
-        phi_grid = np.linspace(0,2*np.pi,Nphi+1)[:-1].reshape((1,Nphi))
-        phi_wgt = np.full((Nphi,), 2*np.pi / Nphi)
+        if angle == 'rad':
+            phi_grid = np.linspace(0,2*np.pi,Nphi+1)[:-1].reshape((1,Nphi))
+            phi_wgt = np.full((Nphi,), 2*np.pi / Nphi)
+        else: # angle == 'deg'
+            phi_grid = np.linspace(0, 360.0, Nphi+1)[:-1].reshape((1,Nphi))
+            phi_wgt = np.full((Nphi,), 360.0 / Nphi)
         # Combine the two grids
         qgrid = np.stack(np.meshgrid(r_grid, phi_grid, indexing = 'ij'))
         qgrid = qgrid.reshape((2,Nr*Nphi)) # (nd, Nq)
@@ -556,6 +564,7 @@ class Real2DHOBasis(NDBasis):
         self.n = basisfun.n         # The Laguerre index: v = 2*n + ell
         self.rmax = rmax            # The radial extent
         self.alpha = basisfun.alpha # The corresponding alpha scaling parameter
+        self.angle = angle          # The angular units
         # (private attributes)
         self._nr = Nr               # The number of radial quadrature points
         self._nphi = Nphi           # The number of angular quadrature points
