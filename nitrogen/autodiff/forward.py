@@ -782,19 +782,27 @@ def mvleibniz(X, Y, k, ni, nck, idx, out=None, Xzlevel = None, Yzlevel = None):
    
     nd,_ = idx.shape
     
+    #
+    # Sum through all derivatives of X and Y
+    # For each pair, accumulate the result 
+    # into the appropriate derivative of Z 
+    #
+    # Derivatives are ordered with lower degrees
+    # first.
+    
     for iX in range(nd):
-        idxX = idx[iX,:]
-        kX = np.sum(idxX)
+        idxX = idx[iX,:]   # The derivative index of X
+        kX = np.sum(idxX)  # The derivative degree
         if kX > Xzlevel:
             break # Skip remaining X derivatives. They are zero.
         
         for iY in range(nd):
-            idxY = idx[iY,:]
-            kY = np.sum(idxY)
+            idxY = idx[iY,:]  # The derivative index of Y
+            kY = np.sum(idxY) # The derivative degree 
             if kY > Yzlevel:
                 break # Skip remaining Y derivatives. They are zero.
             
-            kZ = kX + kY
+            kZ = kX + kY   # The product's degree
             if kZ > k: # Total degree of this term is too high
                 break # Skip remaining Y derivatives
             
@@ -2373,3 +2381,48 @@ def _ltl_tp_unblocked(L):
                
 
     return L
+
+
+def cost(k,ni, quiet = False ):
+    """
+    Estimate the cost of adarray operations.
+
+    Parameters
+    ----------
+    k : int
+        The total degree, :math:`k \\geq 0`
+    ni : int
+        The number of variables, :math:`n_i \\geq 1`
+    quiet : bool, optional
+        Suppress printed output. The default is False.
+
+    Returns
+    -------
+    mem_cost : uint64
+        The memory scaling (equals the number of derivatives).
+    mul_cost : uint64
+        The multiplication operation scaling (the number of 
+        primitive multiplies per generalized product rule)
+
+    """
+    
+    nck = ncktab(k+ni)
+    
+    # First, calculate the memory cost. This equals
+    # the number of derivatives stored
+    mem_cost = nck[k+ni, k]
+    
+    # Now, calculate how many primitive ndarray 
+    # multiplications must be performed for the
+    # generalized Leibniz multiplication formula
+    mul_cost = np.uint64(0) 
+    for kp in range(k+1): # kp = 0, 1, ..., k 
+        mul_cost += nck[kp+ni-1, kp] * nck[k-kp+ni, k-kp]
+    
+    if not quiet:
+        print(f"Memory scaling         = {mem_cost:d}")
+        print(f"Multiplication scaling = {mul_cost:d}")
+     
+    return mem_cost, mul_cost
+    
+    
