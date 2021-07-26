@@ -601,16 +601,16 @@ class RadialHOBasis(NDBasis):
             The dimension, :math:`d`.
         Nr : int, optional
             The number of quadrature points over :math:`r`.
-            The default is `vmax` + 1.
+            The default is `vmax` + 3.
 
         """
 
         #
         # Construct the quadrature grid
         # and weights.
-        nmax = vmax - ell 
+        nmax = vmax - abs(ell) 
         if Nr is None: 
-            Nr = 2*vmax + 1 # default quadrature grid size
+            Nr = vmax + 3 # default quadrature grid size
         # r grid 
         
         #
@@ -640,7 +640,7 @@ class RadialHOBasis(NDBasis):
         super().__init__(basisfun, special.Monomial([d-1]), qgrid, wgt) 
         
         self.nmax = nmax            # The convention vibrational quantum number
-        self.ell = ell              # The angular momentum quantum number
+        self.ell = abs(ell)         # The angular momentum quantum number
         self.rmax = rmax            # The radial extent
         self.alpha = basisfun.alpha # The corresponding alpha scaling parameter
         self.d = d                  # The dimension 
