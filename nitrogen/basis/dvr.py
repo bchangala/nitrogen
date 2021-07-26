@@ -1,17 +1,15 @@
+"""
+dvr.py
+"""
 
 from .legDVR import _legDVR, _legDVRwfs
 from .fourDVR import _fourDVR, _fourDVRwfs
 from .hoDVR import _hoDVR,_hoDVRwfs
 from .sincDVR import _sincDVR,_sincDVRwfs
 
-from .ndbasis import NDBasis, SinCosBasis, LegendreLMCosBasis, RealSphericalHBasis, \
-    Real2DHOBasis, RadialHOBasis
-
 import numpy as np 
 
-__all__ = ['GenericDVR','SimpleDVR', 
-           'NDBasis','SinCosBasis', 'LegendreLMCosBasis',
-           'RealSphericalHBasis','Real2DHOBasis','RadialHOBasis']
+__all__ = ['GenericDVR','SimpleDVR','Contracted']
 
 
 class GenericDVR:

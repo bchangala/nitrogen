@@ -7,13 +7,12 @@ Hamiltonian construction routines.
 """
 
 import numpy as np
-from nitrogen.dvr import GenericDVR
-from nitrogen.dvr import NDBasis
-import nitrogen.dvr.ops as dvrops
+from nitrogen.basis import GenericDVR
+from nitrogen.basis import NDBasis
+import nitrogen.basis.ops as dvrops
 from nitrogen.dfun import sym2invdet
 import nitrogen.angmom as angmom
 import nitrogen.constants
-import nitrogen.dvr 
 
 from scipy.sparse.linalg import LinearOperator
 
@@ -25,7 +24,7 @@ def hdpdvr_bfJ(dvrs, cs, pes, masses, Jlist = 0, Vmax = None, Vmin = None):
     Parameters
     ----------
     dvrs : list of GenericDVR objects and scalars
-        A list of :class:`nitrogen.dvr.GenericDVR` basis set objects or
+        A list of :class:`nitrogen.basis.GenericDVR` basis set objects or
         scalar numbers. The length of the list must be equal to
         the number of coordinates in `cs`. Scalar elements indicate
         a fixed value for that coordinate.
@@ -258,7 +257,7 @@ class DirProdDvrCartN(LinearOperator):
         Parameters
         ----------
         dvrs : list of GenericDVR objects and/or scalars
-            A list of :class:`nitrogen.dvr.GenericDVR` objects and/or
+            A list of :class:`nitrogen.basis.GenericDVR` objects and/or
             scalar numbers. The length of the list must be equal to
             the number of coordinates, `nx`. Scalar elements indicate
             a fixed value for that coordinate.
@@ -408,7 +407,7 @@ class DirProdDvrCartNQD(LinearOperator):
         Parameters
         ----------
         dvrs : list of GenericDVR objects and/or scalars
-            A list of :class:`nitrogen.dvr.GenericDVR` objects and/or
+            A list of :class:`nitrogen.basis.GenericDVR` objects and/or
             scalar numbers. The length of the list must be equal to
             the number of coordinates, `nx`. Scalar elements indicate
             a fixed value for that coordinate.
@@ -567,7 +566,7 @@ class Polar2D(LinearOperator):
     
     A Hamiltonian for a particle in two dimensions
     with polar coordinates :math:`(r,\\phi)` represented by the
-    :class:`~nitrogen.dvr.Real2DHOBasis`
+    :class:`~nitrogen.basis.Real2DHOBasis`
     two-dimensional harmonic oscillator basis set. 
     The differential operator is
     
@@ -594,14 +593,14 @@ class Polar2D(LinearOperator):
         mass : float
             The mass.
         vmax : int
-            Basis set paramter, see :class:`~nitrogen.dvr.Real2DHOBasis`.
+            Basis set parameter, see :class:`~nitrogen.basis.Real2DHOBasis`.
         R : float
-            Basis set parameter, see :class:`~nitrogen.dvr.Real2DHOBasis`.
+            Basis set parameter, see :class:`~nitrogen.basis.Real2DHOBasis`.
         ell : int, optional
-            Basis set parameter, see :class:`~nitrogen.dvr.Real2DHOBasis`.
+            Basis set parameter, see :class:`~nitrogen.basis.Real2DHOBasis`.
             The default is None.
         Nr,Nphi : int, optional
-            Quadrature parameter, see :class:`~nitrogen.dvr.Real2DHOBasis`.
+            Quadrature parameter, see :class:`~nitrogen.basis.Real2DHOBasis`.
             The default is None.
         hbar : float, optional
             The value of :math:`\\hbar`. If None, the default value in 
@@ -610,7 +609,7 @@ class Polar2D(LinearOperator):
         """
         
         # Create the 2D HO basis set
-        basis = nitrogen.dvr.Real2DHOBasis(vmax, R, ell, Nr, Nphi)
+        basis = nitrogen.basis.Real2DHOBasis(vmax, R, ell, Nr, Nphi)
         NH = basis.Nb # The number of basis functions 
         
         # Calculate the potential energy surface on the 
@@ -711,8 +710,8 @@ class GeneralSpaceFixed(LinearOperator):
         Parameters
         ----------
         bases : list
-            A list of :class:`~nitrogen.dvr.GenericDVR` or
-            :class:`~nitrogen.dvr.NDBasis` basis sets for active
+            A list of :class:`~nitrogen.basis.GenericDVR` or
+            :class:`~nitrogen.basis.NDBasis` basis sets for active
             coordinates. Scalar elements will constrain the 
             corresponding coordinate to that fixed value.
         cs : CoordSys
@@ -741,7 +740,7 @@ class GeneralSpaceFixed(LinearOperator):
         ##########################################
         # First, construct the total direct product
         # grid
-        Q = nitrogen.dvr.bases2grid(bases)
+        Q = nitrogen.basis.bases2grid(bases)
         # Q has as many axes as elements in bases, even
         # for multi-dimensional basis sets (whose quadrature grid
         # may not be a direct product structure). Fixed coordinates
@@ -831,7 +830,7 @@ class GeneralSpaceFixed(LinearOperator):
         # defined by the basis sets. Evaluate over the 
         # quadrature grid Q.
         # (only necessary for active coordinates)
-        rhotilde = nitrogen.dvr.calcRhoLogD(bases, Q)
+        rhotilde = nitrogen.basis.calcRhoLogD(bases, Q)
         
         # Calculate Gammatilde, the log deriv of the ratio
         # of the basis weight function and the Euclidean metric
@@ -844,7 +843,7 @@ class GeneralSpaceFixed(LinearOperator):
         # Collect or construct the single
         # derivative operators for every
         # coordinate.
-        D = nitrogen.dvr.collectBasisD(bases)
+        D = nitrogen.basis.collectBasisD(bases)
          
 
         # Define the required LinearOperator attributes
@@ -879,7 +878,7 @@ class GeneralSpaceFixed(LinearOperator):
         # Convert x to from the mixed DVR-FBR
         # representation to the quadrature
         # representation
-        xq = nitrogen.dvr._to_quad(self.bases, x)
+        xq = nitrogen.basis._to_quad(self.bases, x)
         
         # Make a vector in the quadrature
         # representation to accumulate results
@@ -944,7 +943,7 @@ class GeneralSpaceFixed(LinearOperator):
         # Convert this back to the mixed FBR-DVR representation
         # and reshape back to a 1-D vector
         #
-        y = nitrogen.dvr._to_fbr(self.bases, yq)
+        y = nitrogen.basis._to_fbr(self.bases, yq)
         return np.reshape(y, (-1,))
         
     
@@ -986,8 +985,8 @@ class Collinear(LinearOperator):
         Parameters
         ----------
         bases : list
-            A list of :class:`~nitrogen.dvr.GenericDVR` or
-            :class:`~nitrogen.dvr.NDBasis` basis sets for active
+            A list of :class:`~nitrogen.basis.GenericDVR` or
+            :class:`~nitrogen.basis.NDBasis` basis sets for active
             coordinates. Scalar elements will constrain the 
             corresponding coordinate to that fixed value.
         cs : CoordSys
@@ -1021,7 +1020,7 @@ class Collinear(LinearOperator):
         ##########################################
         # First, construct the total direct product
         # grid
-        Q = nitrogen.dvr.bases2grid(bases)
+        Q = nitrogen.basis.bases2grid(bases)
         # Q has as many axes as elements in bases, even
         # for multi-dimensional basis sets (whose quadrature grid
         # may not be a direct product structure). Fixed coordinates
@@ -1149,7 +1148,7 @@ class Collinear(LinearOperator):
         # defined by the basis sets. Evaluate over the 
         # quadrature grid Q.
         # (only necessary for active coordinates)
-        rhotilde = nitrogen.dvr.calcRhoLogD(bases, Q)
+        rhotilde = nitrogen.basis.calcRhoLogD(bases, Q)
         
         # Calculate Gammatilde, the log deriv of the ratio
         # of the basis weight function and (gvib * I**2) ** 1/2
@@ -1162,7 +1161,7 @@ class Collinear(LinearOperator):
         # derivative operators for every
         # vibrational coordinate.
         # 
-        D = nitrogen.dvr.collectBasisD(bases)
+        D = nitrogen.basis.collectBasisD(bases)
          
 
         # Define the required LinearOperator attributes
@@ -1199,7 +1198,7 @@ class Collinear(LinearOperator):
         # Convert x to from the mixed DVR-FBR
         # representation to the quadrature
         # representation
-        xq = nitrogen.dvr._to_quad(self.bases, x)
+        xq = nitrogen.basis._to_quad(self.bases, x)
         # Make a vector in the quadrature
         # representation to accumulate results
         yq = np.zeros_like(xq) 
@@ -1267,7 +1266,7 @@ class Collinear(LinearOperator):
         # Convert this back to the mixed FBR-DVR representation
         # and reshape back to a 1-D vector
         #
-        y = nitrogen.dvr._to_fbr(self.bases, yq)
+        y = nitrogen.basis._to_fbr(self.bases, yq)
         
         return np.reshape(y, (-1,))
         
@@ -1308,8 +1307,8 @@ class NonLinear(LinearOperator):
         Parameters
         ----------
         bases : list
-            A list of :class:`~nitrogen.dvr.GenericDVR` or
-            :class:`~nitrogen.dvr.NDBasis` basis sets for active
+            A list of :class:`~nitrogen.basis.GenericDVR` or
+            :class:`~nitrogen.basis.NDBasis` basis sets for active
             coordinates. Scalar elements will constrain the 
             corresponding coordinate to that fixed value.
         cs : CoordSys
@@ -1338,7 +1337,7 @@ class NonLinear(LinearOperator):
         ##########################################
         # First, construct the total direct product
         # grid
-        Q = nitrogen.dvr.bases2grid(bases)
+        Q = nitrogen.basis.bases2grid(bases)
         # Q has as many axes as elements in bases, even
         # for multi-dimensional basis sets (whose quadrature grid
         # may not be a direct product structure). Fixed coordinates
@@ -1455,7 +1454,7 @@ class NonLinear(LinearOperator):
         # defined by the basis sets. Evaluate over the 
         # quadrature grid Q.
         # (only necessary for active coordinates)
-        rhotilde = nitrogen.dvr.calcRhoLogD(bases, Q)
+        rhotilde = nitrogen.basis.calcRhoLogD(bases, Q)
         
         # Calculate Gammatilde, the log deriv of the ratio
         # of the basis weight function rho and g**1/2
@@ -1468,7 +1467,7 @@ class NonLinear(LinearOperator):
         # derivative operators for every
         # vibrational coordinate.
         # 
-        D = nitrogen.dvr.collectBasisD(bases)
+        D = nitrogen.basis.collectBasisD(bases)
          
         ####################################
         #
@@ -1524,7 +1523,7 @@ class NonLinear(LinearOperator):
         # representation
         # (Prepend the list of bases with a dummy element,
         #  so that the rotational index is left unchanged)
-        xq = nitrogen.dvr._to_quad([None] + self.bases, x)
+        xq = nitrogen.basis._to_quad([None] + self.bases, x)
         # Make a vector in the quadrature
         # representation to accumulate results
         yq = np.zeros_like(xq) 
@@ -1668,7 +1667,7 @@ class NonLinear(LinearOperator):
         # Convert this back to the mixed FBR-DVR representation
         # and reshape back to a 1-D vector
         # (Prepend a dummy basis to keep rotational index unchanged)
-        y = nitrogen.dvr._to_fbr([None] + self.bases, yq)
+        y = nitrogen.basis._to_fbr([None] + self.bases, yq)
         
         return np.reshape(y, (-1,))
     
@@ -1827,7 +1826,7 @@ class AzimuthalLinear(LinearOperator):
                 if bfirst != ellipsis_bases[i]:
                     raise ValueError("For scalar Ellipsis basis, all values must be equal.")
                 size_of_ellipsis_m.append(1)
-        elif isinstance(bfirst, nitrogen.dvr.GenericDVR):
+        elif isinstance(bfirst, nitrogen.basis.GenericDVR):
             # A DVR
             for i in  range(len(ellipsis_bases)):
                 if not np.all(bfirst.D == ellipsis_bases[i].D):
@@ -1835,7 +1834,7 @@ class AzimuthalLinear(LinearOperator):
                 if not np.all(bfirst.grid == ellipsis_bases[i].grid):
                     raise ValueError("All Ellipsis bases must have the same DVR grid.")
                 size_of_ellipsis_m.append(ellipsis_bases[i].num)
-        elif isinstance(bfirst, nitrogen.dvr.NDBasis):
+        elif isinstance(bfirst, nitrogen.basis.NDBasis):
             # An NDBasis
             for i in  range(len(ellipsis_bases)):
                 if not np.all(bfirst.qgrid == ellipsis_bases[i].qgrid):
@@ -1941,7 +1940,7 @@ class AzimuthalLinear(LinearOperator):
         # all have the same quadrature grid (or fixed value) anyway
         #
         bases_quad[ellipsis_idx] = ellipsis_bases[0] 
-        Q = nitrogen.dvr.bases2grid(bases_quad) 
+        Q = nitrogen.basis.bases2grid(bases_quad) 
         
         ########################################
         # Evaluate potential energy function on 
@@ -2019,7 +2018,7 @@ class AzimuthalLinear(LinearOperator):
         #
         # We can use bases_quad, because the rho element for 
         # the Ellipsis basis must be the same for each azimuthal component
-        rhotilde = nitrogen.dvr.calcRhoLogD(bases_quad, Q)
+        rhotilde = nitrogen.basis.calcRhoLogD(bases_quad, Q)
         
         # Calculate Gammatilde, the log deriv of the ratio
         # of the basis weight function rho and g**1/2
@@ -2034,11 +2033,11 @@ class AzimuthalLinear(LinearOperator):
         # 
         # Again, we use bases_quad *BUT* the entries for
         # the Ellipsis basis coordinates will be invalid !!! 
-        D = nitrogen.dvr.collectBasisD(bases_quad)
+        D = nitrogen.basis.collectBasisD(bases_quad)
         #
         # For the Ellipsis basis coordinates, we need to calculate
         # derivatives for each block separately
-        D_ellipsis = [nitrogen.dvr.collectBasisD([b]) for b in ellipsis_bases]
+        D_ellipsis = [nitrogen.basis.collectBasisD([b]) for b in ellipsis_bases]
         # D_ellipsis[i][j] is the D operator for the j**th ellipsis coordinate of the i**th block
         
         
@@ -2115,7 +2114,7 @@ class AzimuthalLinear(LinearOperator):
         # 2) Now transform from the declared azimuthal representations
         # to the mixed DVR/FBR representation
         #
-        x_fbr = nitrogen.dvr.ops.opTensorO(x_dp, self.az_U) 
+        x_fbr = nitrogen.basis.ops.opTensorO(x_dp, self.az_U) 
         
         #
         # 3) Now transform from the mixed representation to the
@@ -2139,7 +2138,7 @@ class AzimuthalLinear(LinearOperator):
             block_bases = [None] + self.bases
             block_bases[axis] = self.ellipsis_bases[i] 
             
-            xq_block = nitrogen.dvr._to_quad(block_bases, x_fbr_block)
+            xq_block = nitrogen.basis._to_quad(block_bases, x_fbr_block)
             
             xq = xq + xq_block
             
@@ -2336,8 +2335,8 @@ class AzimuthalLinear(LinearOperator):
             block_bases[axis] = self.ellipsis_bases[i]
             # project the quadrature representation 
             # to the i**th ellipsis basis
-            y_fbr_block = nitrogen.dvr._to_fbr(block_bases, yq) # Block independent contribution 
-            y_fbr_block += nitrogen.dvr._to_fbr(block_bases, yq_block[i]) # Block-specific contribution 
+            y_fbr_block = nitrogen.basis._to_fbr(block_bases, yq) # Block independent contribution 
+            y_fbr_block += nitrogen.basis._to_fbr(block_bases, yq_block[i]) # Block-specific contribution 
             
             y_fbr_blocks.append(y_fbr_block)
         
@@ -2348,7 +2347,7 @@ class AzimuthalLinear(LinearOperator):
         # 5) Transform from mixed DVR/FBR representation
         # to the multi-valued azimuthal representation
         # (Steps 4 and 5 could be combined like 2 and 3.)
-        y_dp = nitrogen.dvr.ops.opTensorO(y_fbr, self.az_UH)
+        y_dp = nitrogen.basis.ops.opTensorO(y_fbr, self.az_UH)
         
         # 6) Extract the singled-valued basis function 
         # coefficients from the multi-valued azimuthal

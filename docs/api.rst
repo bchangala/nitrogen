@@ -19,11 +19,11 @@ NITROGEN API reference
    :members:
    :show-inheritance:
    
-.. automodule:: nitrogen.dvr
+.. automodule:: nitrogen.basis
    :members:
    :show-inheritance:
    
-.. automodule:: nitrogen.dvr.ops
+.. automodule:: nitrogen.basis.ops
    :members:
    :show-inheritance:
    

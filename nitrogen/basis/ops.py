@@ -1,6 +1,6 @@
 """
-nitrogen.dvr.ops
-----------------
+nitrogen.basis.ops
+------------------
 
 DVR grid operations
 

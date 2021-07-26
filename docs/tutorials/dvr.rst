@@ -10,23 +10,23 @@ This tutorial will not discuss the mathematical details of DVR
 bases. A valuable review by Light and Carrington is 
 available `here <http://doi.org/10.1002/9780470141731.ch4>`_.
 
-DVR bases in NITROGEN are implemented with the :class:`~nitrogen.dvr.DVR` class
-in the :mod:`nitrogen.dvr` module. Commonly used DVR bases can be generated 
-with the :class:`~nitrogen.dvr.DVR` constructor, usually by specifying just
+DVR bases in NITROGEN are implemented with the :class:`~nitrogen.basis.GenericDVR` class
+in the :mod:`nitrogen.basis` module. Commonly used DVR bases can be generated 
+with the :class:`~nitrogen.dvr.SimpleDVR` constructor by specifying just
 the grid range, size, and DVR type.
 
 ..  doctest:: example-dvr-1
     
     >>> import nitrogen as n2
-    >>> my_dvr = n2.dvr.DVR(start=-1.0, stop=1.0, num=11, basis='ho')
+    >>> my_dvr = n2.basis.SimpleDVR(start=-1.0, stop=1.0, num=11, basis='ho')
     >>> my_dvr.grid # the DVR grid points
     array([-1.00000000e+00, -7.58705798e-01, -5.52259538e-01, -3.61610366e-01,
            -1.79041785e-01,  6.81988078e-17,  1.79041785e-01,  3.61610366e-01,
             5.52259538e-01,  7.58705798e-01,  1.00000000e+00])
 
 We do not usually need to evaluate the actual DVR basis functions themselves.
-Nonetheless, :class:`~nitrogen.dvr.DVR` objects provide a 
-:func:`~nitrogen.dvr.DVR.wfs` method (i.e. "**w**\ ave\ **f**\ unction\ **s**") to calculate them. This
+Nonetheless, :class:`~nitrogen.basis.GenericDVR` objects provide a 
+:func:`~nitrogen.basis.GenericDVR.wfs` method (i.e. "**w**\ ave\ **f**\ unction\ **s**") to calculate them. This
 is especially useful for plotting.
 
 ..  plot::
@@ -36,7 +36,7 @@ is especially useful for plotting.
     import matplotlib.pyplot as plt
     import numpy as np 
     
-    my_dvr = n2.dvr.DVR(start=-1.0, stop=1.0, num=11, basis='ho')
+    my_dvr = n2.basis.SimpleDVR(start=-1.0, stop=1.0, num=11, basis='ho')
     x = np.linspace(-3,3,251) # make a grid for plotting
     y = my_dvr.wfs(x)
     plt.plot(x,y[:,[0,-1]],'-')
@@ -45,7 +45,7 @@ is especially useful for plotting.
 This plot illustrates the local :math:`\delta`-like character of DVR functions 
 and the general feature that they possess nodes at the DVR grid points.
 
-The :class:`~nitrogen.dvr.DVR` object also provides the DVR representations
+A :class:`~nitrogen.basis.GenericDVR` object also provides the DVR representations
 of the first and second derivative operators. 
 
 ..  doctest:: example-dvr-1
@@ -75,7 +75,7 @@ This example sets up the corresponding DVR Hamiltonian using a sinc-DVR basis:
 
 ..  doctest:: example-dvr-1 
 
-    >>> dvr = n2.dvr.DVR(-7, 7, 35, basis = 'sinc')
+    >>> dvr = n2.basis.SimpleDVR(-7, 7, 35, basis = 'sinc')
     >>> V = np.diag(0.5 * (dvr.grid)**2) # potential energy matrix
     >>> T = -0.5 * dvr.D2 # kinetic energy matrix 
     >>> H = T + V 
@@ -95,7 +95,7 @@ density of the grid points) is usually exponential.
     
     err = []
     for N in range(10, 50, 5):
-        dvr = n2.dvr.DVR(-7, 7, N, basis = 'sinc') 
+        dvr = n2.basis.SimpleDVR(-7, 7, N, basis = 'sinc') 
         V = np.diag(0.5 * (dvr.grid)**2)
         T = -0.5 * dvr.D2
         H = T + V 
@@ -113,7 +113,8 @@ can be constructed with :func:`numpy.kron`. This is practical for low dimensions
 but does not take advantage of the sparse nature of DVR operators, for which a 
 :class:`~scipy.sparse.linalg.LinearOperator` may be more appropriate.
 
-NITROGEN provides several primitive DVR types (``basis = 'sinc'``, ``'ho'``,
+The :class:`nitrogen.basis.SimpleDVR` constructor 
+provides for several common primitive DVR types (``basis = 'sinc'``, ``'ho'``,
 ``'fourier'``, ``'lengendre'``, ...), an important difference between which 
 is the boundary conditions they satisfy. For example, the ``fourier`` DVR 
 is periodic over the grid range. The derivative operator of a ``legendre`` DVR 

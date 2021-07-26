@@ -7,5 +7,5 @@ Tutorials
    dfun
    autodiff
    coordsys
-   dvr 
+   dvr
    

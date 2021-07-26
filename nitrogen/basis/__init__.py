@@ -1,6 +1,6 @@
 """
-nitrogen.dvr
-------------
+nitrogen.basis 
+--------------
 
 This module provides support for discrete-variable 
 representation (DVR) and finite-basis representation
@@ -13,10 +13,16 @@ representation (DVR) and finite-basis representation
 from . import dvr
 from .dvr import *
 
+from . import ndbasis 
+from .ndbasis import *
+
 # Load submodules
 from . import ops  # DVR operators
 
-__all__ = dvr.__all__
+__all__ = []
+__all__ += dvr.__all__
+__all__ += ndbasis.__all__ 
+
 
 import numpy as np 
 import matplotlib.pyplot as plt 

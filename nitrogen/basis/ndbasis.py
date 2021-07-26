@@ -5,13 +5,13 @@ Implements the NDBasis base class and common
 sub-classes.
 
 =============================================  =================================
-:class:`~nitrogen.dvr.NDBasis` sub-class       Description
+:class:`~nitrogen.basis.NDBasis` sub-class       Description
 ---------------------------------------------  --------------------------------- 
-:class:`~nitrogen.dvr.SinCosBasis`             A sine-cosine (real Fourier) basis
-:class:`~nitrogen.dvr.LegendreLMCosBasis`      Associated Legendre polynomials.
-:class:`~nitrogen.dvr.RealSphericalHBasis`     Real spherical harmonics.
-:class:`~nitrogen.dvr.Real2DHOBasis`           Two-dimensional harmonic osc. basis.
-:class:`~nitrogen.dvr.RadialHOBasis`           Radial HO basis in d dimensions.
+:class:`~nitrogen.basis.SinCosBasis`           A sine-cosine (real Fourier) basis
+:class:`~nitrogen.basisLegendreLMCosBasis`     Associated Legendre polynomials.
+:class:`~nitrogen.basis.RealSphericalHBasis`   Real spherical harmonics.
+:class:`~nitrogen.basis.Real2DHOBasis`         Two-dimensional harmonic osc. basis.
+:class:`~nitrogen.basis.RadialHOBasis`         Radial HO basis in d dimensions.
 =============================================  =================================
 
 """
@@ -19,6 +19,10 @@ sub-classes.
 import nitrogen.special as special
 import scipy.special 
 import numpy as np
+
+__all__ = ['NDBasis','SinCosBasis', 'LegendreLMCosBasis',
+           'RealSphericalHBasis','Real2DHOBasis','RadialHOBasis']
+
 
 class NDBasis:
     """

@@ -10,7 +10,7 @@ calculations and rovibronic spectroscopy.
 # Import sub-packages and modules into namespace
 from . import autodiff
 from . import linalg 
-from . import dvr 
+from . import basis
 from . import dfun 
 from . import coordsys 
 from . import ham
