@@ -108,7 +108,11 @@ class NDBasis:
             raise ValueError("wgt is the wrong size!")
         
         # Calculate the `bas` grid
-        self.bas = basisfun.val(qgrid)
+        self.bas = basisfun.val(qgrid) # (Nb, Nq) 
+        
+        
+        self._UH = (self.bas * np.sqrt(self.wgt)).T
+        self._U  = self.bas.conj() * np.sqrt(self.wgt)
         
         return 
         
@@ -158,17 +162,10 @@ class NDBasis:
         """ The default implemention of
         the FBR to quadrature transformation"""
         
-        UT = self.bas.T # An (Nq,Nb) array 
-        
         # Apply the FBR-to-grid transformation
         # to the axis
-        w = np.tensordot(UT,v, axes = (1,axis) )
+        w = np.tensordot(self._UH, v, axes = (1,axis) )
         w = np.moveaxis(w, 0, axis)
-        
-        # Broadcast the wgt's
-        shape = [1] * v.ndim 
-        shape[axis] = self.Nq 
-        w *= np.sqrt(self.wgt).reshape(tuple(shape))
         
         return w
     
@@ -177,16 +174,9 @@ class NDBasis:
         """ The default implemention of
         the quadrature to FBR transformation"""
         
-        U = self.bas.conj() # An (Nb, Nq) array 
-        
-        # Broadcast the wgt's
-        shape = [1] * w.ndim 
-        shape[axis] = self.Nq
-        w = w * np.sqrt(self.wgt).reshape(tuple(shape))
-        
         # Apply the grid-to-FBR transformation
         # to the axis
-        v = np.tensordot(U,w, axes = (1,axis) )
+        v = np.tensordot(self._U, w, axes = (1,axis) )
         v = np.moveaxis(v, 0, axis)
         
         return v
@@ -231,7 +221,7 @@ class SinCosBasis(NDBasis):
             The default is `m` = 10.
         Nq : int, optional
             The number of quadrature points. The default
-            is 2*(max(abs(`m`)) + 1)
+            is 2*max(abs(`m`)) + 3 
         angle : {'rad', 'deg'}
             The angular unit. The default is 'rad'. 
 
@@ -252,8 +242,8 @@ class SinCosBasis(NDBasis):
         # and equal 2*pi / Nq 
         #
         if Nq is None: 
-            # Nq = 2*(mmax + 1)
-            Nq = 2 * (max(abs(basisfun.m)) + 1) 
+            # Nq = 2*mmax + 3
+            Nq = 2 * max(abs(basisfun.m)) + 3 
         
         if angle == 'rad':
             qgrid = np.linspace(0,2*np.pi,Nq+1)[:-1]
