@@ -368,7 +368,7 @@ class DFun:
 
         """
         
-        # Calculate derivates of f to order deriv + 1
+        # Calculate derivatives of f to order deriv + 1
         F = self.f(X, deriv = deriv + 1, out = None, var = var)
         
         if var is None:
