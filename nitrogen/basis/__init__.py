@@ -2,10 +2,10 @@
 nitrogen.basis 
 --------------
 
-This module provides support for discrete-variable 
-representation (DVR) and finite-basis representation
-(FBR) basis sets. The main objects are the
-:class:`DVR` and :class:`NDBasis` classes and sub-classes.
+Basis set functions including discrete-variable 
+representations (DVRs) and finite-basis representations
+(FBRs). The main objects are the
+:class:`GenericDVR` and :class:`NDBasis` classes and sub-classes.
 
 """
 
@@ -22,7 +22,6 @@ from . import ops  # DVR operators
 __all__ = []
 __all__ += dvr.__all__
 __all__ += ndbasis.__all__ 
-
 
 import numpy as np 
 import matplotlib.pyplot as plt 
