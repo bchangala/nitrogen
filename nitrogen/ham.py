@@ -1678,7 +1678,7 @@ class AzimuthalLinear(LinearOperator):
     A  Hamiltonian for linear molecules
     
     """
-    
+     
     def __init__(self, bases, cs, azimuth, pes = None, masses = None, J = 0, hbar = None,
                  Vmax = None, Vmin = None, Voffset = None):
         
@@ -1988,10 +1988,18 @@ class AzimuthalLinear(LinearOperator):
         #
         # And then calculate its inverse and determinant
         #
-        G,detg = nitrogen.dfun.sym2invdet(g, 1, len(vvar))
+        #G,detg = nitrogen.dfun.sym2invdet(g, 1, len(vvar))
+        G = nitrogen.linalg.packed.inv_sp(g[0])
         #
         # G and detg contain the derivative arrays for G = inv(g) and det(g)
         # 
+        #
+        # Calculate the log. deriv. of g
+        # gtilde = detg[1:] / detg[0]
+        #
+        gtilde = [nitrogen.linalg.packed.trAB_sp(G, g[i+1]) for i in range(len(vvar))]
+        gtilde = np.stack(gtilde)
+        
         # If J = 0, then we only need to keep the vibrational block of G.
         # In packed storage, this is the first nv*(nv+1)/2 
         # elements (where nv = len(vvar))
@@ -1999,14 +2007,12 @@ class AzimuthalLinear(LinearOperator):
         if J == 0:
             nv = len(vvar)
             nG = (nv*(nv+1))//2 
-            G = G[0][:nG] # need only value; lower triangle row-order
+            #G = G[0][:nG] # need only value; lower triangle row-order
+            G = G[:nG].copy() 
         else:
-            G = G[0]      # keep all elements
+            pass      # keep all elements
         
-        #
-        # Calculate the log. deriv. of g
-        gtilde = detg[1:] / detg[0]
-        #
+
         
         ########################################
         #
