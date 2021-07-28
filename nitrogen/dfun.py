@@ -1483,3 +1483,4 @@ def sym2invdet(S, deriv, nvar, logdet = False):
     # and det the determinant (or log of det)
     #
     return iS, det.d.copy()
+

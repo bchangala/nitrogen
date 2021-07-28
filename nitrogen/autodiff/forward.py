@@ -51,7 +51,7 @@ Mathematical functions implemented include
 """
 
 import numpy as np
-import warnings
+import warnings 
 
 class adarray:
     
@@ -789,7 +789,7 @@ def mvleibniz(X, Y, k, ni, nck, idx, out=None, Xzlevel = None, Yzlevel = None):
     #
     # Derivatives are ordered with lower degrees
     # first.
-    
+
     for iX in range(nd):
         idxX = idx[iX,:]   # The derivative index of X
         kX = np.sum(idxX)  # The derivative degree
@@ -834,7 +834,7 @@ def mvchain(df,X,k,ni,nck,idx, out = None, Xzlevel = None):
     df : ndarray
         An array containing the derivatives of 
         single-argument function f through order `k`.
-        The shape of `df` is ``(k+1,) + X.shape``
+        The shape of `df` is ``(k+1,) + X.shape[1:]``
     X : ndarray
         Derivative array in ``adarray.d`` format
     k : int
@@ -888,7 +888,7 @@ def mvchain(df,X,k,ni,nck,idx, out = None, Xzlevel = None):
     if out.dtype != res_type:
         raise TypeError("out data-type is incompatible with f(X)")
         
-    # Initalize result to zero
+    # Initialize result to zero
     out.fill(0)
         
     Z = out # Reference only
@@ -919,7 +919,7 @@ def mvchain(df,X,k,ni,nck,idx, out = None, Xzlevel = None):
         if (df[i] != 0 ).any() and Xizlevel >= 0:
             # If both df is non-zero and
             # Xi is non-zero
-            Z += (df[i] / fact) * Xi
+            Z += (df[i] * (1.0/fact)) * Xi # note broadcast of df[i] over Xi
     
     # Restore the value of X
     np.copyto(X[:1], X0)
@@ -1836,8 +1836,11 @@ def sqrt(x, out = None):
     df = np.ndarray( (k+1,) + x.d.shape[1:], dtype = xval.dtype)
     
     df[0] = np.sqrt(xval) # Uses numpy branch cut
+    
+    if k >= 1:
+        ixval = 1.0 / xval # The inverse value
     for i in range(1, k+1):
-        df[i] = (1.5 - i) * (df[i-1] / xval)
+        df[i] = (1.5 - i) * (df[i-1] * ixval)
     
     return adchain(df, x, out = out)
 
@@ -2383,7 +2386,7 @@ def _ltl_tp_unblocked(L):
     return L
 
 
-def cost(k,ni, quiet = False ):
+def cost(k,ni, quiet = False):
     """
     Estimate the cost of adarray operations.
 
@@ -2398,31 +2401,57 @@ def cost(k,ni, quiet = False ):
 
     Returns
     -------
-    mem_cost : uint64
-        The memory scaling (equals the number of derivatives).
-    mul_cost : uint64
-        The multiplication operation scaling (the number of 
-        primitive multiplies per generalized product rule)
+    None
 
     """
     
-    nck = ncktab(k+ni)
+    nck = ncktab(k + 2*ni)
+    k = np.uint32(k) 
+    two = np.uint32(2)
+    one = np.uint32(1) 
+    
+    nd = nck[k+ni,k] # The number of derivatives
     
     # First, calculate the memory cost. This equals
     # the number of derivatives stored
-    mem_cost = nck[k+ni, k]
+    mem_cost = nd
     
-    # Now, calculate how many primitive ndarray 
-    # multiplications must be performed for the
-    # generalized Leibniz multiplication formula
-    mul_cost = np.uint64(0) 
-    for kp in range(k+1): # kp = 0, 1, ..., k 
-        mul_cost += nck[kp+ni-1, kp] * nck[k-kp+ni, k-kp]
+    # Estimate the number of floating point operations
+    # required for some simple arithmetic. (Assuming real numbers.)
+    #
+    # Addition requires the addition of each derivative separately
+    add_cost = nd
+    #
+    # Multiplication requires the generalized Leibniz formula,
+    # "mvleibniz". This has
+    # sum_(kp=0)^k  (kp + n - 1 choose kp) (k-kp+ni choose k-kp)
+    #      =  (k + 2n choose k) 
+    # terms. Each term requires one multiplication and one addition
+    # (to a given derivative of the result) for a total of 2 FLOPs 
+    # per term
+    mul_cost = two * nck[k + 2*ni, k]
     
+    #
+    # Now calculate the cost of a call to mvchain
+    # This assumes df is already calculated.
+    # 
+    # The total includes
+    #  (k+1) * mul_cost (for calculating powers) and
+    #  (k+1) * (2*nd + 1) for FLOPs scaling by df and summing result.
+    mvc_cost = (k + one) * (mul_cost + two*nd + one) 
+    #
+    # Any actual usage of mvchain requires the calculation
+    # of df, which will be variable depending on the 
+    # function itself. Often these go as ~ k primitive multiplies,
+    # which is typically small compared to the remaining cost.
+    #
+    fun_cost = mvc_cost + k + one  
     if not quiet:
         print(f"Memory scaling         = {mem_cost:d}")
-        print(f"Multiplication scaling = {mul_cost:d}")
+        print(f"Addition FLOPs         = {add_cost:d}")
+        print(f"Multiplication FLOPs   = {mul_cost:d}")
+        print(f"Chain rule FLOPs       = {mvc_cost:d}")
+        print(f"Typical function eval. = {fun_cost:d}")
      
-    return mem_cost, mul_cost
     
-    
+    return

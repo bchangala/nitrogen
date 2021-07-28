@@ -131,13 +131,13 @@ def bases2grid(bases):
     
     for i,bas in enumerate(bases):
         
-        if isinstance(bas, dvr.GenericDVR):
+        if isinstance(bas, GenericDVR):
             grids.append(bas.grid)
             qshape.append(bas.num)
             nq += 1
             index_of_coord.append(i)
             
-        elif isinstance(bas, dvr.NDBasis):
+        elif isinstance(bas, NDBasis):
             for j in range(bas.nd) :
                 grids.append(bas.qgrid[j])
                 index_of_coord.append(i)
@@ -500,9 +500,9 @@ def collectBasisD(bases):
     #
     D = [] 
     for b in bases:
-        if isinstance(b, dvr.GenericDVR):
+        if isinstance(b, GenericDVR):
             D.append(b.D) 
-        elif isinstance(b, dvr.NDBasis):
+        elif isinstance(b, NDBasis):
             # Evaluate the derivative of the basis functions
             # with respect to its coordinates on the basis set's
             # quadrature grid
@@ -546,7 +546,7 @@ def calcRhoLogD(bases, Q):
     rhotilde = [] 
     k = 0
     for b in bases: #
-        if isinstance(b, dvr.GenericDVR):
+        if isinstance(b, GenericDVR):
             # All DVR objects have unit weight function,
             # rho = 1.
             # So rhotilde_k = 0
@@ -554,7 +554,7 @@ def calcRhoLogD(bases, Q):
             rhotilde.append(np.zeros(Q.shape[1:])) 
             k += 1 
         
-        elif isinstance(b, dvr.NDBasis):
+        elif isinstance(b, NDBasis):
             #
             # NDBasis objects provide their weight
             # function with the DFun wgtfun()
