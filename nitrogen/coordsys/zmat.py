@@ -77,7 +77,7 @@ class ZMAT(CoordSys):
         self.zmat = zmat                 # New uniformized z-matrix string
         self.angles = angles             # Angle unit ('deg' or 'rad')
         self.supplementary = supplementary # Use supplementary angles
-        
+         
     def _zmat_q2x(self, Q, deriv = 0, out = None, var = None):
         """
         ZMAT X(Q) function.
@@ -232,11 +232,15 @@ class ZMAT(CoordSys):
                 th = Ci[1]
                 phi = Ci[2]
                 
+                r_sth = r * adf.sin(th)
+                
+                
+                t1 = r * adf.cos(th)         # r cos(th)
+                t2 = -r_sth * adf.sin(phi)   # -r sin(th) sin(phi)
+                t3 = -r_sth * adf.cos(phi)   # -r sin(th) cos(phi)
+                
                 for j in range(3):
-                    A[i,j] = A1[j] \
-                        + r*adf.cos(th) * U[j] \
-                        - r*adf.sin(th)*adf.sin(phi) * V[j] \
-                        - r*adf.sin(th)*adf.cos(phi) * W[j]
+                    A[i,j] = A1[j] + t1 * U[j] + t2 * V[j] + t3 * W[j]
                 
                 
         ##################################################
