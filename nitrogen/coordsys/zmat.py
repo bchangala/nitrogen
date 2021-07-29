@@ -77,7 +77,7 @@ class ZMAT(CoordSys):
         self.zmat = zmat                 # New uniformized z-matrix string
         self.angles = angles             # Angle unit ('deg' or 'rad')
         self.supplementary = supplementary # Use supplementary angles
-         
+    
     def _zmat_q2x(self, Q, deriv = 0, out = None, var = None):
         """
         ZMAT X(Q) function.
