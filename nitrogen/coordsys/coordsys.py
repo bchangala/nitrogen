@@ -276,7 +276,7 @@ class CoordSys(dfun.DFun):
                 # (the base_shape is implicitly handled)
         
         return out
-    
+     
     def Q2g(self, Q, masses = None, deriv = 0, out = None, vvar = None, rvar = None,
             mode = 'bodyframe'):
         """

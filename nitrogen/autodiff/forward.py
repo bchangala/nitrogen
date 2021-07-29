@@ -77,6 +77,8 @@ class adarray:
     zlevel : int
         The highest non-zero derivative order. If -1,
         then this adarray is identically zero.
+    zlevels : ndarray
+        The zero-levels of individual variables. 
         
         
     Notes
@@ -97,10 +99,18 @@ class adarray:
     a derivative with multi-index ``[2, 0, 1, 3]`` would be stored as the 
     corresponding derivative divided by :math:`2!\\times 0!\\times 1!\\times 3!`
     
+    The zero-level indicators `zlevel` and `zlevels` are independent of 
+    each other. 
+    
+    
+    The accounting arrays, `nck`, `idx`, and `zlevels` should be considered
+    immutable. They might be shared by multiple adarrays, unlike `d`. In general,
+    do not modify adarray attributes directly. 
+    
     """
     
     def __init__(self,base_shape,k,ni, nck = None, idx = None, dtype = np.float64,
-                 d = None, zlevel = None):
+                 d = None, zlevel = None, zlevels = None):
         """
         Create a new adarray object.
 
@@ -131,6 +141,9 @@ class adarray:
         zlevel : int, optional
             The zero level indicator. If None, this
             will be set to `k`. The default is None.
+        zlevels : array_like of int, optional
+            The zero-levels of each variables. If None,
+            each will be set to `k`. The default is None.
         
         See Also
         --------
@@ -165,6 +178,22 @@ class adarray:
             self.zlevel = k 
         else:
             self.zlevel = zlevel 
+            
+        if zlevels is None:
+            self.zlevels = np.array([k] * ni) 
+        else:
+            self.zlevels = np.array(zlevels) 
+            
+        # In general, zlevel should be
+        # between (inclusive) max(zlevels) and sum(zlevels)
+        # but that will not be explicitly kept track of.
+        #
+        # The most exhaustive z-leveling is a boolean
+        # mask for each derivative, but I generally think
+        # that the combination of the total zlevel
+        # and the zlevels for each variables covers 
+        # most scenarios. I am trying to reduce overhead
+        # for small grid-size evaluations. 
     
     def copy(self, out = None):
         """
@@ -185,11 +214,19 @@ class adarray:
         """
         if out is None:
             out = adarray(self.d.shape[1:],self.k,self.ni,
-                    self.nck,self.idx,self.d.dtype,self.d.copy())
+                    nck = self.nck,
+                    idx = self.idx,
+                    dtype = self.d.dtype,
+                    d = self.d.copy(), # Copy the derivative ndarray itself
+                    zlevel = self.zlevel, 
+                    zlevels = self.zlevels)
         else:
-            # We assume out has the right shape, data-type, etc.
+            # We assume out has the right shape, data-type, and that
+            # nck and idx are already provided
+            #
             np.copyto(out.d, self.d)
             out.zlevel = self.zlevel 
+            out.zlevels = self.zlevels 
             
         return out
         
@@ -203,6 +240,7 @@ class adarray:
             z = self.copy()
             z.d[0] += other # Attempt ndarray iadd
             z.zlevel = max(z.zlevel, 0) # Assume other is non-zero
+            z.zlevels = np.maximum(z.zlevels, 0) 
         return z
     def __radd__(self,other):
         """ z = other + self """
@@ -224,6 +262,8 @@ class adarray:
             # derivative, as desired.
             #
             # zlevel is unchanged by constant multiplication
+            # zlevels is  "  "
+            
         return z
     def __rmul__(self,other):
         """ z = other * self """
@@ -238,6 +278,7 @@ class adarray:
             z = self.copy()
             z.d /= other # ndarray idiv, using broadcasting
             # zlevel is unchanged by constant division
+            # zlevels " "  " 
         return z
     def __rtruediv__(self, other):
         """ z = other / self """
@@ -258,12 +299,13 @@ class adarray:
         z = self.copy()
         np.negative(z.d, out = z.d) #z.d = -z.d
         # zlevel is unchanged by negation
+        # zlevels " " "
         return z
     def __pos__(self):
         """ z = +self"""
         return self.copy()
 
-def array(d,k,ni,copyd = False,zlevel = None):
+def array(d,k,ni,copyd = False,zlevel = None, zlevels = None):
     """
     Create an adarray object from a raw derivative array.
 
@@ -282,6 +324,10 @@ def array(d,k,ni,copyd = False,zlevel = None):
     zlevel : int, optional
         The zero-level of `d`. If None, this
         will be set safely to `k`. The default is None.
+    zlevels : array_like of int, optional
+        The zero-level of each variable. If None,
+        this will be set safely to `k` for each. The
+        default is None. 
 
     Returns
     -------
@@ -309,8 +355,13 @@ def array(d,k,ni,copyd = False,zlevel = None):
     
     if zlevel is None:    
         zlevel = k
+        
+    if zlevels is None:
+        zlevels = np.array([k] * ni)
+    else:
+        zlevels = np.array(zlevels)
     
-    return adarray(base_shape, k, ni, nck, None, d.dtype, dinit, zlevel)
+    return adarray(base_shape, k, ni, nck, None, d.dtype, dinit, zlevel, zlevels)
     
 def ndize1(x):
     """
@@ -343,7 +394,9 @@ def ndize1(x):
     X = np.ndarray((n,), dtype = adarray)
     for i in range(n):
         X[i] = array(x.d[:,i], x.k, x.ni, 
-                     copyd = False, zlevel = x.zlevel) # keep references
+                     copyd = False,     # keep references
+                     zlevel = x.zlevel, 
+                     zlevels = x.zlevels)
     
     return X    
         
@@ -718,7 +771,8 @@ def idxpos(a,nck):
                                  # the block of multi-indices of the same degree k
         return offset + posk
 
-def mvleibniz(X, Y, k, ni, nck, idx, out=None, Xzlevel = None, Yzlevel = None):
+def mvleibniz(X, Y, k, ni, nck, idx, out=None, Xzlevel = None, Yzlevel = None,
+              Xzlevels = None, Yzlevels = None):
     """
     Multivariate Leibniz formula for derivative arrays.
 
@@ -743,6 +797,9 @@ def mvleibniz(X, Y, k, ni, nck, idx, out=None, Xzlevel = None, Yzlevel = None):
     Xzlevel, Yzlevel : int, optional
         Zero-level for input. If None, this is assumed to be `k`.
         The default is None.
+    Xzlevels, Yzlevels : ndarray, optional
+        The zero-levels for each variable. If None, this is assumed
+        to be `k` for all. The default is None. 
 
     Returns
     -------
@@ -762,6 +819,9 @@ def mvleibniz(X, Y, k, ni, nck, idx, out=None, Xzlevel = None, Yzlevel = None):
     Typically, multiplication should be applied at high-level
     with the * operator directly with :class:`adarray` objects.
     
+    Xzlevel and Xzlevels are used independently to determine
+    whether certain derivatives are to be skipped. 
+    
     """
     
     # Initialize result Z to zero
@@ -777,6 +837,11 @@ def mvleibniz(X, Y, k, ni, nck, idx, out=None, Xzlevel = None, Yzlevel = None):
         Xzlevel = k 
     if Yzlevel is None: 
         Yzlevel = k 
+    
+    if Xzlevels is None:
+        Xzlevels = np.array([k] * ni)
+    if Yzlevels is None:
+        Yzlevels = np.array([k] * ni) 
     
     Z = out # Reference only
    
@@ -795,12 +860,16 @@ def mvleibniz(X, Y, k, ni, nck, idx, out=None, Xzlevel = None, Yzlevel = None):
         kX = np.sum(idxX)  # The derivative degree
         if kX > Xzlevel:
             break # Skip remaining X derivatives. They are zero.
+        if (idxX > Xzlevels).any():
+            continue 
         
         for iY in range(nd):
             idxY = idx[iY,:]  # The derivative index of Y
             kY = np.sum(idxY) # The derivative degree 
             if kY > Yzlevel:
                 break # Skip remaining Y derivatives. They are zero.
+            if (idxY > Yzlevels).any():
+                continue 
             
             kZ = kX + kY   # The product's degree
             if kZ > k: # Total degree of this term is too high
@@ -825,7 +894,7 @@ def mvleibniz(X, Y, k, ni, nck, idx, out=None, Xzlevel = None, Yzlevel = None):
             
     return Z
 
-def mvchain(df,X,k,ni,nck,idx, out = None, Xzlevel = None):
+def mvchain(df,X,k,ni,nck,idx, out = None, Xzlevel = None, Xzlevels = None):
     """
     Multivariate chain rule Z = f(X) via Taylor series.
 
@@ -853,6 +922,9 @@ def mvchain(df,X,k,ni,nck,idx, out = None, Xzlevel = None):
     Xzlevel : int, optional
         The zlevel of the X derivative array. If None, this is
         assumed to be `k`.
+    Xzlevels : ndarray, optional
+        The zlevels of each variable. If None, this is 
+        assumed to be `k` for each.
 
     Returns
     -------
@@ -879,6 +951,8 @@ def mvchain(df,X,k,ni,nck,idx, out = None, Xzlevel = None):
     X[:1].fill(0) # X now equals "X-X0"
     if Xzlevel is None:
         Xzlevel = k
+    if Xzlevels is None:
+        Xzlevels = np.array([k] * ni) 
     
     # Initialize result to zero (and create if necessary)
     res_type = np.result_type(df, X)
@@ -898,12 +972,16 @@ def mvchain(df,X,k,ni,nck,idx, out = None, Xzlevel = None):
         if i == 0:
             # Initialize Xi = X**i = X**0 to 1 (constant)
             Xi = np.zeros(X.shape,dtype = X.dtype)
-            #Xi[0] = 1.0
+            Xi[0] = 1.0
             Xi[:1].fill(1.0)
             Xizlevel = 0 # the zero-level is 0 (constant)
+            Xizlevels = np.array([0] * ni)
             fact = 1.0 # Initialize factorial to 1
         else:
-            Xi = mvleibniz(Xi,X,k,ni,nck,idx) # Xi <-- Xi * (X-X0)
+            Xi = mvleibniz(Xi,X,k,ni,nck,idx,
+                           Xzlevel = Xizlevel, Yzlevel = Xzlevel,
+                           Xzlevels = Xizlevels, Yzlevels = Xzlevels) 
+            # Xi <-- Xi * (X-X0)
             # The call to mvleibniz needs to create a new output buffer
             # because we cannot overwrite Xi while mvleibniz is operating
             # (this probably could be done more efficiently -- revisit)
@@ -913,10 +991,15 @@ def mvchain(df,X,k,ni,nck,idx, out = None, Xzlevel = None):
                 Xizlevel = -1 # so is the next power
             else:
                 Xizlevel = min(Xizlevel + Xzlevel, k)
+                
+            if (Xizlevels < 0).all() or (Xzlevels < 0).all():
+                Xizlevels = np.array([-1] * ni)
+            else:
+                Xizlevels = np.minimum(Xizlevels + Xzlevels, k) 
             
             fact = fact * i 
             
-        if (df[i] != 0 ).any() and Xizlevel >= 0:
+        if (df[i] != 0 ).any() and Xizlevel >= 0 and (Xizlevels >= 0).all():
             # If both df is non-zero and
             # Xi is non-zero
             Z += (df[i] * (1.0/fact)) * Xi # note broadcast of df[i] over Xi
@@ -979,10 +1062,12 @@ def const(value,k,ni,nck = None, idx = None):
     # Determine the zlevel
     if (value == 0).all():
         zlevel = -1 # Identically zero
+        zlevels = np.array([-1] * ni) 
     else:
         zlevel = 0 # A non-zero constant
+        zlevels = np.array([0] * ni) 
     
-    c = array(d, k, ni, copyd = False, zlevel = zlevel)
+    c = array(d, k, ni, copyd = False, zlevel = zlevel, zlevels = zlevels)
         
     return c
 
@@ -1039,8 +1124,13 @@ def sym(value,i,k,ni,nck = None, idx = None):
     
     if k > 0 :
         x.d[(i+1):(i+2)].fill(1)
-        x.zlevel = 1 
-    # If k == 0, then the zlevel from const can be kept
+        
+        x.zlevel = 1
+        
+        x.zlevels = np.array([0] * ni)
+        x.zlevels[i] = 1 
+        
+    # If k == 0, then the zlevel/zlevels from const can be kept
     
     return x
 
@@ -1135,6 +1225,7 @@ def add(x, y, out = None):
     
     np.add(x.d, y.d, out = out.d)
     out.zlevel = max(x.zlevel, y.zlevel)
+    out.zlevels = np.maximum(x.zlevels, y.zlevels) 
     
     return out
 
@@ -1173,6 +1264,7 @@ def subtract(x, y, out = None):
     
     np.subtract(x.d, y.d, out = out.d)
     out.zlevel = max(x.zlevel, y.zlevel)
+    out.zlevels = np.maximum(x.zlevels, y.zlevels) 
     
     return out
 
@@ -1209,7 +1301,9 @@ def mul(x, y, out = None):
     if res_type != out.d.dtype:
         raise TypeError("output data-type incompatible with x * y")
 
-    mvleibniz(x.d,y.d,x.k,x.ni,x.nck,x.idx, out = out.d)
+    mvleibniz(x.d,y.d,x.k,x.ni,x.nck,x.idx, out = out.d,
+              Xzlevel = x.zlevel, Yzlevel = y.zlevel,
+              Xzlevels = x.zlevels, Yzlevels = y.zlevels)
     
     if x.zlevel < 0 or y.zlevel < 0 :
         # Either of the factors is identically zero
@@ -1218,6 +1312,11 @@ def mul(x, y, out = None):
     else:
         # Both zlevels are >= 0
         out.zlevel = min(x.zlevel + y.zlevel, x.k)
+    
+    if (x.zlevels < 0).any() or (y.zlevels < 0).any():
+        out.zlevels = np.array([-1] * x.ni) 
+    else:
+        out.zlevels = np.minimum(x.zlevels + y.zlevels, x.k) 
     
     return out
 
@@ -1289,7 +1388,8 @@ def adchain(df,x, out=None):
     if out is None:
         out = empty_like(x)
     
-    mvchain(df, x.d, x.k, x.ni, x.nck, x.idx, out = out.d)
+    mvchain(df, x.d, x.k, x.ni, x.nck, x.idx, out = out.d,
+            Xzlevel = x.zlevel, Xzlevels = x.zlevels)
     
     # Determine the zlevel of the result
     # We assume, safely, that df has a maximum zlevel
@@ -1300,6 +1400,15 @@ def adchain(df,x, out=None):
     else:
         # x has a zlevel >= 1
         out.zlevel = x.k
+        
+    # For zlevels, first assume full dependence
+    out.zlevels = np.array([x.k]*x.ni)
+    #
+    # then for any variable i that x does not 
+    # depend on (x.zlevels[i] <= 0), neither
+    # will the output depend on it
+    #
+    out.zlevels[x.zlevels <= 0] = 0
     
     return out
 
@@ -1468,6 +1577,8 @@ def acos(x, out = None):
     #
     
     out = asin(x, out = out)  # Put arcsin(x) into place
+    # We are assuming that asin returns with 
+    # zlevel/zlevels all >= 0
     out.d *= -1               # Multiply by -1
     out.d[0] += np.pi/2       # Add pi/2 to value
     
@@ -1728,7 +1839,8 @@ def powi(x, i, out = None):
     #
     if i == 1: # Just a copy
         np.copyto(out.d, x.d)
-        out.zlevel = x.zlevel 
+        out.zlevel = x.zlevel
+        out.zlevels = x.zlevels
         return out
     
     # Otherwise,
@@ -1749,6 +1861,7 @@ def powi(x, i, out = None):
     
     np.copyto(out.d, res.d)
     out.zlevel = res.zlevel
+    out.zlevels = res.zlevels 
         
     return out
 
