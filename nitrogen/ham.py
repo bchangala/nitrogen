@@ -814,13 +814,16 @@ class GeneralSpaceFixed(LinearOperator):
         # Calculate coordinate system metric functions
         #
         g = cs.Q2g(Q, deriv = 1, mode = 'simple', vvar = vvar, masses = masses)
-        G,detg = nitrogen.dfun.sym2invdet(g, 1, len(vvar))
+        #G,detg = nitrogen.dfun.sym2invdet(g, 1, len(vvar))
         # G and detg contain the derivative arrays for G = inv(g) and det(g)
+        G = nitrogen.linalg.packed.inv_sp(g[0])
         G = G[0] # need only value; lower triangle row-order
         #
         # Calculate gtilde_k = (d detg)/dQ_k / detg
         # Only do this for active coordinates (i.e. those in vvar) 
-        gtilde = detg[1:] / detg[0]
+        #gtilde = detg[1:] / detg[0]
+        gtilde = [nitrogen.linalg.packed.trAB_sp(G, g[i+1]) for i in range(len(vvar))]
+        gtilde = np.stack(gtilde)
         #
         
         ########################################
@@ -1427,10 +1430,14 @@ class NonLinear(LinearOperator):
         #
         # And then calculate its inverse and determinant
         #
-        G,detg = nitrogen.dfun.sym2invdet(g, 1, len(vvar))
+        #G,detg = nitrogen.dfun.sym2invdet(g, 1, len(vvar))
+        G = nitrogen.linalg.packed.inv_sp(g[0])
         #
         # G and detg contain the derivative arrays for G = inv(g) and det(g)
         # 
+        gtilde = [nitrogen.linalg.packed.trAB_sp(G, g[i+1]) for i in range(len(vvar))]
+        gtilde = np.stack(gtilde)
+        
         # If J = 0, then we only need to keep the vibrational block of G.
         # In packed storage, this is the first nv*(nv+1)/2 
         # elements (where nv = len(vvar))
@@ -1438,14 +1445,15 @@ class NonLinear(LinearOperator):
         if J == 0:
             nv = len(vvar)
             nG = (nv*(nv+1))//2 
-            G = G[0][:nG] # need only value; lower triangle row-order
+            G = G[:nG].copy() # need only value; lower triangle row-order
         else:
-            G = G[0]      # keep all elements
+            pass 
         
         #
         # Calculate the log. deriv. of g
-        gtilde = detg[1:] / detg[0]
+        # gtilde = detg[1:] / detg[0]
         #
+
         
         ########################################
         #
