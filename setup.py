@@ -1,5 +1,63 @@
 import setuptools
-from nitrogen import __version__
+from setuptools import Extension
+import codecs
+import os.path
+
+####################
+# Version fetching
+#
+def read(rel_path):
+    here = os.path.abspath(os.path.dirname(__file__))
+    with codecs.open(os.path.join(here, rel_path), 'r') as fp:
+        return fp.read()
+
+def get_version(rel_path):
+    for line in read(rel_path).splitlines():
+        if line.startswith('__version__'):
+            delim = '"' if '"' in line else "'"
+            return line.split(delim)[1]
+    else:
+        raise RuntimeError("Unable to find version string.")
+        
+__version__ = get_version("nitrogen/__init__.py")
+        
+#######################
+# Cython handling
+# (adapted from C. McQueen `simplerandom`
+#  see https://github.com/cmcqueen/simplerandom)
+# True -> build extensions using Cython
+# False -> build extensions from C file
+# 'auto' -> build with Cython if available, otherwise from C
+#
+use_cython = 'auto'
+#
+#
+if use_cython:
+    try:
+        from Cython.Distutils import build_ext
+    except ImportError:
+        if use_cython == 'auto':
+            use_cython = False 
+        else:
+            raise # use_cython was True, but cannot import 
+            
+cmdclass = {}
+ext_modules = []
+if use_cython:
+    ext_modules += [
+        Extension("nitrogen.cythontest", [ "nitrogen/cython/test.pyx" ]),
+    ]
+    cmdclass.update({ 'build_ext': build_ext })
+else:
+    ext_modules += [
+        Extension("nitrogen.cythontest", [ "nitrogen/cython/test.c" ]),
+    ]
+    
+for e in ext_modules:
+    e.cython_directives = {'language_level': "3"} #all are Python-3
+    
+######################################
+
 
 with open("README.md", "r") as fh:
 	long_description = fh.read()
@@ -19,10 +77,9 @@ setuptools.setup(
 		"License :: OSI Approved :: MIT License",
 		"Operating System :: OS Independent",
 	],
-	python_requires = '>=3.6',
-    install_requires=['numpy>=1.19',
-                      'scipy>=1.4.1',
-                      'matplotlib>=3.1,<3.3',  # Incompatibility issue with 3.3
-                      'scikit-image'
-                      ]
+	python_requires = '>=3.6', 
+    install_requires=['numpy>=1.19', 'scipy>=1.4.1', 'matplotlib>=3.1,<3.3', 'scikit-image',
+                      'setuptools>=49',"wheel","Cython>=0.29.21"], 
+    cmdclass = cmdclass,
+    ext_modules = ext_modules
 )
