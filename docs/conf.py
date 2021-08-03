@@ -19,7 +19,7 @@ from nitrogen import __version__
 # -- Project information -----------------------------------------------------
 
 project = 'NITROGEN'
-copyright = '2020, Bryan Changala'
+copyright = '2021, Bryan Changala'
 author = 'Bryan Changala'
 version = __version__
 release = version

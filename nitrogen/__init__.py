@@ -20,7 +20,7 @@ from . import tensor
 from . import scf 
 from . import special
 
-__version__ = '2.1.dev4'
+__version__ = '2.1.dev4' 
 
 import numpy as np 
 
