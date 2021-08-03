@@ -115,8 +115,15 @@ class NDBasis:
         self.bas = basisfun.val(qgrid) # (Nb, Nq) 
         
         
-        self._UH = (self.bas * np.sqrt(self.wgt)).T
-        self._U  = self.bas.conj() * np.sqrt(self.wgt)
+        self._UH = (self.bas * np.sqrt(self.wgt)).T    # UH is the generic W
+        self._U  = self.bas.conj() * np.sqrt(self.wgt) # U is the generic W^dagger
+        
+        dbas = basisfun.f(qgrid, deriv = 1) 
+        Di = [] 
+        for i in range(self.nd): 
+            Zi = (dbas[i+1] * np.sqrt(self.wgt)).T  # The generic Z matrix 
+            Di.append(Zi @ self._U) # The D_i derivative quadrature rep.
+        self._Di = Di 
         
         return 
         
@@ -161,6 +168,48 @@ class NDBasis:
         
         return self._quadToFbr(w, axis)
     
+    def quadD(self, x, var, axis = 0):
+        """
+        Apply the quadrature representation derivative operator.
+
+        Parameters
+        ----------
+        x : (...,`Nq`,...) ndarray
+            The quadrature representation array.
+        var : int
+            The coordinate of the derivative.
+        axis : int, optional
+            The quadrature axis. The default is 0. 
+
+        Returns
+        -------
+        y : (...,`Nq`,...) ndarray
+            The result.
+
+        """
+        return self._quadD(x,var,axis)
+        
+    def quadDH(self, x, var,axis = 0):
+        """
+        Apply the quadrature representation D^dagger operator.
+
+        Parameters
+        ----------
+        x : (...,`Nq`,...) ndarray
+            The quadrature representation array.
+        var : int
+            The coordinate of the derivative.
+        axis : int, optional
+            The quadrature axis. The default is 0. 
+
+        Returns
+        -------
+        y : (...,`Nq`,...) ndarray
+            The result.
+
+        """
+        return self._quadDH(x,var,axis)
+    
     def _fbrToQuad(self, v, axis = 0):
         
         """ The default implemention of
@@ -184,6 +233,27 @@ class NDBasis:
         v = np.moveaxis(v, 0, axis)
         
         return v
+    
+    def _quadD(self, x, var, axis = 0):
+        """ The default implementation of quadD"""
+        y = np.tensordot(self._Di[var], x, axes = (1,axis))
+        y = np.moveaxis(y, 0, axis) 
+        return y
+    def _quadDH(self, x, var, axis = 0):
+        """ The default implementation of quadDH"""
+        y = np.tensordot(self._Di[var].conj().T, x, axes = (1,axis))
+        y = np.moveaxis(y, 0, axis) 
+        return y 
+    
+class StructuredBasis(NDBasis):
+    """
+    Multi-dimensional bases that have a structured product
+    form, such as spherical harmonics, D-matrices, etc,
+    and direct product quadrature grids. 
+    """
+    
+    def __init__(self):
+        raise NotImplementedError()
 
 class SinCosBasis(NDBasis):
     
