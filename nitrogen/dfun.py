@@ -1043,7 +1043,13 @@ class SimpleProduct(DFun):
                     raise ValueError("Factors do not have the same nf")
                 
                 maxderiv = _min_maxderiv(maxderiv, factors[i].maxderiv)
-                zlevel = _sum_None(zlevel, factors[i].zlevel) 
+                
+                if factors[i].zlevel is not None and factors[i].zlevel < 0 :
+                    zlevel = -1
+                elif zlevel is not None and zlevel < 0 :
+                    zlevel = -1 # remains zero 
+                else:
+                    zlevel = _sum_None(zlevel, factors[i].zlevel) 
                 
         super().__init__(self._f_simple_prod, nf = nf, nx = nx,
                          maxderiv = maxderiv, zlevel = zlevel) 
@@ -1093,8 +1099,111 @@ class SimpleProduct(DFun):
                     out *= val_i # broadcast onto (nd, nf, ...) with (1, nf, ...)
         
         return out
-                
+
+class SelectedProduct(DFun):
+    
+    """
+    Given multiple sets of functions, create
+    a simple product using only selected combinatoins
+    of factors.
+    
+    """
+
+    def __init__(self, factors, select):
+        """
+        Parameters
+        ----------
+        factors : list of DFun
+            The factor for each input variable.
+        select : (n,len(factors)) array_like
+            The factor function selection indices.
+            
+        Notes
+        -----
+        Only 1D factors are currently supported. This may change 
+        in the future.
+
+        """
         
+        nx = len(factors) # assume 1-D factors. this may change in the future
+        select = np.array(select).copy()  
+        nf = select.shape[0] # the number of selection products
+        if select.shape[1] != nx:
+            raise ValueError("select.shape[1] must equal the number of factors")
+        
+        maxderiv = None 
+        zlevel = 0  
+        
+        # Check all factors
+        for i in range(nx):
+            if factors[i].nx != 1:
+                raise ValueError("All factors must be 1-dimensional. This may"
+                                 " change in the future.")
+            if select[:,i].max() > (factors[i].nf - 1):
+                raise ValueError(f"factors[{i:d}] has too functions to select")
+                
+            maxderiv = _min_maxderiv(maxderiv, factors[i].maxderiv)
+            
+            if factors[i].zlevel is not None and factors[i].zlevel < 0 :
+                zlevel = -1
+            elif zlevel is not None and zlevel < 0 :
+                zlevel = -1 # remains zero 
+            else:
+                zlevel = _sum_None(zlevel, factors[i].zlevel) 
+                
+        super().__init__(self._f_select_prod, nf = nf, nx = nx,
+                         maxderiv = maxderiv, zlevel = zlevel) 
+        
+        self.factors = factors 
+        self.select = select 
+        
+    def _f_select_prod(self, X, deriv = 0, out = None, var = None):
+        #
+        #
+        # Calculate derivative array for a selected product of
+        # independent functions
+        #  f(x1) * g(x2) * h(x3) * ...
+        #
+        factors = self.factors # The factors f, g, h, ...
+        select = self.select   # The selected products 
+        
+        nd, nvar = ndnvar(deriv, var, self.nx) 
+        out, var = self._parse_out_var(X, deriv, out, var)
+        
+        dv = []
+        for v in var:
+            # (deriv+1, nf, ...)
+            dv.append(factors[v].f(X[v:(v+1)], deriv))
+            
+        # dv contains the 1-D derivatives of each factor in var respectively
+        # We need to combine these derivatives, and then scalar multiply
+        # by the values of non-var factors.
+        #
+        idxtab = adf.idxtab(deriv, nvar) 
+        
+        out.fill(1.0) # initialize all derivative products to 1
+        for i in range(nd):
+            idx = idxtab[i]
+            
+            for k in range(self.nf):
+                for j in range(nvar):
+                    #
+                    # For the j**th var, take the required
+                    # derivative of its respective factor
+                    #
+                    out[i,k] *= dv[j][idx[j], select[k,var[j]]] 
+        
+        # Now scale by value of non-var variables
+        for i in range(self.nx):
+            if i not in var:
+                val_i = factors[i].f(X[i:(i+1)], deriv = 0) # (1, nf, ...) 
+                
+                for k in range(self.nf):
+                    out[:,k] *= val_i[:,select[k,i]]
+                    # broadcast onto (nd, ...) with (1, ...)
+        
+        return out 
+    
 class PolyFactor(DFun):
     
     def __init__(self, terms, nx = None):
