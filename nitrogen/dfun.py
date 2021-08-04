@@ -396,6 +396,18 @@ class DFun:
             
         return out
     
+    def _parse_out_var(self, X, deriv, out, var):
+        """ Parse a out and var, which may be None"""
+        if var is None:
+            var = [i for i in range(self.nx)]
+        if out is None:
+            nd, nvar = ndnvar(deriv, var, self.nx)
+            out = np.ndarray( (nd, self.nf) + X.shape[1:], dtype = X.dtype)
+        
+        return out, var
+        
+        
+    
 class CompositeDFun(DFun):
     
     """
@@ -975,6 +987,113 @@ class PermutedDFun(DFun):
     
     def __repr__(self):
         return f"PermutedDFun({self.df!r}, in_order = {self.in_order!r}, out_order = {self.out_order!r})"
+
+
+class SimpleProduct(DFun):
+    """
+    
+    Create a product function from 
+    mutually independent factors.
+    
+    .. math:
+       
+       f(x,y,\cdots) = g(x)h(y) \cdots
+       
+    Multi-dimensional factors may be supported in the future.
+    
+    """
+    
+    def __init__(self, factors):
+        """
+    
+        Parameters
+        ----------
+        factors : list of DFun or None
+            The factor for each input variable. Elements 
+            of None will be interpreted as unity.
+            
+        Notes
+        -----
+        If all elements are None, then 1 output variable
+        (equal to one) will be assumed. 
+
+        """
+        
+        nx = len(factors) # the number of factors 
+        
+        # Set the default parameters if all None
+        nf = 1 
+        maxderiv = None 
+        zlevel = 0  # Constant function (i.e. unity)
+        
+        for i in range(nx):
+            if factors[i] is not None: # There is some DFun presented
+                nf = factors[i].nf 
+                maxderiv = factors[i].maxderiv 
+                zlevel = factors[i].zlevel
+                break 
+        
+        # Now check all factors for agreement
+        for i in range(nx):
+            if factors[i] is not None:
+                if factors[i].nx != 1:
+                    raise ValueError("All factors must be 1-dimensional. This may"
+                                     " change in the future.")
+                if factors[i].nf != nf:
+                    raise ValueError("Factors do not have the same nf")
+                
+                maxderiv = _min_maxderiv(maxderiv, factors[i].maxderiv)
+                zlevel = _sum_None(zlevel, factors[i].zlevel) 
+                
+        super().__init__(self._f_simple_prod, nf = nf, nx = nx,
+                         maxderiv = maxderiv, zlevel = zlevel) 
+        self.factors = factors 
+    
+    def _f_simple_prod(self, X, deriv = 0, out = None, var = None):
+        #
+        #
+        # Calculate derivative array for a product of
+        # independent functions
+        #  f(x1) * g(x2) * h(x3) * ...
+        #
+        factors = self.factors # The factors f, g, h, ...
+        
+        nd, nvar = ndnvar(deriv, var, self.nx) 
+        
+        out, var = self._parse_out_var(X, deriv, out, var)
+        
+        dv = []
+        for v in var:
+            if factors[v] is None:
+                # A unity factor
+                d = np.zeros((deriv+1, self.nf) + X.shape[1:], dtype = X.dtype)
+                d[0].fill(1.0) 
+            else:
+                # An explicit factor
+                d = factors[v].f(X[v:(v+1)], deriv) # (deriv+1, nf, ...)
+            dv.append(d)
+        #
+        # dv contains the 1-D derivatives of each factor in var respectively
+        # We need to combine these derivatives, and then scalar multiply
+        # by the values of non-var factors.
+        #
+        idxtab = adf.idxtab(deriv, nvar) 
+        for i in range(nd):
+            idx = idxtab[i]
+            out[i,:] = 1.0 
+            for j in range(nvar):
+                out[i,:] *= dv[j][idx[j]] 
+        
+        for i in range(self.nx):
+            if i not in var:
+                if factors[i] is None:
+                    pass # A factor of unity
+                else:
+                    val_i = factors[i].f(X[i:(i+1)], deriv = 0) # (1, nf, ...) 
+                    out *= val_i # broadcast onto (nd, nf, ...) with (1, nf, ...)
+        
+        return out
+                
         
 class PolyFactor(DFun):
     
@@ -1098,7 +1217,22 @@ class PolyPower(DFun):
         
         # Return result
         return adf2array([res],out)   
-    
+
+def _min_maxderiv(maxA,maxB):
+    return _composite_maxderiv(maxA,maxB)
+def _max_zlevel(zlevelA,zlevelB):
+    return _merged_zlevel(zlevelA, zlevelB)
+def _product_None(a,b):
+    if a is None or b is None:
+        return None 
+    else:
+        return a * b
+def _sum_None(a,b):
+    if a is None or b is None:
+        return None 
+    else:
+        return a + b
+
 def _composite_maxderiv(maxA,maxB):
     """
     Determine the maxderiv value of a composite
