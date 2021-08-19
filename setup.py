@@ -46,11 +46,13 @@ ext_modules = []
 if use_cython:
     ext_modules += [
         Extension("nitrogen.cythontest", [ "nitrogen/cython/test.pyx" ]),
+        Extension("nitrogen.basis.ndbasis_c", [ "nitrogen/basis/cython/ndbasis_c.pyx" ]),
     ]
     cmdclass.update({ 'build_ext': build_ext })
 else:
     ext_modules += [
         Extension("nitrogen.cythontest", [ "nitrogen/cython/test.c" ]),
+        Extension("nitrogen.basis.ndbasis_c", [ "nitrogen/basis/cython/ndbasis_c.c" ]),
     ]
     
 for e in ext_modules:

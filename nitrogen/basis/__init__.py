@@ -10,6 +10,9 @@ representations (DVRs) and finite-basis representations
 """
 
 # Import main module into name-space
+from . import genericbasis 
+from .genericbasis import *
+
 from . import dvr
 from .dvr import *
 
@@ -19,7 +22,8 @@ from .ndbasis import *
 # Load submodules
 from . import ops  # DVR operators
 
-__all__ = []
+__all__ = [] 
+__all__ += genericbasis.__all__
 __all__ += dvr.__all__
 __all__ += ndbasis.__all__ 
 
@@ -29,6 +33,7 @@ from mpl_toolkits.mplot3d import Axes3D
 from matplotlib import cm
 from skimage.measure import marching_cubes
 from scipy import interpolate
+    
 
 
 def gridshape(dvrs):
@@ -107,13 +112,13 @@ def dvr2grid(dvrs):
 
 def bases2grid(bases):
     """
-    Create direct product grids from a list of DVRs and
-    NDBasis objects.
+    Create direct product grids from a list of GriddedBasis objects
+    and scalars.
 
     Parameters
     ----------
     bases : list
-        Each element is a GenericDVR or NDBasis object or a 
+        Each element is a :class:`~nitrogen.genericbasis.GriddedBasis` object or a 
         fixed-value scalar.
 
     Returns
@@ -131,23 +136,36 @@ def bases2grid(bases):
     
     for i,bas in enumerate(bases):
         
-        if isinstance(bas, GenericDVR):
-            grids.append(bas.grid)
-            qshape.append(bas.num)
-            nq += 1
+        # if isinstance(bas, GenericDVR):
+        #     grids.append(bas.grid)
+        #     qshape.append(bas.num)
+        #     nq += 1
+        #     index_of_coord.append(i)
+        # elif isinstance(bas, NDBasis):
+        #     for j in range(bas.nd) :
+        #         grids.append(bas.qgrid[j])
+        #         index_of_coord.append(i)
+        #     qshape.append(bas.Nq)
+        #     nq += bas.nd
+        # else: 
+        #     grids.append(bas)
+        #     qshape.append(1) 
+        #     nq += 1    
+        #     index_of_coord.append(i)
+        
+        # Use generic GriddedBasis interface
+        if np.isscalar(bas):
+            grids.append(bas) # The scalar value
+            qshape.append(1)
+            nq += 1 
             index_of_coord.append(i)
-            
-        elif isinstance(bas, NDBasis):
-            for j in range(bas.nd) :
-                grids.append(bas.qgrid[j])
+        else:
+            # Assume GriddedBasis
+            for j in range(bas.nd):
+                grids.append(bas.gridpts[j])
                 index_of_coord.append(i)
-            qshape.append(bas.Nq)
+            qshape.append(bas.ng)
             nq += bas.nd
-        else: 
-            grids.append(bas)
-            qshape.append(1) 
-            nq += 1    
-            index_of_coord.append(i)
             
     Qi = []
     for i in range(nq):
@@ -430,10 +448,10 @@ def _to_quad(bases, x, force_copy = False):
     """
     for i,b in enumerate(bases):
         # i**th axis
-        try:
-            x = b.fbrToQuad(x, i)
-        except:
-            pass
+        if b is None or np.isscalar(b):
+            pass 
+        else:
+            x = b.basis2grid(x,i)
     
     if force_copy:
         x = x.copy() 
@@ -447,78 +465,15 @@ def _to_fbr(bases, x, force_copy = False):
     """
     for i,b in enumerate(bases):
         # i**th axis
-        try:
-            x = b.quadToFbr(x, i)
-        except:
-            pass
+        if b is None or np.isscalar(b):
+            pass 
+        else:
+            x = b.grid2basis(x,i)
     
     if force_copy:
         x = x.copy() 
 
     return x 
-
-def collectBasisD(bases):
-    """
-    Collect derivative operators in quadrature
-    representation for a list of bases.
-
-    Parameters
-    ----------
-    bases : list
-        A list of GenericDVR, NDBasis, or scalars.
-
-    Returns
-    -------
-    D : list
-        The derivative operators in the quadrature
-        representation for each coordinate in `bases`.
-        Scalar values (fixed coordinates) have an 
-        entry of None.
-
-    """
-    ###################################
-    #
-    # Collect or construct the single
-    # derivative operators for every
-    # active coordinate.
-    # 
-    # Inactive coordinates will be included
-    # in the list via None.
-    #
-    # For DVR objects, the derivative operator
-    # is provided in the DVR representation
-    # via DVR.D
-    #
-    # For NDBasis objects, we will construct
-    # an effective operator that acts on the
-    # the quadrature representation:
-    #    1) it first transforms *back* to the 
-    #       FBR representation, and then
-    #    2) transform back to a quadrature
-    #       evaluated using the derivative
-    #       of the basis functions directly.
-    #
-    D = [] 
-    for b in bases:
-        if isinstance(b, GenericDVR):
-            D.append(b.D) 
-        elif isinstance(b, NDBasis):
-            # Evaluate the derivative of the basis functions
-            # with respect to its coordinates on the basis set's
-            # quadrature grid
-            #
-            dbas = b.basisfun.jac(b.qgrid)
-            for i in range(b.nd):
-                # For each coordinate in the basis set
-                # 
-                quad2fbr = b.bas.conj() * np.sqrt(b.wgt)
-                dquad2fbr = dbas[:,i] * np.sqrt(b.wgt)
-                D.append(  dquad2fbr.T @ quad2fbr )
-        else:
-            # an inactive coordinate, include None
-            D.append(None)              
-    
-    return D 
 
 def calcRhoLogD(bases, Q):
     """
@@ -529,7 +484,7 @@ def calcRhoLogD(bases, Q):
     Parameters
     ----------
     bases : list
-        List of DVR, NDBasis, and scalars.
+        List of GriddedBasis and scalars.
     Q : ndarray
         The coordinate values. `Q[i]` is an array
         for the i**th coordinate.
@@ -545,46 +500,40 @@ def calcRhoLogD(bases, Q):
     
     rhotilde = [] 
     k = 0
-    for b in bases: #
-        if isinstance(b, GenericDVR):
-            # All DVR objects have unit weight function,
-            # rho = 1.
-            # So rhotilde_k = 0
-            #
-            rhotilde.append(np.zeros(Q.shape[1:])) 
+    for b in bases:
+    
+        if np.isscalar(b):
+            # An inactive coordinate
+            # No entry
             k += 1 
-        
-        elif isinstance(b, NDBasis):
-            #
-            # NDBasis objects provide their weight
-            # function with the DFun wgtfun()
-            # Evaluate wgtfun and its first derivatives
-            # over the quadrature grid. It only takes
-            # the coordinates belonging to this basis 
-            # set as arguments
-            #
-            # Note: using the *entire* quadrature grid is a big 
-            # waste of effort because most of the arrays are the same value
-            # One could slice-out the necessary coordinates and then
-            # broadcast them back out to the entire quadrature grid,
-            # but wgtfun is usually a simple, inexpensive function
-            # so this is not a bottle-neck.
-            #
-            if b.wgtfun is not None: 
+        else:
+            # Assume a GriddedBasis
+            if b.wgtfun is None:
+                for i in range(b.nd):
+                    rhotilde.append(np.zeros(Q.shape[1:]))
+                    k += 1
+            else:
+                # GriddedBasis objects provide their weight
+                # function with the DFun wgtfun()
+                # Evaluate wgtfun and its first derivatives
+                # over the quadrature grid. It only takes
+                # the coordinates belonging to this basis 
+                # set as arguments
+                #
+                # Note: using the *entire* quadrature grid is a big 
+                # waste of effort because most of the arrays are the same value
+                # One could slice-out the necessary coordinates and then
+                # broadcast them back out to the entire quadrature grid,
+                # but wgtfun is usually a simple, inexpensive function
+                # so this is not a bottle-neck.
+                #
                 rho = b.wgtfun.f(Q[k:(k+b.nd)], deriv = 1) 
                 for i in range(b.nd): # for each coordinate in the basis
                     rhoi = rho[i+1][0] / rho[0][0] # calculate log. deriv.
                     rhotilde.append(rhoi) 
-                    k += 1       
-            else:
-                # If wgtfun is None, then the weight function is unity
-                for i in range(b.nd):
-                    rhotilde.append(np.zeros(Q.shape[1:]))
-                    k += 1 
-        else:
-            # inactive coordinate; no entry in rhotilde.
-            k += 1 
-        
+                    k += 1
+                    
     rhotilde = np.stack(rhotilde, axis = 0) # active only 
     
-    return rhotilde 
+    return rhotilde
+        

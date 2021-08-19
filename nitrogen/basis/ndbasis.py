@@ -8,7 +8,7 @@ sub-classes.
 :class:`~nitrogen.basis.NDBasis` sub-class       Description
 ---------------------------------------------  --------------------------------- 
 :class:`~nitrogen.basis.SinCosBasis`           A sine-cosine (real Fourier) basis
-:class:`~nitrogen.basisLegendreLMCosBasis`     Associated Legendre polynomials.
+:class:`~nitrogen.basis.LegendreLMCosBasis`    Associated Legendre polynomials.
 :class:`~nitrogen.basis.RealSphericalHBasis`   Real spherical harmonics.
 :class:`~nitrogen.basis.Real2DHOBasis`         Two-dimensional harmonic osc. basis.
 :class:`~nitrogen.basis.RadialHOBasis`         Radial HO basis in d dimensions.
@@ -17,14 +17,19 @@ sub-classes.
 """
 
 import nitrogen.special as special
+import nitrogen.dfun as dfun 
 import scipy.special 
 import numpy as np
 
-__all__ = ['NDBasis','SinCosBasis', 'LegendreLMCosBasis',
+from .ndbasis_c import _structured_op_double
+
+__all__ = ['NDBasis','StructuredBasis',
+           'SinCosBasis', 'LegendreLMCosBasis',
            'RealSphericalHBasis','Real2DHOBasis','RadialHOBasis']
 
+from .genericbasis import GriddedBasis 
 
-class NDBasis:
+class NDBasis(GriddedBasis):
     """
     
     A generic multi-dimensional finite basis representation
@@ -87,14 +92,12 @@ class NDBasis:
             The quadrature points.
         wgt : (`Nq`,) ndarray
             The quadrature weights.
-            
-        Returns
-        -------
-        None.
 
         """
+        
+        super().__init__(qgrid, basisfun.nf, wgtfun = wgtfun) 
+        
         self.basisfun = basisfun 
-        self.wgtfun = wgtfun 
         self.qgrid = qgrid 
         self.wgt = wgt
         
@@ -119,10 +122,12 @@ class NDBasis:
         self._U  = self.bas.conj() * np.sqrt(self.wgt) # U is the generic W^dagger
         
         dbas = basisfun.f(qgrid, deriv = 1) 
-        Di = [] 
-        for i in range(self.nd): 
-            Zi = (dbas[i+1] * np.sqrt(self.wgt)).T  # The generic Z matrix 
-            Di.append(Zi @ self._U) # The D_i derivative quadrature rep.
+        self._Zi = [(dbas[i+1] * np.sqrt(self.wgt)).T for i in range(self.nd) ]
+        # The generic Z matrix
+        # for each coordinate variable
+        
+        # The D_i derivative quadrature rep.
+        Di = [self._Zi[i] @ self._U for i in range(self.nd)] 
         self._Di = Di 
         
         return 
@@ -245,6 +250,27 @@ class NDBasis:
         y = np.moveaxis(y, 0, axis) 
         return y 
     
+    #
+    # GriddedBasis methods
+    #
+    def _basis2grid(self, x, axis = 0):
+        return self.fbrToQuad(x, axis = axis)
+    def _grid2basis(self,x, axis = 0):
+        return self.quadToFbr(x, axis = axis) 
+    def _basis2grid_d(self,x,var, axis = 0):
+        y = np.tensordot(self._Zi[var], x, axes = (1,axis))
+        y = np.moveaxis(y, 0, axis) 
+        return y
+    def _grid2basis_d(self, x,var, axis = 0):
+        y = np.tensordot(self._Zi[var].conj().T, x, axes = (1,axis))
+        y = np.moveaxis(y, 0, axis) 
+        return y 
+    def _d_grid(self,x,var, axis = 0):
+        return self.quadD(x, var, axis = axis)
+    def _dH_grid(self,x,var, axis = 0):
+        return self.quadDH(x, var, axis = axis) 
+    
+    
 class StructuredBasis(NDBasis):
     """
     Multi-dimensional bases that have a structured product
@@ -252,9 +278,227 @@ class StructuredBasis(NDBasis):
     and direct product quadrature grids. 
     """
     
-    def __init__(self):
-        raise NotImplementedError()
+    def __init__(self, bases, structure):
+        """
+        Initialize a generic StructuredBasis.
 
+        Parameters
+        ----------
+        bases : list of NDBasis objects
+            The basis function factors
+        structure : (Nb, nfs) array_like
+            The product structure of each basis function in
+            terms of the indices of each factor basis in `bases`.
+            
+        Notes
+        -----
+        Currently only 1-dimensional factor bases are supported. This may
+        be expanded in the future.
+        
+        """
+        
+        structure = np.array(structure)
+        if structure.ndim != 2:
+            raise ValueError("structure must be 2-d")
+        
+        Nb,nfs = structure.shape
+        nd = nfs # Assume the number of coordinates is the number of factors
+                 # (i.e. all factors are 1-d. this may change in future)
+        if len(bases) != nfs:
+            raise ValueError("len(bases) must equal structure.shape[1]")
+        
+        # Check that each basis is 1-d
+        # This may be extended in the future.
+        for i in range(nfs):
+            if bases[i].nd != 1:
+                raise ValueError("All basis factors must be 1-dimensional. "
+                                 "This may change in the future.")
+        basisfuns = [b.basisfun for b in bases]
+        basisfun = dfun.SelectedProduct(basisfuns, structure) 
+        
+        #
+        # wgtfun is a simple product of 
+        # each element in wgtfuns
+        wgtfun = dfun.SimpleProduct([b.wgtfun for b in bases])
+        
+        # Construct the direct product 
+        # quadrature grids and shape into 
+        # a (nd, Nq) array 
+        qgrids = [b.qgrid for b in bases] 
+        qgrid = np.stack(np.meshgrid(*qgrids, indexing = 'ij')).reshape((nd,-1))
+        
+        # Construct the total quadrature weights
+        # by taking the direct product of all
+        # individual weights 
+        wgts = [b.wgt for b in bases]
+        wgt = np.array(wgts[0]).copy()
+        for i in range(1, nfs):
+            wgt = np.outer(wgt, wgts[i]).reshape((-1,))
+        
+        super().__init__(basisfun, wgtfun, qgrid, wgt)
+        
+        # 
+        # Analyze the structure 
+        # ---------------------
+        #
+        # Determine the size of the recursively smaller
+        # sub-structures, working from left-to-right
+        #
+        # The first layer is just the structured basis
+        # itself, which we do not include
+        Nsub = []
+        #
+        # At the same time, record which index of the immediate
+        # sub-structure is paired with each member of
+        # the structure before it. These inverse indices are
+        # provided by np.unique(..., return_inverse = True).
+        # There are only nd - 1 of these to keep track of.
+        #
+        sub_idx = [] 
+        #
+        # We also need to keep track of the first index of any
+        # given sub-structure
+        #
+        lead_idx = [structure[:,0].copy().astype(np.uint)] 
+        
+        sub_structure = structure # Initialize
+        final_nb = Nb
+        for i in range(1,nfs):
+            #
+            # The sub-structure is the list of unique 
+            # rows for the remaining columns of the given structure
+            #
+            sub_structure, inverse_idx = np.unique(sub_structure[:,1:], 
+                                                   return_inverse = True, 
+                                                   axis = 0)
+            final_nb = sub_structure.shape[0]
+            Nsub.append(sub_structure.shape[0]) 
+            sub_idx.append(inverse_idx.astype(np.uint))
+            lead_idx.append(sub_structure[:,0].copy().astype(np.uint))
+            
+        #
+        # The final sub-structure is just a dummy singleton
+        Nsub.append(1)
+        sub_idx.append(np.array([0]*final_nb))
+        
+        Nsub = tuple(Nsub)
+        
+        # For each factor, we need the W and Z 
+        # quadrature transformation matrices from their
+        # respective bases to grids 
+        Ws = [] 
+        Zs = [] # a list of lists 
+                
+        for i in range(nfs):
+            b = bases[i] 
+            dbas = b.basisfun.f(b.qgrid, deriv = 1)
+            
+            Wi =  (dbas[0] * np.sqrt(b.wgt)).T 
+            Zi = []
+            for j in range(b.nd):
+                Zij =  (dbas[j+1] * np.sqrt(b.wgt)).T
+                Zi.append(Zij)
+            
+            Ws.append(Wi)
+            Zs.append(Zi)
+        
+        self.nfs = nfs # The number of factors
+        self.Nsub = Nsub 
+        self.sub_idx = sub_idx 
+        self.lead_idx = lead_idx 
+        self.Ws = Ws 
+        self.Zs = Zs 
+        
+        return 
+    #@profile
+    def _fbrToQuad(self, v, axis = 0):
+        """ structured basis fbr-to-quadrature transformation
+        """
+        
+        #
+        # Prepare data in proper shape
+        #
+        x = _reshape_axis_to_center(v, axis)
+        
+        for i in range(self.nfs): 
+            
+            W = self.Ws[i] # The quadrature transformation for this factor
+            nq = W.shape[0]
+            nsub = self.Nsub[i] 
+            
+            y = np.empty_like(x, shape = (x.shape[0],nq,nsub,x.shape[2]))
+            
+            # Now perform the quadrature transformation for this 
+            # factor 
+            _structured_op_double(x, y, W, 
+                                  self.lead_idx[i].astype(np.intc), 
+                                  self.sub_idx[i].astype(np.intc))
+            #
+            # y contains the intermediate result.
+            # as (..., nq, nsub, ...)
+            # reshape it so that the remaining sub-structure index (axis = 2)
+            # is in the middle for the next iteration
+            x = _reshape_axis_to_center(y, 2)
+            
+        #
+        # y (and x) should now be the completed quadrature representation
+        # of this basis. 
+        out_shape = list(v.shape) 
+        out_shape[axis] = self.Nq 
+        y = y.reshape(tuple(out_shape))
+        
+        return y 
+    
+    def _quadToFbr(self, w, axis = 0):
+        """ structured basis quad-to-fbr transformation
+        """
+        #
+        # Reshape data
+        #
+        x = _reshape_axis_to_center(w, axis)
+        # x now has shape (..., Nq, ...) 
+        #
+        for i in range(self.nfs-1, -1, -1): 
+            # Working backwards
+            
+            Wh = self.Ws[i].conj().T # W^dagger 
+            nq = Wh.shape[1] # the number of quadrature points for this factor
+            nsub = self.Nsub[i] # the sub-structure after this factor 
+            
+            #
+            # reshape x to a 4-d, push everything to the left
+            x = x.reshape( (-1, nq, nsub, x.shape[-1])) 
+            
+            # reverse structured op
+            
+            # y is now (..., nb, ...)
+            # where nb is the nsub of the left-ward factor.
+            #
+            # Let x reference y for the next iteration
+            x = y 
+            
+            
+            
+def _reshape_axis_to_center(x, axis):
+    """
+    Reshape x to a 3D array with 
+    `axis` at the center. The first and/or
+    last axes will be singleton if necessary
+    
+    """
+    
+    n_pre = 1 
+    for i in range(axis):
+        n_pre *= x.shape[i]
+    
+    n_post = 1
+    for i in range(axis+1,x.ndim):
+        n_post *= x.shape[i]
+        
+    new_shape = (n_pre, x.shape[axis], n_post) 
+    
+    return np.reshape(x, new_shape) 
+    
 class SinCosBasis(NDBasis):
     
     """

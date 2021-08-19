@@ -122,3 +122,7 @@ def podvr(prim_dvr, npo, i, qref, cs, pes_fun, masses):
     w,u = np.linalg.eigh(linalg.full(h1))
 
     return dvrs[i].contract(u[:,:npo])
+
+
+
+    

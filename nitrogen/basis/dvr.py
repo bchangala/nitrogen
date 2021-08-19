@@ -11,8 +11,9 @@ import numpy as np
 
 __all__ = ['GenericDVR','SimpleDVR','Contracted']
 
+from .genericbasis import GriddedBasis 
 
-class GenericDVR:
+class GenericDVR(GriddedBasis):
     """
     A super-class for generic 1D DVRs.
     
@@ -41,6 +42,9 @@ class GenericDVR:
             
         if D2.ndim != 2 or D2.shape[0] != num or D2.shape[1] != num:
             raise ValueError('D2 must be (num,num) array')
+        
+        # Initialize the generic GriddedBasis
+        super().__init__(grid.reshape((1,-1)), len(grid), wgtfun = None)
         
         self.num = len(grid)
         self.grid = grid 
@@ -99,6 +103,26 @@ class GenericDVR:
     
     def contract(self, u):
         return Contracted(u, self)
+    
+    #
+    # GriddedBasis methods
+    #
+    def _basis2grid(self, x, axis = 0):
+        return x # DVR is already in the grid representation 
+    def _grid2basis(self,x, axis = 0):
+        return x # DVR is already in the grid representation 
+    def _basis2grid_d(self,x,var, axis = 0):
+        return self._d_grid(x, var, axis)
+    def _grid2basis_d(self, x,var, axis = 0):
+        return self._dH_grid(x, var, axis) 
+    def _d_grid(self,x,var,axis = 0):
+        y = np.tensordot(self.D, x, axes = (1,axis))
+        y = np.moveaxis(y, 0, axis)
+        return y 
+    def _dH_grid(self,x,var,axis = 0):
+        y = np.tensordot(self.D.conj().T, x, axes = (1,axis))
+        y = np.moveaxis(y, 0, axis)
+        return y 
 
 
 class SimpleDVR(GenericDVR):
