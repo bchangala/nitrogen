@@ -107,7 +107,8 @@ class ConcatenatedBasis(GriddedBasis):
         nb = 0
         bidx = []
         for b in bases:
-            bidx.append(np.arange(nb, nb + b.nb))
+            #bidx.append(np.arange(nb, nb + b.nb))
+            bidx.append((nb, nb+b.nb)) # slice start/stop values 
             nb += b.nb
         
         super().__init__(bases[0].gridpts, nb, bases[0].wgtfun) 
@@ -127,8 +128,11 @@ class ConcatenatedBasis(GriddedBasis):
         for i in range(self.__nbases):
             indices = self.__bidx[i]
             b = self.__bases[i]
-            y += b.basis2grid(np.take(x, indices, axis = axis), axis = axis)
+            idx = _create_nd_slice(x.ndim, axis, indices[0], indices[1])
+            xi = x[idx]
+            y += b.basis2grid(xi, axis = axis)
         return y 
+    
     
     def _grid2basis(self, x, axis = 0):
         
@@ -138,7 +142,8 @@ class ConcatenatedBasis(GriddedBasis):
         y_sub = [b.grid2basis(x, axis = axis) for b in self.__bases]
         return np.concatenate(y_sub, axis = axis)
     
-    def _basis2grid_d(self, x, axis = 0):
+    
+    def _basis2grid_d(self, x, var, axis = 0):
         y = 0
         #
         # Add each block of basis functions 
@@ -147,15 +152,17 @@ class ConcatenatedBasis(GriddedBasis):
         for i in range(self.__nbases):
             indices = self.__bidx[i]
             b = self.__bases[i]
-            y += b.basis2grid_d(np.take(x, indices, axis = axis), axis = axis)
+            idx = _create_nd_slice(x.ndim, axis, indices[0], indices[1])
+            xi = x[idx]
+            y += b.basis2grid_d(xi, var, axis = axis)
         return y 
     
-    def _grid2basis_d(self, x, axis = 0):
+    def _grid2basis_d(self, x, var, axis = 0):
         
         # Calculate the overlap with each block of 
         # basis functions, then concatenate along the axis
         #
-        y_sub = [b.grid2basis_d(x, axis = axis) for b in self.__bases]
+        y_sub = [b.grid2basis_d(x, var, axis = axis) for b in self.__bases]
         return np.concatenate(y_sub, axis = axis) 
     
     #
@@ -304,6 +311,13 @@ def sameGrid(A, B):
             return True 
         
         
+def _create_nd_slice(nd, axis, start, stop, step = None):
+    
+    pre = [slice(None)] * axis 
+    idx = [slice(start, stop, step)] 
+    post = [slice(None)] * (nd - axis - 1) 
+    
+    return tuple(pre + idx + post)
         
         
         

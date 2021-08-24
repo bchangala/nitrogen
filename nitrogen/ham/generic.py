@@ -3,7 +3,7 @@
 General purpose space-fixed and body-fixed curvilinear Hamiltonians
 """
 
-__all__ = ['GeneralSpaceFixed', 'Collinear', 'NonLinear']
+__all__ = ['GeneralSpaceFixed', 'Collinear', 'NonLinear', 'AzimuthalLinear']
 
 import numpy as np 
 from scipy.sparse.linalg import LinearOperator
@@ -121,8 +121,7 @@ class GeneralSpaceFixed(LinearOperator):
         g = cs.Q2g(Q, deriv = 1, mode = 'simple', vvar = vvar, masses = masses)
         #G,detg = nitrogen.dfun.sym2invdet(g, 1, len(vvar))
         # G and detg contain the derivative arrays for G = inv(g) and det(g)
-        G = nitrogen.linalg.packed.inv_sp(g[0])
-        G = G[0] # need only value; lower triangle row-order
+        G = nitrogen.linalg.packed.inv_sp(g[0])  # need only value; lower triangle row-order
         #
         # Calculate gtilde_k = (d detg)/dQ_k / detg
         # Only do this for active coordinates (i.e. those in vvar) 
@@ -679,11 +678,8 @@ class NonLinear(LinearOperator):
         #
         # And then calculate its inverse and determinant
         #
-        #G,detg = nitrogen.dfun.sym2invdet(g, 1, len(vvar))
-        G = nitrogen.linalg.packed.inv_sp(g[0])
+        G = nitrogen.linalg.packed.inv_sp(g[0]) # value only
         #
-        # G and detg contain the derivative arrays for G = inv(g) and det(g)
-        # 
         gtilde = [nitrogen.linalg.packed.trAB_sp(G, g[i+1]) for i in range(len(vvar))]
         gtilde = np.stack(gtilde)
         
@@ -697,11 +693,6 @@ class NonLinear(LinearOperator):
             G = G[:nG].copy() # need only value; lower triangle row-order
         else:
             pass 
-        
-        #
-        # Calculate the log. deriv. of g
-        # gtilde = detg[1:] / detg[0]
-        #
 
         
         ########################################
@@ -747,7 +738,7 @@ class NonLinear(LinearOperator):
         self.isactive = isactive # The activity of each coordinate 
         
         return  
-    
+    #@profile 
     def _matvec(self, x):
         """ The matrix-vector product function
         
@@ -1170,11 +1161,7 @@ class AzimuthalLinear(LinearOperator):
         #G,detg = nitrogen.dfun.sym2invdet(g, 1, len(vvar))
         G = nitrogen.linalg.packed.inv_sp(g[0])
         #
-        # G and detg contain the derivative arrays for G = inv(g) and det(g)
-        # 
-        #
-        # Calculate the log. deriv. of g
-        # gtilde = detg[1:] / detg[0]
+        # Calculate the log. deriv. of det(g)
         #
         gtilde = [nitrogen.linalg.packed.trAB_sp(G, g[i+1]) for i in range(len(vvar))]
         gtilde = np.stack(gtilde)
@@ -1248,6 +1235,7 @@ class AzimuthalLinear(LinearOperator):
         
         return 
     
+    
     def _matvec(self, x):
         
         J = self.J 
@@ -1287,36 +1275,53 @@ class AzimuthalLinear(LinearOperator):
         #
         # Remember that the first axis of x_fbr is the rotational index
         #
-        x_partialq = x_fbr 
-        for i,b in enumerate(self.bases_dp):
-            if np.isscalar(b):
-                pass
-            elif i != eidx:
-                x_partialq = b.basis2grid(x_partialq, axis = i+1)
-            else: # The Ellipsis
-                pass
-        # x_partialq is the quadrature transformation for all
-        # factors **except** the Ellipsis coordinate.
-        xq = self.bases_dp[eidx].basis2grid(x_partialq, axis = eidx+1)
-        # xq is the full quadrature representation 
         
-        # Now calculate the quadrature of the derivatives
-        # for each **active** coordinate
-        dxq = []
+        # First transform the ellipsis basis to the quadrature grid
+        # (this will reduce the size considerably)
+        x_qe = self.bases_dp[eidx].basis2grid(x_fbr, axis = eidx + 1)
+        # Now transform the remaining factors 
+        xq = x_qe 
         for i,b in enumerate(self.bases_dp):
             if np.isscalar(b):
-                pass # Inactive, no entry
+                pass 
             elif i != eidx:
-                # A normal basis factor, which we assume 
-                # is left-unitary for the grid transformation
+                xq = b.basis2grid(xq, axis = i + 1)
+            else:
+                pass # ellipsis factor is already transformed
+        # Now calculate derivatives
+        dxq = [] 
+        for i,b in enumerate(self.bases_dp):
+            if np.isscalar(b):
+                pass # Inactive, no entry in list 
+            elif i != eidx:
+                # A normal basis factor, for which we assume left-unitarity
                 for k in range(b.nd):
                     dxq.append(b.d_grid(xq, k, axis = i+1))
             else:
-                # The Ellipsis factor. We must apply the
-                # derivative basis-to-grid transformation
-                # to x_partial
+                # The Ellipsis factor 
                 for k in range(b.nd):
-                    dxq.append(b.basis2grid_d(x_partialq, k, axis = eidx+1))
+                    # Tranform from direct-product fbr to derivative-grid
+                    dk = b.basis2grid_d(x_fbr, k, axis = eidx+1)
+                    # Now transform rest again
+                    for j,bj in enumerate(self.bases_dp):
+                        if np.isscalar(bj):
+                            pass
+                        elif j != eidx:
+                            dk = bj.basis2grid(dk, axis = j + 1)
+                        else:
+                            pass
+                    dxq.append(dk) 
+        #
+        # Calculate the ellipsis derivatives in this way forces us
+        # to perform basis2grid transformations for other coordinates
+        # multiple times (instead of just doing it once with x_fbr)
+        # This is still likely to be cheaper because there is usually
+        # only 1 ellipsis coordinate, but transforming it from the
+        # Concatenated FBR representation (which is large) to the
+        # single quadrature grid (which is usually small) reduces the
+        # array size considerably.
+        #
+        
         #
         # dxq now contains the quadrature representation 
         # of the derivative for each coordinate. Inactive
@@ -1356,7 +1361,7 @@ class AzimuthalLinear(LinearOperator):
                 # dtilde_l is the sum of the derivative 
                 # and one-half Gammatilde_l
                 #
-                dtilde_l = dxq[lact] + 0.5 * self.Gammatilde[lact] * xq[r]
+                dtilde_l = dxq[lact][r] + 0.5 * self.Gammatilde[lact] * xq[r]
                 
                 for kact in range(nact):
                     
@@ -1436,7 +1441,7 @@ class AzimuthalLinear(LinearOperator):
                             
                             # First, do the psi' (dtilde_k psi) term
 
-                            dtilde_k = dxq[kact] + 0.5 * self.Gammatilde[kact] * xq[r]
+                            dtilde_k = dxq[kact][r] + 0.5 * self.Gammatilde[kact] * xq[r]
                             yq[rp] += (rot_me * (-hbar**2) * 0.50) * Gak * dtilde_k
                             
                             # Now, do the -(dtilde_k psi') * psi term
@@ -1455,6 +1460,8 @@ class AzimuthalLinear(LinearOperator):
         # We work in the reverse order as the original basis-to-grid
         # transformation above.
         kact = 0
+
+        y_fbr = 0
         for i,b in enumerate(self.bases_dp):
             if np.isscalar(b):
                 pass # Inactive, no entry in dyq
@@ -1467,28 +1474,37 @@ class AzimuthalLinear(LinearOperator):
                     yq += b.dH_grid(dyq[kact], k, axis = i+1)
                     kact += 1
             else:
-                # The Ellipsis factor. We must apply the
-                # grid-to-(derivative basis) transformation resulting
-                # in a y_partial.
-                y_partial = 0
-                for k in range(b.nd):
-                    y_partial += b.grid2basis_d(dyq[kact], k, axis = eidx + 1)
+                for k in range(b.nd): # For each ellipsis derivative
+                    dk = dyq[kact]
+                    for j,bj in enumerate(self.bases_dp):
+                        if np.isscalar(bj):
+                            pass
+                        elif j != eidx:
+                            dk = bj.grid2basis(dk, axis = j + 1)
+                        else: 
+                            pass # do last 
+                    # finally, transform ellipsis grid onto derivative functions
+                    y_fbr += b.grid2basis_d(dk, k, axis = eidx + 1)
+                    
                     kact += 1
+        
         #
-        # yq and y_partial contain the two contributions to our
-        # final result. We next transform yq for only the
-        # Ellipsis axis and add that to y_partial.
-        # Then we finish transforming y_partial
-        # to yield the final y_fbr result.
-        y_fbr = y_partial + self.bases_dp[eidx].grid2basis(yq, axis = eidx + 1)
+        # yq contains the contributions from the non-derivative 
+        # result and the derivatives of all non-ellipsis coordinates
+        # 
+        # y_fbr currently contains just the results from the ellipsis derivatives
+    
+        y_qe = yq 
         for i, b in enumerate(self.bases_dp):
             if np.isscalar(b):
                 pass
             elif i != eidx:
-                y_fbr = b.grid2basis(y_fbr, axis = i + 1)
+                y_qe = b.grid2basis(y_qe, axis = i + 1)
+               
             else:
-                pass # the ellipsis axis is already transformed
-                    
+                pass # the ellipsis axis will be transformed last 
+        y_fbr += self.bases_dp[eidx].grid2basis(y_qe, axis = eidx + 1) 
+               
         #
         # 5) Transform from mixed DVR/FBR representation
         # to the multi-valued azimuthal representation
