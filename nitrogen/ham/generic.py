@@ -290,8 +290,7 @@ class Collinear(LinearOperator):
         Parameters
         ----------
         bases : list
-            A list of :class:`~nitrogen.basis.GenericDVR` or
-            :class:`~nitrogen.basis.NDBasis` basis sets for active
+            A list of :class:`~nitrogen.basis.GriddedBasis` basis sets for active
             coordinates. Scalar elements will constrain the 
             corresponding coordinate to that fixed value.
         cs : CoordSys
@@ -584,8 +583,7 @@ class NonLinear(LinearOperator):
         Parameters
         ----------
         bases : list
-            A list of :class:`~nitrogen.basis.GenericDVR` or
-            :class:`~nitrogen.basis.NDBasis` basis sets for active
+            A list of :class:`~nitrogen.basis.GriddedBasis` basis sets for active
             coordinates. Scalar elements will constrain the 
             corresponding coordinate to that fixed value.
         cs : CoordSys
@@ -738,7 +736,7 @@ class NonLinear(LinearOperator):
         self.isactive = isactive # The activity of each coordinate 
         
         return  
-    #@profile 
+    
     def _matvec(self, x):
         """ The matrix-vector product function
         
@@ -924,13 +922,155 @@ class NonLinear(LinearOperator):
     
 class AzimuthalLinear(LinearOperator):
     """
-    A  Hamiltonian for linear molecules
+    A general rovibrational Hamiltonian for linear molecules. 
+    
+    This Hamiltonian enables a fairly flexible treatment of linear
+    molecules that accounts for the necessary rovibrational boundary conditions 
+    related to linear geometries. The same kinetic energy operator
+    is used as that of :class:`NonLinear` Hamiltonians. The requirements 
+    for the basis functions are explained in more detail in the parameter notes
+    below.
     
     """
      
     def __init__(self, bases, cs, azimuth, pes = None, masses = None, J = 0, hbar = None,
-                 Vmax = None, Vmin = None, Voffset = None):
+                 Vmax = None, Vmin = None, Voffset = None,
+                 signed_azimuth = False ):
+        """
+
+        Parameters
+        ----------
+        bases : list
+            A list of :class:`~nitrogen.basis.GriddedBasis` basis sets for active
+            coordinates. Scalar elements will constrain the 
+            corresponding coordinate to that fixed value.
+        cs : CoordSys
+            The coordinate system.
+        azimuth : list
+            The azimuthal designation of each element of `bases`. Each element
+            must be one of None, Ellipsis, or a two-element tuple. See Notes
+            for details.
+        pes : DFun or function, optional
+            The potential energy surface, V(q). This accepts the 
+            coordinates defined by `cs` as input. If None (default),
+            no PES is used.
+        masses : array_like, optional
+            The atomic masses. If None (default), unit masses
+            are used. 
+        J : int, optional
+            The total angular momentum quantum number :math:`J`. The
+            default value is 0.
+        hbar : scalar, optional
+            The value of :math:`\\hbar`. If None, the default value in 
+            standard NITROGEN units is used (``n2.constants.hbar``).
+        Vmax,Vmin : scalar, optional
+            Potential energy cut-off thresholds. The default is None.
+        Voffset : scalar, optional
+            A potential energy offset. This will be subtracted
+            from the surface value. The default is None.
+        signed_azimuth : bool, optional
+            If True, then the Ellipsis basis functions depend on the
+            sign of the azimuthal quantum number. If False, then 
+            the sign is ignored. The default is False.
+
+        Notes
+        -----
         
+        Basis functions are constructed as products of factors supplied
+        in the `bases` parameter. Each (non-scalar) element represents
+        a single, possibly multi-dimensional, :class:`~nitrogen.basis.GriddedBasis`
+        basis set. Together with symmetric-top rotational wavefunctions,
+        the total product is 
+        
+        ..  math::
+        
+            \\Phi = f^{(m_1)}_i g^{(m_2)}_j h^{(m_3)}_k \\cdots \\vert J,k\\rangle
+        
+        where :math:`i,j,k,\\ldots` are the basis function indices. Each
+        factor is labeled with an additional *azimuthal quantum number*,
+        :math:`m_i`, assigned automatically (see below). The linear boundary
+        conditions are enforced by selecting only basis functions for which
+        
+        ..  math::
+        
+            k - \\sum_i m_i = 0.
+        
+        The azimuthal quantum numbers for each basis factor are assigned according
+        to the `azimuth` list, which has one element for each element in `bases`.
+        
+        A basis factor can be assigned in one of three ways:
+            
+        1. For factors/coordinates not relevant to the linear boundary conditions (typically
+        radial distances) the appropriate azimuthal quantum number is simply
+        :math:`m=0` for every basis function of that factor. This is indicated
+        with an `azimuth` element of ``None``. 
+        
+        2. For factors that involve internal rotation coordinates,
+        the azimuthal quantum number corresponds to the vibrational angular momentum 
+        for internal rotation about the body-fixed :math:`z` axis. Currently,
+        only one coordinate from a given basis factor can be identified 
+        as an internal rotation coordinate. This is specified with an `azimuth`
+        element of a two-element tuple ``(i, a)``. ``i`` is the coordinate
+        index of the internal rotation index for that basis factor (i.e. ``i`` = 0
+        means the first coordinate in the function, ``i`` = 1 the second, etc.)
+        ``a`` is a scaling parameter which defines the handedness and units
+        of the coordinate. The sign of ``a`` is positive for right-handed
+        rotation about :math:`z` and negative for left-handed rotation.
+        Its magnitude is equal to the geometric period of the internal 
+        rotation coordinate (in whatever units it is defined
+        in) divided by :math:`2\\pi`.
+        
+        The azimuthal quantum numbers are automatically determined by 
+        calculating the matrix representation of the operator :math:`-i a \\partial`,
+        where :math:`\\partial` is the partial derivative with respect to the
+        coordinate identified by the ``azimuth`` entry. To work properly, 
+        the set of basis functions must be closed under :math:`\\partial` (i.e.
+        a unitary transformation produces exact eigenfunctions) and the grid
+        representation must itself be quasi-unitary. The eigenfunctions
+        of :math:`-i a \\partial` are referred to as the *azimuthal representation*, 
+        and this is the working representation of the linear Hamiltonian.
+        The corresponding eigenvalues are the azimuthal quantum numbers 
+        :math:`m`. 
+        
+        3. There will be one special coordinate, :math:`\\theta`,
+        that behaves as a generalized
+        polar coordinate (e.g. the bond angle of a triatomic molecule). 
+        The boundary conditions on this coordinate as it approaches
+        linear geometries are related to the "pure rotational" angular 
+        momentum component
+        
+        ..  math::
+            
+            m^* = k - \\sum_{i'} m_{i'}
+        
+        where the sum includes all azimuthal quantum numbers other than
+        that associated with the polar coordinate. Usually, the polar
+        coordinate should have an integration volume element that
+        goes like :math:`\\sim \\theta` near linear geometries and 
+        its basis functions should go like :math:`\\sim \\theta^{m^*}`.
+        Associated Legendre polynomials and 2D radial harmonic oscillator 
+        wavefunctions are two such examples.
+        
+        The user is required to explicitly provide separate sets of 
+        basis functions for every possible (integer) value of 
+        :math:`m^*`. That is, the element of `bases` for the polar
+        coordinate is not just a single :class:`~nitrogen.basis.GriddedBasis`,
+        but a function of signature ``f(m)`` that returns a :class:`~nitrogen.basis.GriddedBasis`
+        with appropriate boundary conditions. Each of these different
+        basis sets must have equivalent grids and quadrature rules. 
+        
+        To indicate that a given factor contains the generalized
+        polar coordinate, the corresponding element in `azimuth` is
+        ``...`` (``Ellipsis``). One and only one factor must be designated
+        as the polar coordinate.
+        
+        Examples
+        --------
+        
+        
+        
+        
+        """
         # For each basis, get the azimuthal quantum number
         # list 
         
@@ -939,11 +1079,10 @@ class AzimuthalLinear(LinearOperator):
         
         # There should be one entry of Ellipsis in the azimuth list
         n = 0
-        ellipsis_idx = 0 # The basis index for the Ellipsis factor
         for i,entry in enumerate(azimuth):
             if entry is Ellipsis:
                 n += 1
-                ellipsis_idx = i
+                ellipsis_idx = i # The basis index for the Ellipsis factor
         if n != 1:
             raise ValueError("azimuth must contain exactly one Ellipsis")
         
@@ -1035,6 +1174,19 @@ class AzimuthalLinear(LinearOperator):
         # These have been kept track of with min_m and max_m in the above
         # loops
         ellipsis_range = np.arange(min_m, max_m + 1)
+        
+        # If the sign of the ellipsis quantum number does not matter
+        # then we can truncate the range further
+        if not signed_azimuth:
+            max_abs = max(abs(min_m), abs(max_m))
+            ellipsis_range = np.arange(0, max_abs + 1) 
+            print("The Ellipsis basis is not sign dependent.")
+        else:
+            print("The Ellipsis basis is sign dependent.")
+        
+        print("Attempting to calculate Ellipsis bases over m = ")
+        print(ellipsis_range)
+            
         #
         # For each m in this range, bases[ellipsis_idx](m) returns
         # a basis specification. This must be a compatible GriddedBasis, i.e.
@@ -1074,8 +1226,23 @@ class AzimuthalLinear(LinearOperator):
         
         az_grids = np.meshgrid(*az_m, indexing = 'ij') 
         
-        total = az_grids[0] - sum(az_grids[1:]) # k - sum(m)
-        sing_val_mask = (total == 0) 
+        non_ellip_total = np.zeros_like(az_grids[0])
+        for i in range(len(az_grids)):
+            if i != (ellipsis_idx + 1):
+                non_ellip_total += az_grids[i]
+        az_e = az_grids[ellipsis_idx + 1] 
+        #
+        # non_ellip_total is equal to k - Sum' m 
+        # where the Sum' is over all non-ellipsis azimuthal 
+        # quantum numbers
+        # 
+        # az_e is the ellipsis factor azimuthal quantum number
+        #
+        if signed_azimuth:
+            sing_val_mask = (az_e == non_ellip_total)
+        else:
+            sing_val_mask = (az_e == abs(non_ellip_total)) 
+            
         svm_1d = np.reshape(sing_val_mask, (-1,)) 
         NH = np.count_nonzero(svm_1d)  # the number of single-valued functions
         
@@ -1234,7 +1401,6 @@ class AzimuthalLinear(LinearOperator):
         self.nact = len(vvar) # The number of active coordinates 
         
         return 
-    
     
     def _matvec(self, x):
         

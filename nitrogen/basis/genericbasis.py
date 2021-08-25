@@ -10,7 +10,7 @@ __all__ = ["GriddedBasis", "ConcatenatedBasis",
 
 class GriddedBasis:
     """
-    A generic super-class for ``gridded'' basis sets,
+    A generic super-class for gridded basis sets,
     including DVRs and FBRs equipped with quadrature grids.
     
     Attributes
