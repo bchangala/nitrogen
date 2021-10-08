@@ -44,6 +44,10 @@ NITROGEN API reference
 .. automodule:: nitrogen.linalg.packed
    :members:
    :show-inheritance:
+   
+.. automodule:: nitrogen.math
+   :members:
+   :show-inheritance:
 
 .. automodule:: nitrogen.scf 
    :members: 

@@ -120,11 +120,11 @@ def spech_fft(C,dt,sample_factor = 1, damping = 0.0):
     The autocorrelation function is provided for :math:`t \geq 0`, i.e.
     C[0] is the :math:`t = 0` value. It is assumed that :math:`C(-t) = C(t)^*`.
     
-    The returned spectrum is calculated by a Fourier transforms as
+    The returned spectrum approximates the Fourier transformation
     
     ..  math::
         
-        g(\\omega) = \\frac{1}{2\\pi} \\int_{-\\infty}^{\\infty} dt e^{i \\omega t} C(t)
+        g(\\omega) = \\frac{1}{2\\pi}\\, \\int_{-\\infty}^{\\infty} dt e^{i \\omega t} C(t)
     
     
     This normalization means that the angular frequency integral of 
