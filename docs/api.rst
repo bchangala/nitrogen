@@ -52,6 +52,10 @@ NITROGEN API reference
 .. automodule:: nitrogen.scf 
    :members: 
    :show-inheritance: 
+   
+.. automodule:: nitrogen.vpt 
+   :members: 
+   :show-inheritance: 
 
 The ``autodiff`` sub-package
 ----------------------------

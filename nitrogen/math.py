@@ -138,7 +138,10 @@ def spech_fft(C,dt,sample_factor = 1, damping = 0.0):
     A Gaussian window function is also applied to the autocorrelation 
     function, of the form :math:`C(t) \\exp(-a (t/T)^2)`, where 
     :math:`T` is length of the correlation function (before any padding).
-    The damping factor :math:`a` is controlled by the `damping` keyword
+    The damping factor :math:`a` is controlled by the `damping` keyword.
+    At sufficiently large :math:`a`, the line shape becomes Gaussian
+    with an angular frequency full-width at half-maximum equal to
+    :math:`\\omega_\\text{FWHM} = 4 T^{-1} \\sqrt{a \\ln 2}`.
     
     """
     
@@ -182,3 +185,42 @@ def spech_fft(C,dt,sample_factor = 1, damping = 0.0):
     g = np.real(G[IDX]) 
     
     return g, freq 
+
+
+def gaussianFWHM(x, fwhm, norm = 'area'):
+    """
+    Calculate a Gaussian function.
+    
+    Parameters
+    ----------
+    x : array_like
+        Input array
+    fwhm : scalar
+        The full-width at half-maximum value.
+    norm : {'area', 'amplitude'}
+        The normalization convention. The default is 'area'. See Notes for
+        definitions.
+    
+    Returns
+    -------
+    y : ndarray
+        The result.
+        
+    Notes
+    -----
+    For `norm` = ``\`area\```, the integrated area is equal to 
+    unity. For `norm` = ``\`amplitude\```, the
+    peak amplitude is equal to unity.
+    
+    """
+    
+    y = np.exp(-4*np.log(2) * (x/fwhm)**2)
+    
+    if norm == 'area':
+        y *= np.sqrt(np.log(16)/np.pi) / fwhm 
+    elif norm == 'amplitude':
+        pass
+    else:
+        raise ValueError('unexpected norm keyword')
+    
+    return y 

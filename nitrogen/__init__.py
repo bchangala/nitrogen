@@ -19,6 +19,7 @@ from . import pes
 from . import tensor 
 from . import scf 
 from . import special
+from . import math 
 from . import vpt 
 
 __version__ = '2.1.dev4' 
