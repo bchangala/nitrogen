@@ -305,7 +305,8 @@ class adarray:
         """ z = +self"""
         return self.copy()
 
-def array(d,k,ni,copyd = False,zlevel = None, zlevels = None):
+def array(d,k,ni,copyd = False,zlevel = None, zlevels = None,
+          nck = None, idx = None):
     """
     Create an adarray object from a raw derivative array.
 
@@ -328,6 +329,8 @@ def array(d,k,ni,copyd = False,zlevel = None, zlevels = None):
         The zero-level of each variable. If None,
         this will be set safely to `k` for each. The
         default is None. 
+    nck, idx : ndarray, optional
+        See :class:`adarray` constructor.
 
     Returns
     -------
@@ -349,7 +352,9 @@ def array(d,k,ni,copyd = False,zlevel = None, zlevels = None):
     if np.ndim(d) < 1:
         return ValueError("d must have at least 1 dimension")
     
-    nck = ncktab(k + ni, min(k,ni))
+    if nck is None:
+        nck = ncktab(k + ni, min(k,ni))
+        
     if d.shape[0] != nck[k+ni,min(k,ni)]:
         return ValueError("The first dimension of d has an incorrect length")
     
@@ -361,7 +366,7 @@ def array(d,k,ni,copyd = False,zlevel = None, zlevels = None):
     else:
         zlevels = np.array(zlevels)
     
-    return adarray(base_shape, k, ni, nck, None, d.dtype, dinit, zlevel, zlevels)
+    return adarray(base_shape, k, ni, nck, idx, d.dtype, dinit, zlevel, zlevels)
     
 def ndize1(x):
     """
@@ -1051,7 +1056,8 @@ def const(value,k,ni,nck = None, idx = None):
         value = np.array(value)
     
     base_shape = value.shape
-    nck = ncktab(k + ni, min(k,ni))
+    if nck is None:
+        nck = ncktab(k + ni, min(k,ni))
     nd = nck[k + ni, min(k,ni)]
     
     d = np.zeros((nd,)+base_shape, dtype = value.dtype)
@@ -1067,7 +1073,8 @@ def const(value,k,ni,nck = None, idx = None):
         zlevel = 0 # A non-zero constant
         zlevels = np.array([0] * ni) 
     
-    c = array(d, k, ni, copyd = False, zlevel = zlevel, zlevels = zlevels)
+    c = array(d, k, ni, copyd = False, zlevel = zlevel, zlevels = zlevels,
+              nck = nck, idx = idx)
         
     return c
 
