@@ -305,6 +305,7 @@ class adarray:
         """ z = +self"""
         return self.copy()
 
+
 def array(d,k,ni,copyd = False,zlevel = None, zlevels = None,
           nck = None, idx = None):
     """
@@ -775,6 +776,343 @@ def idxpos(a,nck):
         posk = idxposk(a,nck)    # The position of this multi-index within
                                  # the block of multi-indices of the same degree k
         return offset + posk
+
+def mvexpand(X, k, ni, nck):
+    """
+    Expand a packed derivative array to
+    full symmetric tensors for each derivative degree.
+
+    Parameters
+    ----------
+    X : ndarray
+        A derivative array
+    k : int
+        Maximum derivative order
+    ni : int
+        Number of variables
+    nck : ndarray
+        Binomial table
+
+    Returns
+    -------
+    partials : list
+        A list of arrays for the zeroth, first, second, etc.
+        derivatives in full symmetric form.
+
+    """
+    
+    partials = [] 
+    
+    idx_low = np.uint64(0)
+    for i in range(k+1):
+        
+        # There are nk derivatives of order i
+        nk = nck[i+ni-1, min(i,ni-1)]
+        
+        idx_high = idx_low + nk
+        
+        Xk = X[idx_low:idx_high]
+        
+        partials.append(mvexpand_block(Xk, i, ni, nck))
+        
+        idx_low = idx_high 
+        
+    return partials
+        
+def mvexpand_block(Xk, k, ni, nck):
+    """
+    Expand the derivative array block of a single total degree
+
+    Parameters
+    ----------
+    Xk : ndarray
+        The block of the derivative array for a single degree
+    k : int
+        The degree
+    ni : int
+        The number of variables.
+    nck : ndarray
+        Binomial table.
+
+    Returns
+    -------
+    out : ndarray
+        The full derivative tensor. The first `k` indices have
+        length `ni`. The remaining shape matches the base shape
+        of `Xk`.
+
+    """
+    
+    if k == 0:
+        # Zeroth derivative, return value array
+        return Xk[0]
+    elif k == 1:
+        # First derivative, return gradient array
+        return Xk[0:ni]
+    else:
+    
+        base_shape = Xk.shape[1:]
+        d_shape = tuple([ni] * k) + base_shape 
+        
+        out = np.zeros((ni**k,) + base_shape, dtype = Xk.dtype) 
+        
+        grids = np.meshgrid(*[np.arange(ni) for i in range(k)], indexing = 'ij')
+        degs = np.stack([g.reshape((-1,)) for g in grids], axis = 1)
+        
+        N = degs.shape[0] 
+        
+        one = np.uint64(1)
+        
+        factorial = [np.math.factorial(i) for i in range(k+1)] 
+        
+        for i in range(N):
+            deg = degs[i,:] 
+            idx = np.array([np.count_nonzero(deg == j) for j in range(ni)])
+            pos = idxposk(idx, nck) # position in this degree block
+            
+            c = 1
+            for j in range(ni):
+                c *= factorial[idx[j]]
+                
+            np.copyto(out[i:i+1], c * Xk[pos:pos+one])
+            
+        return out.reshape(d_shape) 
+
+def mvcompress(partials, ni, idx):
+    """
+    Repack partial derivative arrays to 
+    derivative array format 
+    
+    partials : list
+        The derivative tensors for separated by degree
+    ni : int
+        The number of variables
+    idx : ndarray
+        The multi-index table
+        
+    """
+    k = len(partials) - 1
+    
+    idx = idxtab(k, ni) 
+    nd = idx.shape[0] 
+    
+    base_shape = np.array(partials[0]).shape 
+    
+    dtype = np.result_type(partials[0])
+    
+    X = np.ndarray( (nd,) + base_shape, dtype = dtype)
+    
+    
+    factorial = [np.math.factorial(i) for i in range(k+1)]
+    
+    for iX in range(nd):
+        
+        idxX = idx[iX,:]
+        
+        ki = sum(idxX) # The degree, and the element of partials to index 
+        
+        if ki == 0:
+            # idxX = 0, 0 , 0....
+            np.copyto(X[0:1], partials[0])
+        else:
+            # First or higher derivative
+            
+            val = partials[ki]  # The full array for the given derivative degree
+            # Successively index, and compute factorial
+            c = 1
+            for i in range(ni): # For each variable
+                for j in range(idxX[i]): # For each derivative of this variable
+                    val = val[i]
+                
+                c *= factorial[idxX[i]]
+                    
+                    
+            # val now has shape = base_shape       
+            np.copyto(X[iX:iX+1], val / c)
+    
+    return X 
+
+def mvrotate(X, T, k, nck, idx):
+    """
+    Rotate the derivative array via a linear transformation. The new 
+    coordinates are defined by a matrix :math:`\\mathbf{T}`, i.e.
+    :math:`y_i = T_{ij} x_j`.
+
+    Parameters
+    ----------
+    X : ndarray
+        The derivative array with respect to the original coordinates.
+    T : ndarray
+        The (ni,ni) linear transformation matrix.
+    k : int
+        The maximum derivative degree.
+    nck : ndarray
+        Binominal coefficient table.
+    idx : ndarray
+        The multi-index table. 
+
+    Returns
+    -------
+    Y : ndarray
+        The derivative array with respect to the new coordinates.
+
+    """
+    
+    ni = T.shape[0] 
+    
+    iT = np.linalg.inv(T)
+    
+    
+    # 
+    # For now, the linear transformation of
+    # derivatives will be carried out on the
+    # full, "uncompressed", partial derivative 
+    # tensors.
+    # 
+    # This is not the most efficient, memory-wise
+    # (or probably even compute-wise), but it is 
+    # simple to get working.
+    #
+    #
+    # Calculate the partial tensors for the original
+    # derivatives
+    #
+    partials = mvexpand(X, k, ni, nck) 
+    
+    # For each, tensor dot each index with the
+    # transpose of the inverse of the transformation
+    # array, T.
+    #
+    new_partials = [partials[0]]
+    
+    for i in range(1, k+1):
+        # Apply iT.T to each of the derivative indices 
+        
+        temp = partials[i]
+        for j in range(i):
+            temp = np.tensordot(iT.T, temp, axes = (1,i-1) )
+            # Normally, after tensordot, the operated index
+            # needs to be moved back into its proper position.
+            # However, the symmetry of each of the original and
+            # final indices lets us get away without moving
+            # it back. Instead, I just always operate on the
+            # last derivative index.
+            #
+        
+        new_partials.append(temp.copy())
+    
+    #
+    # Reshape the new partial derivatives into a standard
+    # packed derivative array
+    #
+    return mvcompress(new_partials, ni, idx) 
+        
+    
+def mvtranslate(X, D, k, ni, nck, idx, out = None, 
+                Xzlevel = None, Xzlevels = None):
+    """
+    Evaluate a shifted multivariate Taylor series.
+
+    Parameters
+    ----------
+    X : ndarray
+        The derivative array about the initial expansion point.
+    D : ndarray
+        The expansion point displacement.
+    k : int
+        Maximum derivative order
+    ni : int
+        Number of independent variables
+    nck : ndarray 
+        Binomial coefficient table for `X` satisfying requirements
+        for :func:`mvleibniz`.
+    idx : ndarray
+        Multi-index table for `X` satisfying requirements for
+        :func:`mvleibniz`.
+    out : ndarray, optional
+        Output location. If None, a new ndarray is created with the 
+        same data-type as X.        
+    Xzlevel : int, optional
+        The zlevel of the X derivative array. If None, this is
+        assumed to be `k`.
+    Xzlevels : ndarray, optional
+        The zlevels of each variable. If None, this is 
+        assumed to be `k` for each.
+
+    Returns
+    -------
+    out : ndarray
+        The derivative array about the new expansion point.
+
+    """
+    
+    base_shape = X.shape[1:]
+    D = np.array(D).reshape((ni,) + base_shape)
+    
+    
+    # Initialize result to zero (and create if necessary)
+    res_type = np.result_type(X, D)
+
+    if out is None:
+        out = np.ndarray(X.shape, dtype = res_type)
+    
+    if out.dtype != res_type:
+        raise TypeError("out data-type is incompatible with [X,D]")
+        
+    # Initialize result to zero
+    out.fill(0)
+    
+    if Xzlevel is None:
+        Xzlevel = k 
+    if Xzlevels is None:
+        Xzlevels = np.array([k] * ni)    
+    
+    
+    Z = out # Reference only
+    
+    # Calculate the powers of d
+    dpow = np.ones( (k+1,) + D.shape, dtype = D.dtype)
+    for i in range(k):
+        dpow[i+1] = dpow[i] * D 
+        
+    # Calculate necessary nchoosek table
+    nckc = ncktab(k)
+    
+    nd,_ = idx.shape
+    
+    for iD in range(nd):
+        idxD = idx[iD,:]   # The powers of d
+        
+        # Calculate the power of D
+        # d0^p0 * d1^p1 * d2^p2 * ...
+        #
+        Dpow = np.ones(D.shape[1:], dtype = D.dtype)
+        for i in range(ni):
+            Dpow *= dpow[idxD[i], i]
+            
+        for iZ in range(nd):
+            idxZ = idx[iZ,:] # The result index
+            
+            idxX = idxD + idxZ # The index of the original derivatives
+            kX = np.sum(idxX)
+            if kX > Xzlevel:
+                break # Skip remaining X derivatives. They are zero
+            if (idxX > Xzlevels).any():
+                continue # This derivative is zero
+            
+            # Calculate the multi-index
+            # binomial coefficient
+            c = 1.0 
+            for i in range(ni):
+                c *= nckc[idxX[i], min(idxZ[i], idxD[i])]
+                
+            iX = idxpos(idxX, nck)
+            
+            Z[iZ] += c * X[iX] * Dpow
+            
+    
+    return Z 
+            
 
 def mvleibniz(X, Y, k, ni, nck, idx, out=None, Xzlevel = None, Yzlevel = None,
               Xzlevels = None, Yzlevels = None):
