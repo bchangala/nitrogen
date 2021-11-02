@@ -35,7 +35,7 @@ def Vfun(X, deriv = 0, out = None, var = None):
     
     r1 = adf.sqrt(R1[0]*R1[0] + R1[1]*R1[1] + R1[2]*R1[2])
     r2 = adf.sqrt(R2[0]*R2[0] + R2[1]*R2[1] + R2[2]*R2[2])
-    cosa  = R1[0]*R2[0] + R1[1]*R2[1] + R1[2]*R2[2] / (r1*r2)
+    cosa  = (R1[0]*R2[0] + R1[1]*R2[1] + R1[2]*R2[2]) / (r1*r2)
     
     re = 0.9579205     # Angstrom
     ae = 104.4996470 * n2.pi/180.0 # radians
