@@ -409,7 +409,7 @@ def ndize1(x):
 
 def nck(n,k):
     """
-    Calculate the binomical coefficient (`n` choose `k`).
+    Calculate the binomial coefficient (`n` choose `k`).
     
     This function uses a simple recursive algorithm. Use of 
     :func:`ncktab` may be significantly faster (i.e. 
