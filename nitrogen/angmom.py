@@ -274,3 +274,90 @@ def X2ABC(X, mass):
     ABC = constants.hbar**2 / (2.0 * w) # hc * cm^-1
     
     return ABC
+
+def X2PAS(X, mass):
+    """
+    Rotate coordinates to the principal
+    axis system.
+    
+    Parameters
+    ----------
+    X : ndarray
+        A (3*N,...) array containing the
+        x, y, and z Cartesian positions of N particles.
+    mass : array_like
+        The masses of the N particles.
+        
+    Returns
+    -------
+    XPAS : ndarray
+        A (3*N,...) array of the positions in the
+        PAS frame.
+    R : ndarray
+        A (3,3,...) orthogonal array containing the transformation
+        matrix from the original axes to the principal
+        axis system.
+    COM : ndarray
+        A (3,...) array of the center-of-mass position
+        in the original frame.
+        
+    Notes
+    -----
+    The PAS coordinates are defined as
+    
+    ..  math::
+        
+        \\vec{x}_\\text{PAS} = \\mathbf{R}(\\vec{x} - \\vec{x}_\\text{COM})
+    
+    """
+    
+    # Calculate the inertia tensor
+    I = X2I(X, mass) 
+    
+    # Calculate the eigenvectors
+    I = np.moveaxis(I, (0,1), (-2,-1))
+    _,U = np.linalg.eigh(I)
+    
+    # Check that they form a right-handed axis
+    # system
+    #
+    # Compute (a x b) . c
+    #
+    # If this is +1, then the system is right-handed
+    # If this is -1, then the system is left-handed
+    # and one vector needs to change sign (or all three)
+    trip = np.inner( np.cross(U[:,0], U[:,1]), U[:,2] )
+    if U.ndim == 2:
+        if trip < 0:
+            U *= -1 
+    else:
+        U[:,:, trip < 0] *= -1
+    
+    # The array that transforms vectors in 
+    # the original frame to the PAS is
+    # the transpose of U
+    #
+    RPAS = U.T 
+    RPAS = np.moveaxis(RPAS, (-2,-1), (0,1))
+    
+    
+    # Finally, calculate the 
+    # PAS coordinates
+    XPAS = np.zeros_like(X)
+    
+    N = X.shape[0] // 3  # Number of atoms
+    
+    # First, calculate the center of mass
+    COM = 0
+    for k in range(N):
+        COM += mass[k] * X[3*k:3*(k+1)]
+    COM /= sum(mass) 
+    
+    for k in range(N):
+        
+        for i in range(3):
+            for j in range(3):
+                
+                XPAS[3*k+i] += RPAS[i,j] * (X[3*k+j] - COM[j])
+    
+    return XPAS, RPAS, COM
