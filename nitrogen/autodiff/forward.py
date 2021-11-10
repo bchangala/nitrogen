@@ -893,7 +893,6 @@ def mvcompress(partials, ni, idx):
     """
     k = len(partials) - 1
     
-    idx = idxtab(k, ni) 
     nd = idx.shape[0] 
     
     base_shape = np.array(partials[0]).shape 
@@ -932,7 +931,7 @@ def mvcompress(partials, ni, idx):
     
     return X 
 
-def mvrotate(X, T, k, nck, idx):
+def mvrotate(X, iT, k, nck, idxnew):
     """
     Rotate the derivative array via a linear transformation. The new 
     coordinates are defined by a matrix :math:`\\mathbf{T}`, i.e.
@@ -942,15 +941,16 @@ def mvrotate(X, T, k, nck, idx):
     ----------
     X : ndarray
         The derivative array with respect to the original coordinates.
-    T : ndarray
-        The (ni,ni) linear transformation matrix.
+    iT : ndarray
+        The  **inverse** of the linear transformation matrix. The second
+        dimension of `iT` is allowed to be less than `ni`.
     k : int
         The maximum derivative degree.
     nck : ndarray
-        Binominal coefficient table.
-    idx : ndarray
-        The multi-index table. 
-
+        Binominal coefficient table for the original number of coordinates.
+    idxnew : ndarray
+        The multi-index table for the new number of coordinates.
+        
     Returns
     -------
     Y : ndarray
@@ -958,10 +958,8 @@ def mvrotate(X, T, k, nck, idx):
 
     """
     
-    ni = T.shape[0] 
-    
-    iT = np.linalg.inv(T)
-    
+    ni = iT.shape[0]   # The original number of coordinates
+    nnew = iT.shape[1] # The new number of coordinates
     
     # 
     # For now, the linear transformation of
@@ -1005,7 +1003,7 @@ def mvrotate(X, T, k, nck, idx):
     # Reshape the new partial derivatives into a standard
     # packed derivative array
     #
-    return mvcompress(new_partials, ni, idx) 
+    return mvcompress(new_partials, nnew, idxnew)
         
     
 def mvtranslate(X, D, k, ni, nck, idx, out = None, 
