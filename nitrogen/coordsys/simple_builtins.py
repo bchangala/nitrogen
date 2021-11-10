@@ -238,7 +238,7 @@ class LinearTrans(CoordTrans):
         Parameters
         ----------
         T : ndarray
-            A square matrix.
+            The linear transformation matrix.
         t : ndarray, optional
             An offset vector. If None, it is ignored.
         Qpstr: list of str, optional
@@ -250,10 +250,10 @@ class LinearTrans(CoordTrans):
         if np.ndim(T) != 2:
             raise ValueError("T must be 2-dimensional")
         m,n = T.shape
-        if m != n:
-            raise ValueError("T must be square")
+        # m is the number of Q coordinates
+        # n is the number of Q' coordinates
             
-        super().__init__(self._lintrans, nQp = m, nQ = m, 
+        super().__init__(self._lintrans, nQp = n, nQ = m, 
                          name = name,
                          Qpstr = Qpstr, maxderiv = None,
                          zlevel = 1)
@@ -264,6 +264,9 @@ class LinearTrans(CoordTrans):
             self.t = None 
         else:
             self.t = t.copy() # Offset vector.
+            if len(self.t) != m:
+                raise ValueError("The length of t must equal the first dimension"
+                                 " of T")
         
     def _lintrans(self, Qp, deriv = 0, out = None, var = None):
         """
@@ -274,7 +277,8 @@ class LinearTrans(CoordTrans):
         """
         
         base_shape =  Qp.shape[1:]
-        N = self.nQp # = self.nX, number of inputs = number of outputs
+        N = self.nQp # = self.nX, number of inputs
+        nQ = self.nQ
         
         if var is None:
             var = [i for i in range(N)] # Calculate derivatives for all Qp
@@ -283,7 +287,7 @@ class LinearTrans(CoordTrans):
         nd = dfun.nderiv(deriv, nvar)
         
         if out is None:
-            out = np.ndarray( (nd, N) + base_shape, dtype = Qp.dtype)
+            out = np.ndarray( (nd, nQ) + base_shape, dtype = Qp.dtype)
         
         out.fill(0) # Initialize derivative array to 0
         
@@ -291,7 +295,7 @@ class LinearTrans(CoordTrans):
         # Q_i = T_ij * Q'_j + t_i
         np.copyto(out[0],  np.tensordot(self.T, Qp, axes = (1,0)) )
         if self.t is not None:
-            for i in range(N):
+            for i in range(nQ):
                 out[0,i] += self.t[i]
             
         # 1st derivatives
@@ -299,7 +303,7 @@ class LinearTrans(CoordTrans):
             for i in range(nvar):
                 # derivatives with respect to k = var[i]
                 # This is just the k^th column of T 
-                for j in range(self.nQ):
+                for j in range(nQ):
                     out[i+1, j:(j+1)].fill(self.T[j,var[i]])
                 
             
