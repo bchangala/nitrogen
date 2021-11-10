@@ -1327,6 +1327,136 @@ class PolyPower(DFun):
         # Return result
         return adf2array([res],out)   
 
+class PowerExpansion(DFun):
+    
+    """
+    Power series expansion about a given point. This is usually more efficient
+    than similar functions :class:`PolyPower` and :class:`PolyFactor`
+    because it uses derivative array translation instead of an explicit
+    sum over terms.
+    
+    Attributes
+    ----------
+    d : (nf,nd) ndarray
+        The defining derivative array about the expansion point
+    x0 : (nx,) ndarray
+        The expansion point. 
+    
+    """
+    
+    def __init__(self, d, x0):
+        """
+        Create a power series expansion 
+        
+        ..  math::
+            
+            f(\\mathbf{x}) = \\sum_\\alpha d^{(\\alpha)}(\\mathbf{x}-
+                                                        \\mathbf{x}_0)^\\alpha
+                
+        Parameters
+        ----------
+        d : array_like
+            The derivative array(s) at the expansion point.
+        x0 : array_like
+            The expansion point.
+            
+        """
+        
+        d = np.array(d) 
+        
+        if d.ndim == 1:
+            d = d.reshape((1,-1))
+        
+        # d now has shape (nf, nd)
+        
+        nf = d.shape[0] 
+        nd = d.shape[1] 
+        
+        x0 = np.array(x0)
+        nx = len(x0)
+        
+        # Figure out the order of the expansion
+        #
+        order = 0
+        while True:
+            if nd == nderiv(order, nx):
+                # found
+                break
+            elif nd < nderiv(order, nx):
+                raise ValueError('the shape of d is inconsistent with x0')
+            else:
+                order += 1 
+        # order now equals the expansion order,
+        # which is equal to the zlevel of the DFun
+        
+        
+        super().__init__(self._fexpansion, nf = nf, nx = nx, maxderiv = None,
+                         zlevel = order)
+        
+        self.d = d 
+        self.x0 = x0 
+        self.order = self.zlevel 
+        self.idxD = adf.idxtab(self.order, self.nx)
+        self.nckD = adf.ncktab(self.order + self.nx + 1) 
+        
+        return 
+    
+    def _fexpansion(self, X, deriv = 0, out = None, var = None):
+
+        # Calculate the displacement from the 
+        # expansion origin
+        disp = np.empty_like(X)
+        for i in range(self.nx):
+            disp[i] = X[i] - self.x0[i] 
+        
+        # Now calculate the powers of the displacement
+        # [power, variable, ...]
+        disp_pow = np.ones((self.order+1,) + X.shape, dtype = X.dtype)
+        for k in range(self.order):
+            disp_pow[k+1] = disp_pow[k] * disp 
+
+        out, var = self._parse_out_var(X, deriv, out, var)
+        out.fill(0)
+        
+        nvar = len(var)
+        idx = adf.idxtab(deriv, nvar) # Index table for output derivative array
+        nd = nderiv(deriv, nvar)
+        
+        for iD in range(self.idxD.shape[0]):
+            
+            idxD = self.idxD[iD] # The index of the powers of d
+        
+            Dpow = np.ones(disp_pow.shape[2:], dtype = disp_pow.dtype)
+            for i in range(self.nx):
+                Dpow *= disp_pow[idxD[i], i]
+                
+            for iZ in range(nd):
+                idxZ = idx[iZ,:] # The result index in the requested
+                                 # `var` order
+                
+                idx_orig = np.arange(self.nx) * 0
+                for vid in range(nvar):
+                    idx_orig[var[vid]] = idxZ[vid]
+                # idx_orig is the result index in the complete variable order
+                
+                idxX = idxD + idx_orig # The index of the expansion coefficient
+                                       # that contributes to result
+                kX = np.sum(idxX)
+                if kX > self.order:
+                    break # Skip remaining 
+                
+                # Calculate the multi-index
+                # binomial coefficient
+                c = 1.0 
+                for i in range(self.nx):
+                    c *= self.nckD[idxX[i], min(idx_orig[i], idxD[i])]
+                    
+                iX = adf.idxpos(idxX, self.nckD)
+                
+                out[iZ,:] += c * self.d[:,iX] * Dpow
+        
+        return out
+
 def _min_maxderiv(maxA,maxB):
     return _composite_maxderiv(maxA,maxB)
 def _max_zlevel(zlevelA,zlevelB):
