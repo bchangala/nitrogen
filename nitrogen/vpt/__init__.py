@@ -30,6 +30,10 @@ def autocorr_linear(w, f, t):
     C : ndarray
         The autocorrelation function, :math:`C(t)`. 
         
+    See also
+    --------
+    ~nitrogen.math.spech_fft : Calculate the spectrum of an autocorrelation function
+        
     Notes
     -----
     
@@ -90,6 +94,11 @@ def autocorr_quad(w, f, t, calc_log = False):
     C : ndarray
         The autocorrelation function, :math:`C(t)`. 
         
+    See also
+    --------
+    corr_quad_recursion_elements : Calculate quadratic correlator recursion coefficients
+    ~nitrogen.math.spech_fft : Calculate the spectrum of an autocorrelation function
+        
     Notes
     -----
     Instead of computing the quadratic correlator via a closed-form
@@ -102,29 +111,15 @@ def autocorr_quad(w, f, t, calc_log = False):
     """
     
     n = len(w)
+    
+    # Calculate the correlator recursion coefficients
     r,S,T = corr_quad_recursion_elements(w, f, t)
     
+    # Extract the gradient and hessian 
+    F,K = _partition_darray(f, n)
+    f0 = f[0] # The energy offset
     
-    F = np.zeros((n,))
-    K = np.zeros((n,n))
-    # Extract gradient and hessian
-    # from the derivative array
-    # 
-    if len(f) < ((n+2)*(n+1)) // 2:
-        raise ValueError("derivative array must contain at least second derivatives")
-    idx = n + 1
-    for i in range(n):
-        F[i] = f[i+1]
-        for j in range(i,n):
-            K[i,j] = f[idx]
-            K[j,i] = K[i,j]
-            
-            if i == j:
-                K[i,j] *= 2.0 
-                
-            idx += 1 
-    
-    # Calculate the sum
+    # Calculate the ODE coefficient sum
     sumIH = 0
     for i in range(n):
         sumIH += 0.25 * ( (w[i] + K[i,i]) - (w[i] - K[i,i])*(r[:,i]**2 - T[:,i,i]))
@@ -142,7 +137,7 @@ def autocorr_quad(w, f, t, calc_log = False):
     logC = nitrogen.math.cumsimp(g, t)
     
     # Add the energy offset phase correction 
-    logC += -1j * f[0] * t 
+    logC += -1j * f0 * t 
     
     if calc_log:
         return logC 
@@ -212,26 +207,7 @@ def corr_quad_recursion_elements(w, f, t):
     irW = np.diag(w**-0.5) # 1/Sqrt[W]
     
 
-    F = np.zeros((n,))
-    K = np.zeros((n,n))
-    
-    # Extract gradient and hessian
-    # from the derivative array
-    # 
-    if len(f) < ((n+2)*(n+1)) // 2:
-        raise ValueError("derivative array must contain at least second derivatives")
-    
-    idx = n + 1
-    for i in range(n):
-        F[i] = f[i+1]
-        for j in range(i,n):
-            K[i,j] = f[idx]
-            K[j,i] = K[i,j]
-            
-            if i == j:
-                K[i,j] *= 2.0 
-                
-            idx += 1 
+    F,K = _partition_darray(f, n)
     
     # Calculate displacement vector
     d = -np.linalg.inv(K) @ F 
@@ -244,6 +220,11 @@ def corr_quad_recursion_elements(w, f, t):
     omega = np.sqrt(abs(z2))
     rtO = np.diag(np.sqrt(omega))
     irO = np.diag(1/np.sqrt(omega))
+    
+    # Calculate sigma for each mode
+    #  1 for bounded modes
+    # -i for unbounded modes
+    sig = np.array([1 if z2[i] > 0 else -1j for i in range(n)])
 
     # Weighted transformation matrix
     R = irW @ L @ rtO
@@ -305,11 +286,7 @@ def corr_quad_recursion_elements(w, f, t):
     #
     # END COMMENT BLOCK - PBC
     ####################################
-    
-    # Calculate sigma for each mode
-    #  1 for bounded modes
-    # -i for unbounded modes
-    sig = np.array([1 if z2[i] > 0 else -1j for i in range(n)])
+
     # 
     # Compute the diagonal matrices
     # Sigma**1/2 and Sigma**-1/2
@@ -379,6 +356,133 @@ def corr_quad_recursion_elements(w, f, t):
     T = T1 + T2 
     
     return r, S, T 
+    
+    
+def _partition_darray(f,n):
+    """
+    Extract the gradient and hessian from
+    an adarray-style derivative array
+    
+    Parameters
+    ----------
+    f : derivative array
+    n : the number of coordinates
+    
+    Returns
+    -------
+    F : (n,) array
+        The gradient
+    K : (n,n) array
+        The symmetric hessian
+    """
+    
+    F = np.zeros((n,), dtype = f.dtype)  # The gradient vector
+    K = np.zeros((n,n), dtype = f.dtype) # The hessian matrix
+    
+    if len(f) < ((n+2)*(n+1)) // 2:
+        raise ValueError("derivative array must contain at least second derivatives")
+    
+    idx = n + 1
+    for i in range(n):
+        F[i] = f[i+1]
+        for j in range(i,n):
+            K[i,j] = f[idx]
+            K[j,i] = K[i,j]
+            
+            if i == j:
+                K[i,j] *= 2.0  # Account for permutation factorial
+                
+            idx += 1 
+    
+    return F, K 
+    
+def calc_rectilinear_modes(hes, mass, hbar = None, norm = 'dimensionless'):
+    """
+    Calculate the rectilinear normal modes
+    and energies
+    
+    Parameters
+    ----------
+    hes : array_like
+        The (3*N,3*N) Cartesian Hessian matrix.
+    mass : array_like
+        The N masses
+    hbar : float, optional
+        The value of :math:`\\hbar`. If None (default),
+        NITROGEN units will be assumed.
+    norm : {'dimensionless', 'mass-weighted'}
+        The normalization convention of the displacement
+        vectors. 
+        
+    Returns
+    -------
+    w : (N,) ndarray
+        The harmonic frequencies, in energy units.
+    R : (3*N,3*N) ndarray
+        Each column of `R` is the displacement
+        vector for the corresponding normal mode. 
+        
+    Notes
+    -----
+    For norm = 'dimensionless', the displacement vectors
+    are those of the non-mass-weighted Cartesian coordinates
+    with respect to dimensionless, normalized coordinates.
+    In these coordinates, the potential energy surface is
+    
+    ..  math::
+        V = \\sum_i \\frac{1}{2} \\omega_i q_i^2
+        
+    For norm = 'mass-weighted', the displacement vectors
+    are those for the mass-weighted Cartesian coordinates
+    and equal the eigenvectors of the mass-weighted Hessian, i.e.
+    the traditional :math:`\\mathbf{L}` array.
+    """
+    
+    hes = np.array(hes)
+    if hes.ndim != 2 or hes.shape[0] != hes.shape[1]:
+        raise ValueError("hes has an unexpected shape")
+    if hes.shape[0] % 3 != 0:
+        raise ValueError("the shape of hes must be a multiple of 3")
+        
+    N = hes.shape[0] // 3
+    if N < 1:
+        raise ValueError("there must be at least 1 atom")
+    
+    m = np.repeat(mass, [3]*N)
+    iMrt = np.diag(m**-0.5)
+    
+    # Mass-scale the Cartesian hessian
+    H = iMrt @ hes @ iMrt 
+    
+    # Diagonalize the mass-weighted hessian
+    lam,L = np.linalg.eigh(H) 
+    #
+    # The eigenvalues equal the square of the angular frequency
+    #
+    
+    if hbar is None:
+        hbar = nitrogen.constants.hbar 
+
+    # Calculate the harmonic energies    
+    w = hbar * np.sqrt(abs(lam))
+
+    # Calculate the Cartesian displacements
+    # for the dimensionless normal coordinates
+    #
+    T = iMrt @ L
+    for i in range(9):
+        v = T[:,i] 
+        a = v.T @ hes @ v 
+        T[:,i] *= np.sqrt(abs(w[i] / a))
+    
+    if norm == 'dimensionless':
+        return w, T 
+    elif norm == 'mass-weighted':
+        return w, L 
+    else:
+        raise ValueError('unexpected norm option')
+        
+     
     
     
     
