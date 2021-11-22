@@ -29,7 +29,7 @@ __version__ = get_version("nitrogen/__init__.py")
 # False -> build extensions from C file
 # 'auto' -> build with Cython if available, otherwise from C
 #
-use_cython = 'auto'
+use_cython = True #'auto'
 #
 #
 if use_cython:
