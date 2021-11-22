@@ -69,7 +69,7 @@ def autocorr_linear(w, f, t):
     
     return C 
 
-def autocorr_quad(w, f, t, calc_log = False):
+def autocorr_quad(w, f, t, method = 'direct'):
     
     """
     Calculate the vacuum state autocorrelation function 
@@ -85,9 +85,8 @@ def autocorr_quad(w, f, t, calc_log = False):
     t : array_like
         The time array, in units where :math:`\\hbar = 1`. (Alternatively,
         the `t` array can be identified with :math:`t/\\hbar`.)
-    calc_log : bool, optional
-        Calculate the logarithm of :math:`C(t)` instead. The default is 
-        False.
+    method : {'direct','integral','integral_log'}
+        The calculation method. See Notes
 
     Returns
     -------
@@ -101,49 +100,203 @@ def autocorr_quad(w, f, t, calc_log = False):
         
     Notes
     -----
-    Instead of computing the quadratic correlator via a closed-form
-    expression, this function first calculates the derivative of its
-    logarithm, which is determined by the recursion coefficients
-    of quadratic exponential operators. This derivative is then
-    numerically integrated by cumulative Simpson's rule and
-    then exponentiated. 
+    For `method` = 'direct', a direct expression based on 
+    a discontinuity-free BCH disentangling formula is used.
     
+    For `method` = 'integral', an alternative method is
+    used to first calculate the logarithmic derivative
+    of :math:`C(t)`. This is numerically integrated
+    by a cumulative version of Simpson's rule and then 
+    exponentiated.
+    
+    For `method` = 'integral_log', the integrated logarithm
+    is returned directly, without exponentiation. That is,
+    the branch-cut discontinuity-free logarithm of :math:`C(t)` 
+    is returned.
+    
+    For the integral methods, a sufficiently small time-step
+    in the `t` array is required for accurate results. The direct
+    method does not rely in numerical integration.
+
     """
     
     n = len(w)
     
-    # Calculate the correlator recursion coefficients
-    r,S,T = corr_quad_recursion_elements(w, f, t)
-    
     # Extract the gradient and hessian 
     F,K = _partition_darray(f, n)
-    f0 = f[0] # The energy offset
+    h0 = f[0] # The energy offset
+
+    t = np.array(t)
+    if t.ndim != 1:
+        raise ValueError('t must be 1-dimensional')
     
-    # Calculate the ODE coefficient sum
-    sumIH = 0
-    for i in range(n):
-        sumIH += 0.25 * ( (w[i] + K[i,i]) - (w[i] - K[i,i])*(r[:,i]**2 - T[:,i,i]))
-        sumIH += (-np.sqrt(0.5)) * F[i] * r[:,i] 
-        
-        for j in range(i): # j < i 
-            sumIH += 0.5 * K[i,j] * (r[:,i] * r[:,j] - T[:,i,j]) 
+    
+    if method == 'integral' or method == 'integral_log':
+        #
+        # Calculate the correlation function by
+        # integration of its logarithmic derivative
+        #
+        # Check for a valid time vector
+        if t[0] != 0:
+            raise ValueError('t[0] must be zero for integral methods')
+        if np.any( np.abs(np.diff(t) - (t[1]-t[0])) > 1e-8):
+            raise ValueError('Time vector must be uniformly spaced.')
             
-    g = (-1j) * sumIH # the derivative of the logarithm
-    
-    #
-    # Integrate the logarithm via
-    # Simpson's 1/3 rule, cumulatively 
-    #
-    logC = nitrogen.math.cumsimp(g, t)
-    
-    # Add the energy offset phase correction 
-    logC += -1j * f0 * t 
-    
-    if calc_log:
-        return logC 
+        #
+        # Calculate the correlator recursion coefficients
+        r,S,T = corr_quad_recursion_elements(w, f, t)
+        
+        # Calculate the ODE coefficient sum
+        sumIH = 0
+        for i in range(n):
+            sumIH += 0.25 * ( (w[i] + K[i,i]) - (w[i] - K[i,i])*(r[:,i]**2 - T[:,i,i]))
+            sumIH += (-np.sqrt(0.5)) * F[i] * r[:,i] 
+            
+            for j in range(i): # j < i 
+                sumIH += 0.5 * K[i,j] * (r[:,i] * r[:,j] - T[:,i,j]) 
+                
+        g = (-1j) * sumIH # the derivative of the logarithm
+        #
+        # C'(t) = g * C(t)
+        #
+        # --> C(t) = exp[ integral of g(t) ]
+        #
+        # Integrate the logarithm via
+        # Simpson's 1/3 rule, cumulatively 
+        #
+        logC = nitrogen.math.cumsimp(g, t)
+        
+        # Add the energy offset phase correction 
+        logC += -1j * h0 * t 
+        
+        if method == 'integral_log':
+            # Return the continuous logarithm of C
+            return logC 
+        else:
+            # Return C
+            C = np.exp(logC)
+            return C
+        
+    elif method == 'direct':
+        #
+        # Calculate the correlation function by
+        # the direct method
+        #
+        
+        # First, calculate the propagation normal
+        # modes
+        rtW = np.diag(np.sqrt(w))
+        irW = np.diag(1/np.sqrt(w))
+
+        z2,L = np.linalg.eigh(rtW @ K @ rtW)
+        # Force L to have positive determinant! 
+        if np.linalg.det(L) < 0:
+            L[:,0] *= -1 
+        
+        omega = np.sqrt(np.abs(z2))
+        sigma = np.array([1 if z2[i] > 0 else -1j for i in range(n)])
+        
+       
+        rtSO = np.diag(np.sqrt(sigma * omega))
+        irSO = np.diag(1/np.sqrt(sigma*omega))
+        LamP = irW @ L @ rtSO + rtW @ L @ irSO 
+        LamM = irW @ L @ rtSO - rtW @ L @ irSO 
+        iLamP = np.linalg.inv(LamP)
+        
+        C = np.zeros_like(t, dtype = np.complex128)
+        
+        def eta(x):
+            #
+            # eta(x) = (e^x - 1) / x
+            #
+            
+            result_small = 1.0 + x/2 + x**2/6 + x**3/24 + x**4/120 + x**5/720 + x**6/5040
+            result_big = np.expm1(x) / (x + 1e-20) 
+            
+            result = np.choose(abs(x) > 1e-2,
+                               [result_small, result_big])
+            
+            return result 
+        
+        def zeta(x):
+            #
+            # zeta(x) = (e^x - x - 1) / x**2
+            #
+            
+            result_small = 1/2 + x/6 + x**2/24 + x**3/120 + x**4/720 + x**5/5040 + x**6/40320
+            result_big = (np.expm1(x) - x) / (x + 1e-20)**2 
+            
+            result = np.choose(abs(x) > 1e-2,
+                               [result_small, result_big])
+            
+            return result 
+        
+        # Force all time values to be non-negative.
+        # Afterward, negative time can be evaluated
+        # via the hermiticity of C(t)
+        for i in range(len(t)):
+            
+            tp = abs(t[i]) # The current time value
+            
+            # The exp^- diagonal 
+            em = np.diag(np.exp(-1j * tp * sigma*omega))
+            
+            #
+            # Calculate det(exp[A'])**1/2:
+            #
+            # A factoring and eigendecomposition
+            # procedure ensures there are no
+            # branch-cut discontinuities
+            #
+            quad_term = np.exp(-1j * tp * sum(sigma*omega) / 2)
+            quad_term *= np.linalg.det(LamP / 2) ** -1 
+            
+            
+            M = iLamP.T @ em @ iLamP @ LamM @ em @ LamM.T 
+            evs = np.linalg.eigvals(M)
+            
+            for a in evs:
+                quad_term *= np.sqrt(1 - a)**-1
+        
+            #
+            # Calculate the gradient contributions
+            #
+            hp = -1j*tp*h0 # Trivial phase contribution
+            
+            # The eta^- and zeta^- diagonal matrices
+            etam = np.diag(eta(-1j*tp*sigma*omega))
+            zetam = np.diag(zeta(-1j*tp*sigma*omega))
+        
+            # First term
+            temp1 = iLamP @ LamM @ em @ LamM.T @ iLamP.T 
+            G1 = -etam @ temp1 @ np.linalg.inv(np.eye(n) - em@temp1) @ etam 
+            
+            # Second term
+            temp2 = iLamP.T @ em @ iLamP @ LamM @ em @ LamM.T
+            temp3 = etam @ LamM.T @ np.linalg.inv(np.eye(n) - temp2) @ iLamP.T @ etam 
+            G2 = -(temp3 + temp3.T)
+            
+            # Third term
+            G3 = -2*zetam - etam @ LamM.T @ \
+                np.linalg.inv(np.eye(n) - temp2) @ \
+                iLamP.T @ em @ iLamP @ LamM @ etam 
+            
+            Gamma = G1 + G2 + G3
+            
+            Fbar = (LamP - LamM).T @ F 
+            hp += (tp/4)**2 * np.dot(Fbar, Gamma @ Fbar) 
+            
+            C[i] = quad_term * np.exp(hp)
+            
+            # For negative time values, correct
+            # for the complex conjugate 
+            if t[i] < 0:
+                C[i] = np.conjugate(C[i])
+                
+        return C 
+        
     else:
-        C = np.exp(logC)
-        return C
+        raise ValueError('Invalid method option')
     
 
 def corr_quad_recursion_elements(w, f, t):
@@ -311,10 +464,10 @@ def corr_quad_recursion_elements(w, f, t):
     #
     # Calculate the exponential matrices
     #
-    ExpP = np.zeros((len(t), n, n), dtype = np.complex128)
+    #ExpP = np.zeros((len(t), n, n), dtype = np.complex128)
     ExpM = np.zeros((len(t), n, n), dtype = np.complex128)
     for i in range(n): 
-        ExpP[:,i,i] = np.exp(+1j * sig[i] * omega[i] * t)
+    #   ExpP[:,i,i] = np.exp(+1j * sig[i] * omega[i] * t)
         ExpM[:,i,i] = np.exp(-1j * sig[i] * omega[i] * t)
     
     #
