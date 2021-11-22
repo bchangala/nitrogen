@@ -13,6 +13,11 @@
 import os
 import sys
 #sys.path.insert(0, os.path.abspath('..'))
+# ^ This line needed to be commented out
+# so that read-the-docs can use
+# the locally built version
+# See https://stackoverflow.com/questions/13238736/how-to-document-cython-function-on-readthedocs
+#
 from nitrogen import __version__
 
 
