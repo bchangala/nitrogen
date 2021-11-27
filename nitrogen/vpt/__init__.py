@@ -7,6 +7,9 @@ Vibrational perturbation theory and harmonic oscillator methods
 """
 
 import nitrogen.math 
+from nitrogen.autodiff.forward import idxtab as adf_idxtab
+from nitrogen.autodiff.forward import idxpos as adf_idxpos 
+from nitrogen.autodiff.forward import ncktab as adf_ncktab 
 import numpy as np 
 
 
@@ -509,7 +512,147 @@ def corr_quad_recursion_elements(w, f, t):
     T = T1 + T2 
     
     return r, S, T 
+
+def corr_quad_ratio_table(r, S, T, nmax):
+    """
+    Calculate correlation function ratios using
+    the quadratic recursion elements.
+
+    Parameters
+    ----------
+    r, S, T : ndarray
+        Quadratic recursion coefficients.
+    nmax : int
+        The maximum total quantum number.
+
+    Returns
+    -------
+    Imn : (...,ns,ns) ndarray
+        The recursion coefficients. `ns` is the number of
+        states.
+    qns : (ns, n) ndarray
+        The quantum number table for `n` modes.
+
+    See Also
+    --------
+    corr_quad_recursion_elements : Calculate the recursion coefficients.
+
+    """
+    if nmax < 0:
+        raise ValueError('nmax must be a non-negative integer')
+    nmodes = r.shape[-1] # The number of modes 
     
+    # Calculate the list of quantum numbers
+    # for states to include in the table
+    qns = adf_idxtab(nmax, nmodes) 
+    ns = qns.shape[0] # The number of states in the table
+    
+    nck = adf_ncktab(nmodes+nmax, min(nmodes,nmax)) # A binomial coefficient table
+    
+    base_shape = r.shape[:-1]
+    Imn = np.zeros(base_shape + (ns,ns), dtype = np.complex128)
+    
+    ###########################
+    # First, calculate the m,0 and 0,n elements
+    # on the edges of the table
+    #
+    # The 0,0 element is always unity.
+    if nmax >= 0:
+        Imn[...,0,0] = 1.0 
+    # Continue with higher states
+    for M in range(1,ns):
+        mp1 = qns[M] # < ... m+1 ... |
+        #
+        # Identify the first non-zero quantum number's position
+        i = np.nonzero(mp1)[0][0]
+        m = mp1.copy()
+        m[i] -= 1 
+        # m is quantum number vector of < m | 0 >
+        
+        ratio = 0 
+        #
+        # -r_i < m | 0 >  term
+        ratio += -r[...,i] * Imn[...,adf_idxpos(m,nck), 0]
+        
+        for j in range(nmodes):
+            if m[j] > 0:
+                mm1 = m.copy()
+                mm1[j] -= 1 
+                # add -T_ij sqrt(m_j) < ... m_j-1 ... | 0 > term
+                ratio += -T[...,i,j] * np.sqrt(m[j]) * Imn[...,adf_idxpos(mm1,nck),0]
+        
+        #
+        #
+        Imn[...,M,0] = ratio / np.sqrt(m[i]+1)
+        #
+        # Table is symmetric
+        Imn[...,0,M] = Imn[...,M,0] 
+    
+    #
+    # Now compute interior entries in
+    # the table
+    #   
+    #   0XXXXXXXX
+    #   Xxxx|
+    #   Xxxx|
+    #   XxxxV
+    #   X-->.
+    #
+    # The block of the table with column and rows
+    # less than the current position will always
+    # be calculated already. Once the M = N
+    # diagonal position is reached, this is still
+    # true because the current column will be
+    # complete at that point. 
+    #
+    for M in range(1,ns):
+        mp1 = qns[M]
+        i = np.nonzero(mp1)[0][0]
+        m = mp1.copy()
+        m[i] -= 1
+        
+        m_pos = adf_idxpos(m,nck)
+        
+        for N in range(1,M+1):
+            # Calculate
+            # < m | n >
+            # Both m and n are non-zero 
+            n = qns[N]
+            n_pos = N
+            
+            #
+            ratio = 0 
+            #
+            # -r term
+            ratio += -r[...,i] * Imn[...,m_pos,n_pos]
+            #
+            # 
+            for j in range(nmodes):
+                # 
+                # S and T terms
+                if n[j] > 0:
+                    nm1 = n.copy()
+                    nm1[j] -= 1 
+                    nm1_pos = adf_idxpos(nm1,nck) # position of |...n_j - 1 ...>
+                    ratio += S[...,i,j] * np.sqrt(n[j]) * Imn[...,m_pos,nm1_pos]
+                
+                if m[j] > 0:
+                    mm1 = m.copy()
+                    mm1[j] -= 1 
+                    mm1_pos = adf_idxpos(mm1,nck) # position of < ... m_j - 1 |
+                    ratio += -T[...,i,j] * np.sqrt(m[j]) * Imn[...,mm1_pos, n_pos]
+            
+            Imn[...,M,N] = ratio / np.sqrt(m[i] + 1)
+            # Apply symmetry for upper triangle
+            Imn[...,N,M] = Imn[...,M,N]
+     
+    #
+    # The table is now completely filled
+    #
+    
+    return Imn, qns
+    
+                            
     
 def _partition_darray(f,n):
     """
