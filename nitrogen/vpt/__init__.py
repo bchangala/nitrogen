@@ -300,8 +300,210 @@ def autocorr_quad(w, f, t, method = 'direct'):
         
     else:
         raise ValueError('Invalid method option')
-    
 
+def autocorr_quad_finiteT(w, f, t, beta, method = 'direct'):
+    
+    """
+    Calculate the thermal correlation function 
+    for propagation on a quadratic potential energy surface.
+    
+    
+    Parameters
+    ----------
+    w : array_like
+        The harmonic frequency (in energy units) of each mode.
+    f : array_like
+        The derivative array, including up to at least second derivatives.
+    t : array_like
+        The time array, in units where :math:`\\hbar = 1`. (Alternatively,
+        the `t` array can be identified with :math:`t/\\hbar`.)
+    beta : float 
+        The value of :math:`\\beta = 1/kT` in inverse energy units.
+    method : {'direct'}
+        The calculation method. See Notes.
+
+    Returns
+    -------
+    C : ndarray
+        The thermal autocorrelation function, :math:`C(t)`. 
+        
+    See also
+    --------
+    autocorr_quad : Calculate the zero-temperature correlation function
+    ~nitrogen.math.spech_fft : Calculate the spectrum of an autocorrelation function
+        
+    Notes
+    -----
+    For `method` = 'direct' (currently the only method),
+    a direct evaluation of the thermal trace
+    
+    .. math::
+       
+       C(t, \\beta) = \\frac{1}{Z_0(\\beta)} \\text{Tr}\\left[ e^{(+it-\\beta)H_0} e^{-it H_1} \\right]
+        
+    is performed using a stable, discontinuity-free method.
+    
+    """    
+    
+    n = len(w)
+    
+    # Extract the gradient and hessian 
+    F,K = _partition_darray(f, n)
+    h0 = f[0] # The energy offset
+
+    t = np.array(t)
+    if t.ndim != 1:
+        raise ValueError('t must be 1-dimensional')
+    
+    
+    if method == 'direct':
+        #
+        # Calculate the thermal correlation function by
+        # the direct trace approach.
+        
+        # First, calculate the propagation normal
+        # modes
+        rtW = np.diag(np.sqrt(w))
+        irW = np.diag(1/np.sqrt(w))
+
+        z2,L = np.linalg.eigh(rtW @ K @ rtW)
+        # Force L to have positive determinant! 
+        if np.linalg.det(L) < 0:
+            L[:,0] *= -1 
+        
+        omega = np.sqrt(np.abs(z2))
+        sigma = np.array([1 if z2[i] > 0 else -1j for i in range(n)])
+        
+       
+        rtSO = np.diag(np.sqrt(sigma * omega))
+        irSO = np.diag(1/np.sqrt(sigma*omega))
+        LamP = irW @ L @ rtSO + rtW @ L @ irSO 
+        LamM = irW @ L @ rtSO - rtW @ L @ irSO 
+        iLamP = np.linalg.inv(LamP)
+        
+        Fbar = (LamP.T - LamM.T) @ F
+        
+        # Calculate the ground state partition function
+        # referenced to the ground state origin
+        Z0p = 1 
+        for i in range(n):
+            Z0p *= 1/(-np.expm1(-w[i]*beta))
+        
+        C = np.zeros_like(t, dtype = np.complex128)
+        
+        def eta(x):
+            #
+            # eta(x) = (e^x - 1) / x
+            #
+            
+            result_small = 1.0 + x/2 + x**2/6 + x**3/24 + x**4/120 + x**5/720 + x**6/5040
+            result_big = np.expm1(x) / (x + 1e-20) 
+            
+            result = np.choose(abs(x) > 1e-2,
+                               [result_small, result_big])
+            
+            return result 
+        
+        def zeta(x):
+            #
+            # zeta(x) = (e^x - x - 1) / x**2
+            #
+            
+            result_small = 1/2 + x/6 + x**2/24 + x**3/120 + x**4/720 + x**5/5040 + x**6/40320
+            result_big = (np.expm1(x) - x) / (x + 1e-20)**2 
+            
+            result = np.choose(abs(x) > 1e-2,
+                               [result_small, result_big])
+            
+            return result 
+        
+        # Force all time values to be non-negative.
+        # Afterward, negative time can be evaluated
+        # via the hermiticity of C(t)
+        for i in range(len(t)):
+            
+            tp = abs(t[i]) # The current time value
+            tau = -1j * tp + beta
+            
+            # The exp^- diagonal 
+            em = np.diag(np.exp(-1j * tp * sigma*omega))
+            etam = np.diag(eta(-1j * tp * sigma * omega)) # eta^-
+            zetam = np.diag(zeta(-1j * tp * sigma * omega)) # zeta^-
+            xim = np.diag(np.exp(-tau * w)) # xi^-1
+            xim2 = np.diag(np.exp(-tau * w/2)) # xi^-1/2
+            one = np.eye(n) 
+            
+            ########################################
+            # Calculate the quadratic contribution
+            #
+            # Factor 1
+            irt_detMA = np.linalg.det(LamP/2)**-1 * np.exp(-1j * tp * sum(sigma*omega)/2)
+            K1 = one - iLamP.T @ em @ iLamP @ (LamM @ em @ LamM.T + 4 * xim)
+            iK1 = np.linalg.inv(K1)
+            for a in np.linalg.eigvals(K1):
+                irt_detMA *= 1/np.sqrt(a) 
+            
+            # Factor 2
+            T1 = LamM @ iLamP @ (LamM @ em @ LamM.T + 4 * xim) @ iK1 @ iLamP.T @ LamM.T 
+            T2 = LamP @ em @ (LamM.T @ iK1 @ iLamP.T @ em @ iLamP @ LamM @ em + one) @ LamP.T
+            t3 = -LamP @ em @ LamM.T @ iK1 @ iLamP.T @ LamM.T 
+            T3 = t3 + t3.T 
+            MD = np.eye(n) - 0.25 * xim2 @ (T1 + T2 + T3) @ xim2
+            
+            irt_detMD = 1.0 
+            for b in np.linalg.eigvals(MD):
+                irt_detMD *= 1/np.sqrt(b)
+           
+            Tr = irt_detMD * irt_detMA 
+            C[i] = Tr / (np.exp(-1j*tp*sum(w)/2) * Z0p) 
+            #
+            #########################################
+            
+            ###########################################3
+            # Calculate the gradient contribution
+            #
+            K = LamM @ em @ LamM.T + 4 * xim # The commonly used expression
+            KT = iLamP @ K @ iLamP.T # The transformed expression, also commonly used
+            iDbar = np.linalg.inv(one - iLamP.T @ em @ iLamP @ K) @ iLamP.T @ em @ iLamP
+            
+            iDL = np.linalg.inv(one - em @ KT) # em on left side
+            iDR = np.linalg.inv(one - KT @ em) # em on right side
+            
+            A1 = -etam @ KT @ iDL @ etam 
+            A2 = -2*zetam - etam @ LamM.T @ iDbar @ LamM @ etam 
+            a3 = -etam @ iDR @ iLamP @ LamM @ etam 
+            A3 = a3 + a3.T
+            A = A1 + A2 + A3 
+            
+            B1 = -LamM @ iDR @ KT @ etam 
+            B2 = LamP @ (one + em @ LamM.T @ iDbar @ LamM) @ etam 
+            B3 = -LamM @ iDR @ iLamP @ LamM @ etam 
+            B4 = LamP @ em @ LamM.T @ iLamP.T @ iDL @ etam 
+            B = B1 + B2 + B3 + B4 
+            
+            D1 = xim2 @ LamM @ KT @ iDL @ LamM.T @ xim2 
+            D2 = xim2 @ LamP @ em @ (one + LamM.T @ iDbar @ LamM @ em) @ LamP.T @ xim2 - 4*one
+            d3 = -xim2 @ LamM @ iDR @ iLamP @ LamM @ em @ LamP.T @ xim2 
+            D3 = d3 + d3.T 
+            D = D1 + D2 + D3 
+            
+            Gamma = A + B.T @ xim2 @ np.linalg.inv(D) @ xim2 @ B 
+            
+            hp = -1j * tp * h0 # Trivial offset phase
+            hp += (tp**2 / 16) * Fbar @ ( Gamma @ Fbar ) # Gradient contribution
+            
+            C[i] *= np.exp(hp)
+            
+            # For negative time values, correct
+            # for the complex conjugate 
+            if t[i] < 0:
+                C[i] = np.conjugate(C[i])
+                
+        return C 
+        
+    else:
+        raise ValueError('Invalid method option')
+    
 def corr_quad_recursion_elements(w, f, t):
     """
     Calculate the correlation function recursion coefficients 
