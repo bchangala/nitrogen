@@ -12,12 +12,15 @@
 #
 import os
 import sys
-#sys.path.insert(0, os.path.abspath('..'))
-# ^ This line needed to be commented out
-# so that read-the-docs can use
-# the locally built version
-# See https://stackoverflow.com/questions/13238736/how-to-document-cython-function-on-readthedocs
-#
+on_rtd = os.environ.get('READTHEDOCS') == 'True' # Check whether we are on Read the Docs
+
+if not on_rtd:
+    sys.path.insert(0, os.path.abspath('..'))
+    # ^ This line needed to be commented out
+    # so that read-the-docs can use
+    # the locally built version
+    # See https://stackoverflow.com/questions/13238736/how-to-document-cython-function-on-readthedocs
+    #
 from nitrogen import __version__
 
 
