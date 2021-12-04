@@ -8,6 +8,98 @@ Angular momentum and spherical tensor routines.
 
 import numpy as np
 import nitrogen.constants as constants 
+import py3nj # For Wigner-nj symbols
+
+
+def wigner3j(jj1, jj2, jj3, mm1, mm2, mm3):
+    """
+    Calculate the Wigner 3-j symbol,
+    
+    .. math::
+    
+       \\left(\\begin{array}{ccc} j_1 & j_2 & j_3 \\\\ m_1 & m_2 & m_3 \\end{array} \\right)
+
+    Parameters
+    ----------
+    jj1 : integer
+        Twice the value of :math:`j_1`.
+    jj2 : integer
+        Twice the value of :math:`j_2`.
+    jj3 : integer
+        Twice the value of :math:`j_3`.
+    mm1 : integer
+        Twice the value of :math:`m_1`.
+    mm2 : integer
+        Twice the value of :math:`m_2`.
+    mm3 : integer
+        Twice the value of :math:`m_3`.
+
+    Returns
+    -------
+    float
+        The result.
+        
+    Notes
+    -----
+    This currently wraps the `py3nj <https://github.com/fujiisoup/py3nj>`_ 
+    implementation. The back-end may change in the future. 
+    
+    
+    Examples
+    --------
+    >>> n2.angmom.wigner3j(2 * 20, 2 * 21, 2 * 22, 2 * 5, 2 * -15, 2 * 10)
+    0.032597617477982975
+
+    """
+    
+    result = py3nj.wigner3j(jj1, jj2, jj3, mm1, mm2, mm3)
+    
+    return result 
+
+def clebsch_gordan(jj1, jj2, jj3, mm1, mm2, mm3):
+    """
+    Calculate the Clebsch-Gordan coefficient,
+    
+    .. math::
+        
+       \\langle j_1\\,m_1, j_2 \\, m_2 \\vert j_3 \\, m_3 \\rangle
+      
+    Parameters
+    ----------
+    jj1 : integer
+        Twice the value of :math:`j_1`.
+    jj2 : integer
+        Twice the value of :math:`j_2`.
+    jj3 : integer
+        Twice the value of :math:`j_3`.
+    mm1 : integer
+        Twice the value of :math:`m_1`.
+    mm2 : integer
+        Twice the value of :math:`m_2`.
+    mm3 : integer
+        Twice the value of :math:`m_3`.
+    
+    Returns
+    -------
+    float
+        The result.
+    
+    Notes
+    -----
+    This currently wraps the `py3nj <https://github.com/fujiisoup/py3nj>`_ 
+    implementation. The back-end may change in the future. 
+    
+    Examples
+    --------
+    >>> n2.angmom.clebsch_gordan(2 * 6, 2 * 9, 2 * 13, 2 * -3, 2 * 4, 2 * 1)
+    0.4277601867185667
+    
+    
+    """
+    
+    result = py3nj.clebsch_gordan(jj1, jj2, jj3, mm1, mm2, mm3)
+    
+    return result 
 
 def Jbf_cs(J):
     """

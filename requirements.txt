@@ -9,3 +9,4 @@ scikit-image
 setuptools>=49
 wheel
 Cython>=0.29.21
+py3nj

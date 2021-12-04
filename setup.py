@@ -81,7 +81,7 @@ setuptools.setup(
 	],
 	python_requires = '>=3.6', 
     install_requires=['numpy>=1.19', 'scipy>=1.4.1', 'matplotlib>=3.1,<3.3', 'scikit-image',
-                      'setuptools>=49',"wheel","Cython>=0.29.21"], 
+                      'setuptools>=49',"wheel","Cython>=0.29.21","py3nj"], 
     cmdclass = cmdclass,
     ext_modules = ext_modules
 )
