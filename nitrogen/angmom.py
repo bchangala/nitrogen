@@ -56,6 +56,51 @@ def wigner3j(jj1, jj2, jj3, mm1, mm2, mm3):
     
     return result 
 
+def wigner6j(jj1, jj2, jj3, jj4, jj5, jj6):
+    """
+    Calculate the Wigner 6-j symbol,
+    
+    .. math::
+    
+       \\left\\{\\begin{array}{ccc} j_1 & j_2 & j_3 \\\\ j_4 & j_5 & j_6 \\end{array} \\right\\}
+
+    Parameters
+    ----------
+    jj1 : integer
+        Twice the value of :math:`j_1`.
+    jj2 : integer
+        Twice the value of :math:`j_2`.
+    jj3 : integer
+        Twice the value of :math:`j_3`.
+    jj4 : integer
+        Twice the value of :math:`j_4`.
+    jj5 : integer
+        Twice the value of :math:`j_5`.
+    jj6 : integer
+        Twice the value of :math:`j_6`.
+
+    Returns
+    -------
+    float
+        The result.
+        
+    Notes
+    -----
+    This currently wraps the `py3nj <https://github.com/fujiisoup/py3nj>`_ 
+    implementation. The back-end may change in the future. 
+    
+    
+    Examples
+    --------
+    >>> n2.angmom.wigner6j(2 * 3, 2 * 6, 2 * 5, 2 * 4, 2 * 6, 2 * 9)
+    -0.020558557070186504
+
+    """
+    
+    result = py3nj.wigner6j(jj1, jj2, jj3, jj4, jj5, jj6)
+    
+    return result
+
 def clebsch_gordan(jj1, jj2, jj3, mm1, mm2, mm3):
     """
     Calculate the Clebsch-Gordan coefficient,
@@ -100,6 +145,55 @@ def clebsch_gordan(jj1, jj2, jj3, mm1, mm2, mm3):
     result = py3nj.clebsch_gordan(jj1, jj2, jj3, mm1, mm2, mm3)
     
     return result 
+
+def dircos_tensor(N1,k1,m1,N2,k2,m2):
+    """
+    Calculate a matrix element of the 
+    direction cosine spherical tensor,
+    
+    ..  math::
+        
+        \\langle N_1, k_1, m_1 \\vert \\lambda_{Qq} \\vert N_2, k_2, m_2 \\rangle
+        
+
+    Parameters
+    ----------
+    N1, k1, m2, N2, k2, m2 : integer
+        Angular momentum quantum numbers
+
+    Returns
+    -------
+    (3,3) ndarray
+        The direction cosine tensor matrix element in terms
+        of spherical tensor components. 
+        
+    Notes
+    -----
+    
+    The basis functions are standard symmetric top rotational basis functions
+    with the usual phase conventions. :math:`k` is the body-frame :math:`z` 
+    component with respect to "anomalous" body-frame operators. 
+
+    """
+    
+    red = (-1) ** (k1 + k2 + N1 + N2 - 1) * np.sqrt( (2*N2 + 1) / (2*N1 + 1))
+    
+    lamQq = np.zeros((3,3))
+    
+    for Q in [-1,0,1]:
+    
+        cg1 = clebsch_gordan(2*N2, 2*1, 2*N1,
+                             2*m2, 2*Q, 2*m1)
+        
+        for q in [-1, 0, 1]:
+            
+            cg2 = clebsch_gordan(2*N2, 2*1, 2*N1,
+                                -2*k2, 2*q,-2*k1)
+            
+            lamQq[Q,q] = red * cg1 * cg2 
+    
+    return lamQq 
+            
 
 def Jbf_cs(J):
     """
