@@ -12,8 +12,10 @@
 #
 import os
 import sys
-on_rtd = os.environ.get('READTHEDOCS') == 'True' # Check whether we are on Read the Docs
+from unittest.mock import MagicMock
 
+
+on_rtd = os.environ.get('READTHEDOCS') == 'True' # Check whether we are on Read the Docs
 if not on_rtd:
     sys.path.insert(0, os.path.abspath('..'))
     # ^ This line needed to be commented out
@@ -21,6 +23,18 @@ if not on_rtd:
     # the locally built version
     # See https://stackoverflow.com/questions/13238736/how-to-document-cython-function-on-readthedocs
     #
+else:
+    # On read-the-docs
+    # Set up mock modules 
+    # (See https://read-the-docs.readthedocs.io/en/latest/faq.html#i-get-import-errors-on-libraries-that-depend-on-c-modules)
+    #
+    class Mock(MagicMock):
+        @classmethod 
+        def __getattr__(cls,name):
+            return MagicMock()
+    MOCK_MODULES = ['py3nj'] # py3nj needs Fortran compilation 
+    sys.modules.update((mod_name, Mock()) for mod_name in MOCK_MODULES)
+    
 from nitrogen import __version__
 
 
