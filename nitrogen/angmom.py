@@ -208,6 +208,10 @@ def Jbf_cs(J):
     -------
     Jx,Jy,Jz : ndarray
         Body-fixed angular momentum components
+        
+    Notes
+    -----
+    The basis function order is :math:`k = -J, \ldots, +J`.
 
     """
     
@@ -547,3 +551,233 @@ def X2PAS(X, mass):
                 XPAS[3*k+i] += RPAS[i,j] * (X[3*k+j] - COM[j])
     
     return XPAS, RPAS, COM
+
+
+def Nbf_matrix(N):
+    """
+    Calculate the body-fixed operators of :math:`\mathbf{N}` for
+    a given :math:`N` quantum number,
+    
+    ..  math::
+        \\langle N k' \\vert N_i \\vert N k \\rangle
+
+    Parameters
+    ----------
+    N : integer
+        The :math:`N` quantum number
+
+    Returns
+    -------
+    Nx,Ny,Nz : ndarray
+        The matrix representations.
+        
+    Notes
+    -----
+    The basis function order is :math:`k = 0, 1, \\ldots, N, -N, -N+1, \\ldots, -1`.
+    This is different than :func:`Jbf_cs`.
+
+    """
+    
+    # 
+    # k = 0, 1, 2, ..., N, -N, ..., -1
+    #
+    # The final ndarrays will be indexable by the signed k quantum number
+    #
+    krange = [i for i in range(N+1)] + [ i-N for i in range(N)]
+    n = 2*N+1 # the number of functions
+    
+    kI, kJ = np.meshgrid(krange, krange, indexing = 'ij')
+    
+    Nz = np.diag(krange) 
+    
+    # Calculate Np = Nx + i*Ny 
+    # (this is the *lowering* operating in body-fixed frame
+    #  because of the anamalous commutation sign of Nx, Ny, Nz)
+    Np = np.zeros((n,n))
+    Nm = np.zeros((n,n))
+    
+    idx = (kI == kJ - 1)
+    Np[idx] = np.sqrt( N*(N+1) - kJ*(kJ-1) )[idx] # lowering operator
+    
+    
+    # Raising operator, Nm = Nx - i*Ny 
+    idx = (kI == kJ + 1)
+    Nm[idx] = np.sqrt( N*(N+1) - kJ*(kJ+1) )[idx] # raising operator
+    
+    Nx = (Np + Nm) / 2
+    Ny = (Np - Nm) / (2 * 1j) 
+    
+    return Nx, Ny, Nz 
+
+def caseb_multistate_N(alpha, N, k, SS1, JJ1):
+    """
+    Calculate the body-fixed :math:`N_i` operators 
+    for a multi-state case (b) basis set.
+
+    Parameters
+    ----------
+    alpha : array_like
+        The electronic (or other) state index.
+    N : array_like
+        The :math:`N` quantum number.
+    k : array_like
+        The signed :math:`k` quantum number.
+    SS1 : array_like
+        The value of :math:`2S+1`.
+    JJ1 : array_like
+        The value of :math:`2J+1`.
+
+    Returns
+    -------
+    Nx, Ny, Nz : ndarray
+        The matrix elements of the body-fixed components
+        of :math:`\\mathbf{N}`. 
+        
+    Notes
+    -----
+    
+    The case (b) basis function is
+    
+    ..  math::
+        \\vert J m_J N k S; \\alpha \\rangle = \\sum_{m_N, m_S} 
+        \\vert N k m_N \\rangle \\vert S m_S \\rangle \\vert \\alpha \\rangle
+        \\langle N m_N, S m_S \\vert J m_J \\rangle
+        
+    The matrix elements of the body-fixed components :math:`N_i`, :math:`i = x,y,z`,
+    are 
+    
+    ..  math::
+        \\langle J' m_J' N' k' S' ;\\alpha' \\vert N_i \\vert J m_J N k S ; \\alpha\\rangle
+        = \\delta_{\\alpha\\alpha'} \\delta_{JJ'} \\delta_{m_J m_J'} \\delta_{SS'}
+          \\delta_{NN'} \\langle N' k' \\vert N_i \\vert N k \\rangle 
+    """
+    
+    
+    n = len(N) # The number of basis functions in the list 
+    
+    Nx = np.zeros((n,n), dtype = np.complex128)
+    Ny = np.zeros((n,n), dtype = np.complex128)
+    Nz = np.zeros((n,n), dtype = np.complex128)
+    
+    # Calculate N operators for every possible value of N
+    Nops = [ (Nbf_matrix(i) if i in N else None) for i in range(max(N)+1)] 
+    
+    for i in range(n):
+        for j in range(n):
+            #
+            # The matrix element is diagonal in 
+            # alpha (electronic index or other), N, S and J
+            #
+            if alpha[i] != alpha[j]:
+                continue 
+            if N[i] != N[j]:
+                continue 
+            if SS1[i] != SS1[j]:
+                continue 
+            if JJ1[i] != JJ1[j]:
+                continue
+            
+            Nx[i,j] = Nops[N[i]][0][k[i], k[j]]
+            Ny[i,j] = Nops[N[i]][1][k[i], k[j]]
+            Nz[i,j] = Nops[N[i]][2][k[i], k[j]]
+    
+    
+    return Nx, Ny, Nz 
+
+def caseb_multistate_S(alpha, N, k, SS1, JJ1):
+    """
+    Calculate the body-fixed :math:`S_i` operators 
+    for a multi-state case (b) basis set.
+
+    Parameters
+    ----------
+    alpha : array_like
+        The electronic (or other) state index.
+    N : array_like
+        The :math:`N` quantum number.
+    k : array_like
+        The signed :math:`k` quantum number.
+    SS1 : array_like
+        The value of :math:`2S+1`.
+    JJ1 : array_like
+        The value of :math:`2J+1`.
+
+    Returns
+    -------
+    Sx, Sy, Sz : ndarray
+        The matrix elements of the body-fixed components
+        of :math:`\\mathbf{S}`. 
+        
+    Notes
+    -----
+    
+    The case (b) basis function is
+    
+    ..  math::
+        \\vert J m_J N k S; \\alpha \\rangle = \\sum_{m_N, m_S} 
+        \\vert N k m_N \\rangle \\vert S m_S \\rangle \\vert \\alpha \\rangle
+        \\langle N m_N, S m_S \\vert J m_J \\rangle
+        
+    The matrix elements of the body-fixed components :math:`S_i`, :math:`i = x,y,z`,
+    are calculated by first calculating the body-fixed  spherical tensor components
+    
+    ..  math::
+        
+        &\\langle J' m_J' N' k' S' ;\\alpha' \\vert S_q \\vert J m_J N k S ; \\alpha\\rangle
+        = \\delta_{\\alpha\\alpha'} \\delta_{JJ'} \\delta_{m_J m_J'} \\delta_{SS'}  \\\\
+        &\\qquad\\qquad \\times (-1)^{k + J + S + 1} \\sqrt{(2N+1)(2N'+1)(2S+1)S(S+1)} 
+          \\left(\\begin{array}{ccc} N & 1 & N' \\\\ k & -q & -k' \\end{array} \\right)
+          \\left\\{\\begin{array}{ccc} N & S & J \\\\ S & N' & 1 \\end{array} \\right\\}
+                
+    and then relating
+    
+    ..  math::
+        
+        S_x &= \\frac{1}{\\sqrt{2}} ( -S_{q = +1} + S_{q = -1}) \\\\
+        S_y &= \\frac{+i}{\\sqrt{2}} ( S_{q = +1} + S_{q = -1}) \\\\
+        S_z &= S_{q = 0} 
+    
+    """
+    
+    
+    n = len(N) # The number of basis functions in the list 
+    
+    Sq = np.zeros((3,n,n))
+    
+    for q in [-1,0,1]:
+        for i in range(n):
+            for j in range(n):
+                #
+                # The matrix element is diagonal in 
+                # alpha (electronic index or other), S and J
+                #
+                if alpha[i] != alpha[j]:
+                    continue 
+                if SS1[i] != SS1[j]:
+                    continue 
+                if JJ1[i] != JJ1[j]:
+                    continue
+                
+                # (-1) ** (k + J + S + 1)
+                coeff1 = (-1)**(k[j] + (SS1[j] + JJ1[j])/2 )
+                # sqrt((2N+1) * (2N'+1) * (2S+1) * S(S+1) )
+                ssp1 = (SS1[j] ** 2  - 1)/4 # the value of S(S+1) 
+                coeff2 = np.sqrt( (2*N[j] + 1) * (2*N[i] + 1) * SS1[j] * ssp1) 
+                
+                threej = wigner3j(2*N[j], 2*1, 2*N[i],
+                                  2*k[j], 2*(-q), 2*(-k[i])) 
+                
+                sixj = wigner6j(2*N[j], SS1[j]-1, JJ1[j]-1,
+                                SS1[j]-1, 2*N[i], 2*1)
+                
+                Sq[q,i,j] = coeff1 * coeff2 * threej * sixj 
+    #
+    # Calculate the Cartesian components
+    # from the spherical tensor components
+    #
+    Sx = (Sq[1] - Sq[-1]) / np.sqrt(2) 
+    Sy = 1j * (Sq[1] + Sq[-1]) / np.sqrt(2) 
+    Sz = Sq[0].copy()  
+    
+    return Sx, Sy, Sz 
+        
