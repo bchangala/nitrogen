@@ -1,7 +1,7 @@
 import setuptools
 from setuptools import Extension
 import codecs
-import os.path
+import os
 
 ####################
 # Version fetching
@@ -63,6 +63,13 @@ for e in ext_modules:
 
 with open("README.md", "r") as fh:
 	long_description = fh.read()
+    
+on_rtd = os.environ.get('READTHEDOCS') == 'True' # Check whether we are on Read the Docs
+install_requires = ['numpy>=1.19', 'scipy>=1.4.1', 'matplotlib>=3.1,<3.3', 'scikit-image',
+                  'setuptools>=49',"wheel","Cython>=0.29.21"]
+if not on_rtd:
+    # py3nj requires fortran compilation; cannot be built on read-the-docs
+    install_requires += ['py3nj']
 	
 setuptools.setup(
 	name = "nitrogen",
@@ -80,8 +87,7 @@ setuptools.setup(
 		"Operating System :: OS Independent",
 	],
 	python_requires = '>=3.6', 
-    install_requires=['numpy>=1.19', 'scipy>=1.4.1', 'matplotlib>=3.1,<3.3', 'scikit-image',
-                      'setuptools>=49',"wheel","Cython>=0.29.21","py3nj"], 
+    install_requires=install_requires,
     cmdclass = cmdclass,
     ext_modules = ext_modules
 )
