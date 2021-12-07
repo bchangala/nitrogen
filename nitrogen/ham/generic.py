@@ -10,6 +10,7 @@ import numpy as np
 from scipy.sparse.linalg import LinearOperator
 import nitrogen.constants
 import nitrogen.basis 
+import warnings
 
 class GeneralSpaceFixed(LinearOperator):
     """
@@ -1703,6 +1704,7 @@ class AzimuthalLinearRT(LinearOperator):
                  Vmax = None, Vmin = None, Voffset = None,
                  signed_azimuth = False,
                  NE = 1, Lambda = None, SS1 = None,
+                 Li = None, LiLj_ac = None,
                  pesorder = 'LR', ASO = None):
         """
 
@@ -1748,6 +1750,16 @@ class AzimuthalLinearRT(LinearOperator):
         SS1 : array_like of integers, optional
             The spin multiplicity, :math:`2S+1`, of each electronic
             state. If None (default), singlet states will be assumed.
+        Li : (3,NE,NE) array_like, optional
+            The matrix elements of the body-fixed electronic orbital
+            angular momentum, :math:`L_i`, :math:`i=x,y,z`.
+            If None (default), :math:`L_z` will be determined
+            from `Lambda` and :math:`L_{x,y}` will be assumed to be zero.
+        LiLj_ac : (3,3,NE,NE) array_like, optional
+            The matrix elements of the anti-commutators, 
+            :math:`[L_i,L_j]_+ = L_i L_j + L_j L_i`,
+            :math:`i,j=x,y,z`. If None (default), these will be
+            approximated from `Li`. 
         pesorder : {'LR', 'LC'}, optional
             V matrix electronic state ordering. The `pes` function returns
             the *lower* triangle of the diabatic potential matrix. If 'LR'
@@ -1791,9 +1803,9 @@ class AzimuthalLinearRT(LinearOperator):
         The azimuthal quantum numbers for each basis factor are assigned according
         to the `azimuth` list in the same way as :class:`AzimuthalLinear`.
         
-        In the current implementation, only :math:`L_z` is considered
-        and the other components are ignored. Additionally it is 
-        assumed the electronic orbital angular momentum is constant. 
+        The electronic orbital angular momentum matrix elements
+        are supplied by optional parameters. They are assumed to be 
+        constant.
         Geometry-dependent quenching functions may be added in the future.
         
         
@@ -2234,13 +2246,47 @@ class AzimuthalLinearRT(LinearOperator):
                                                 sre_basis_list[:,4], # 2S+1
                                                 sre_basis_list[:,5]) # 2J+1
         
-        # Construct body-fixed L_i operators
-        # For now, assume Lz is constant and diagonal
-        # and that Lx and Ly are zero
-        Lz = np.diag(1.0 * sre_basis_list[:,1]) # Lambda 
-        Lx = np.zeros((Nsre,Nsre))
-        Ly = np.zeros((Nsre,Nsre))
-        Li = (Lx, Ly, Lz) 
+        #
+        # Construct body-fixed L_i operators and 
+        # their products 
+        #
+        # We are supplied with Li and {Li,Lj} in 
+        # the Ne x Ne electronic representation
+        #
+        # If Li is not supplied, assume that 
+        # L_z is Lambda and the orthogonal components
+        # are zero
+        if Li is None: 
+            print("Li is being constructed from Lambda")
+            Lz = np.diag(1.0 * np.array(Lambda)) # Lambda 
+            Lx = np.zeros((NE,NE))
+            Ly = np.zeros((NE,NE))
+            Li = [Lx, Ly, Lz]
+        Li_e = np.array(Li) # Pure electronic representation
+        if not np.allclose(np.diag(Li_e[2]), Lambda):
+            warnings.warn("Lz appears inconsistent with Lambda")
+            
+        if LiLj_ac is None:
+            print("{Li,Lj} is being constructed from Li")
+            # Calculate anti-commutator assuming closure
+            # [Li, Lj]_+ = LiLj + LjLi
+            LiLj_ac = [ 
+                [ Li[i] @ Li[j] + Li[j] @ Li[i] for j in range(3)] 
+                    for i in range(3)]
+        LiLj_ac_e = np.array(LiLj_ac) # Pure electronic representation 
+        
+        #
+        # Expand these to the full Nsre x Nsre
+        # spin-rot-electronic representation
+        # These operators are diagonal in J, N
+        # k, and S.
+        # 
+        Li, LiLj_ac = nitrogen.angmom.caseb_multistate_L(Li_e, LiLj_ac_e, 
+                                                         sre_basis_list[:,0], # elec. index 
+                                                         sre_basis_list[:,2], # N
+                                                         sre_basis_list[:,3], # k
+                                                         sre_basis_list[:,4], # 2S+1
+                                                         sre_basis_list[:,5]) # 2J+1
         
         
         # Define the required LinearOperator attributes
@@ -2262,6 +2308,7 @@ class AzimuthalLinearRT(LinearOperator):
         self.Ni = Ni 
         self.Si = Si 
         self.Li = Li 
+        self.LiLj_ac = LiLj_ac 
         self.ASO = ASO 
         
         self.bases_dp = bases_dp
@@ -2471,17 +2518,25 @@ class AzimuthalLinearRT(LinearOperator):
                 # G^ab term
                 ab_idx = nitrogen.linalg.packed.IJ2k(nact + a, nact + b) 
                 Gab = self.G[ab_idx] 
+                
+                #
+                # {Na-La, Nb-Lb} = 
+                #  {Na, Nb} + {La, Lb} - 2(NaLb + NbLa)
+                # 
+                # (N and L commute)
+                # N has closure
+                N_ac = self.Ni[a] @ self.Ni[b] + self.Ni[b] @ self.Ni[a]
+                L_ac = self.LiLj_ac[a,b]
+                cross = self.Ni[a] @ self.Li[b] + self.Ni[b] @ self.Li[a] 
+                
+                anticom = N_ac + L_ac - 2*cross  # {Na-La, Nb-Lb}
+                
                         
                 for srep in range(Nsre):
                     for sre in range(Nsre):
                         #
                         # < sre' | ... |  sre > spin-rot-elec block
                         #
-                        # Calculate the spin-rot-elec matrix element
-                        #
-                        NLa = self.Ni[a] - self.Li[a]  # (N_a - L_a)
-                        NLb = self.Ni[b] - self.Li[b]  # (N_b - L_b)
-                        anticom = NLa @ NLb + NLb @ NLa # anti-commutator
                         sre_me = -anticom[srep,sre] # minus sign from 1j * 1j 
                         
                         if sre_me == 0:

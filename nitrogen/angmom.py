@@ -781,3 +781,67 @@ def caseb_multistate_S(alpha, N, k, SS1, JJ1):
     
     return Sx, Sy, Sz 
         
+def caseb_multistate_L(Li_e, LiLj_ac_e, alpha, N, k, SS1, JJ1):
+    """
+    Calculate the body-fixed :math:`L_i` operators 
+    for a multi-state case (b) basis set.
+
+    Parameters
+    ----------
+    Li_e : (3,NE,NE) array_like
+        The pure electronic matrix elements of 
+        :math:`L_i`.
+    LiLj_ac_e : (3,3,NE,NE) array_like
+        The pure electronic matrix elements of
+        the anti-commutators :math:`[L_i, L_j]_+ = L_i L_j + L_j L_i`.
+    alpha : array_like
+        The electronic state index, i.e. the values for
+        indexing into `Li_e` and `LiLj_ac_e`.
+    N : array_like
+        The :math:`N` quantum number.
+    k : array_like
+        The signed :math:`k` quantum number.
+    SS1 : array_like
+        The value of :math:`2S+1`.
+    JJ1 : array_like
+        The value of :math:`2J+1`.
+
+    Returns
+    -------
+    Li : (3,n,n) ndarray
+        Li[i] is the :math:`L_i` operator in the case (b) representation.
+    LiLj_ac : (3,3,n,n) ndarray
+        LiLj_ac[i,j] is the :math:`[L_i, L_j]_+` anti-commutator in 
+        the case (b) representation.
+
+    """
+    
+    Li_e = np.array(Li_e)
+    LiLj_ac_e = np.array(LiLj_ac_e) 
+    
+    # Construct Li in spin-rot-elec basis 
+    n = len(N) # the number of case (b) basis functions 
+    
+    Li = np.zeros((3, n, n), dtype = np.complex128)
+    LiLj_ac = np.zeros((3, 3, n, n), dtype = np.complex128)
+    
+    
+    for i in range(n):
+        for j in range(n):
+            
+                #
+                # Diagonal in N, k, S and J
+                #
+                if N[i] != N[j] or k[i] != k[j] or \
+                   SS1[i] != SS1[j] or \
+                   JJ1[i] != JJ1[j]:
+                    continue
+                
+                for a in range(3):
+                    Li[a,i,j] = Li_e[a, alpha[i], alpha[j]]
+                
+                    for b in range(3):
+                        LiLj_ac[a,b,i,j] = LiLj_ac_e[a,b, alpha[i], alpha[j]]
+                        
+    return Li, LiLj_ac 
+    
