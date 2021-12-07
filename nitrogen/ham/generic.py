@@ -2529,15 +2529,15 @@ class AzimuthalLinearRT(LinearOperator):
                 L_ac = self.LiLj_ac[a,b]
                 cross = self.Ni[a] @ self.Li[b] + self.Ni[b] @ self.Li[a] 
                 
-                anticom = N_ac + L_ac - 2*cross  # {Na-La, Nb-Lb}
-                
+                anticom = -(N_ac + L_ac - 2*cross)  # {1j(Na-La), 1j(Nb-Lb)}
+                                                    # (minus sign from 1j*1j)
                         
                 for srep in range(Nsre):
                     for sre in range(Nsre):
                         #
                         # < sre' | ... |  sre > spin-rot-elec block
                         #
-                        sre_me = -anticom[srep,sre] # minus sign from 1j * 1j 
+                        sre_me = anticom[srep,sre]
                         
                         if sre_me == 0:
                             continue # a zero spin-rot-elec matrix element 
