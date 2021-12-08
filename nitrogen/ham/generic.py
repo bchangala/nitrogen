@@ -1701,7 +1701,6 @@ class AzimuthalLinearRT(LinearOperator):
      
     def __init__(self, bases, cs, azimuth, 
                  pes = None, masses = None, JJ1 = 1, hbar = None,
-                 Vmax = None, Vmin = None, Voffset = None,
                  signed_azimuth = False,
                  NE = 1, Lambda = None, SS1 = None,
                  Li = None, LiLj_ac = None,
