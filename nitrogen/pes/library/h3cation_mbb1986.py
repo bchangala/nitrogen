@@ -1,5 +1,5 @@
 """
-H3+_MBB1986.py
+h3cation_mbb1986.py
 
 H3^+ ground state surface from Ref [1]_ ("MBB"). Note the issues
 mentioned in Ref [2]_. Comprehensive energies for this surface

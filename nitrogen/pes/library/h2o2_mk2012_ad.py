@@ -1,5 +1,5 @@
 """
-H2O2_MK2012_AD.py
+h2o2_mk2012_ad.py
 
 Hydrogen peroxide, H2O2, ground state surface from
 Ref [1]_. The coefficients are available from the references

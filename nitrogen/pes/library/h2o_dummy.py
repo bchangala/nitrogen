@@ -1,5 +1,5 @@
 """
-H2O_dummy.py
+h2o_dummy.py
 
 A water-like surface 
 

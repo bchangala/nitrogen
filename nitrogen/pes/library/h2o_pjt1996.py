@@ -1,5 +1,5 @@
 """
-H2O_PJT1996.py
+h2o_pjt1996.py
 
 Water potential energy surface from Ref [1]_ ("PJT2"). This
 surface was optimized for H2(^16O), containing contributions from B-O breakdown.

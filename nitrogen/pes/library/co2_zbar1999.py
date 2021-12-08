@@ -1,5 +1,5 @@
 """
-CO2_ZBAR1999.py
+co2_zbar1999.py
 
 CO_2 ground state surface from Ref [1]_, using the PES 
 form presented in Ref [2]_. This PES is refined with
