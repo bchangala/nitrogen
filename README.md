@@ -6,4 +6,4 @@ It is available from PyPI via `pip install nitrogen`. The source repository is [
 
 Documentation is available on [Read the Docs](https://nitrogen-docs.readthedocs.io).
 
-NITROGEN ver. 2.x is a complete re-write in Python, currently in initial development and planning. The original C code (ver. 1.x) is available [here](https://www.colorado.edu/nitrogen).
+NITROGEN ver. 2.x is a complete re-write in Python. The original C code (ver. 1.x) is available [here](https://www.colorado.edu/nitrogen).
