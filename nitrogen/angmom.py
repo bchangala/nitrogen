@@ -607,7 +607,59 @@ def Nbf_matrix(N):
     Nx = (Np + Nm) / 2
     Ny = (Np - Nm) / (2 * 1j) 
     
-    return Nx, Ny, Nz 
+    return Nx, Ny, Nz
+
+def L_matrix(L):
+    """
+    Calculate the Cartesian components of a general
+    angular momentum operator with normal commutation 
+    relations
+    
+    ..  math::
+        \\langle L m' \\vert L_i \\vert L m \\rangle
+
+    Parameters
+    ----------
+    L : integer
+        The total angular momentum quantum number, :math:`L`.
+
+    Returns
+    -------
+    LX, LY, LZ : ndarray
+        The matrix representations.
+        
+    Notes
+    -----
+    The basis function order is :math:`m = 0, 1, \\ldots, L, -L, -L+1, \\ldots, -1`.
+
+    """
+    
+    # 
+    # k = 0, 1, 2, ..., L, -L, ..., -1
+    #
+    # The final ndarrays will be indexable by the signed m quantum number
+    #
+    mrange = [i for i in range(L+1)] + [ i-L for i in range(L)]
+    n = 2*L+1 # the number of functions
+    
+    mI, mJ = np.meshgrid(mrange, mrange, indexing = 'ij')
+    
+    LZ = np.diag(mrange) 
+    
+    Lp = np.zeros((n,n))
+    Lm = np.zeros((n,n))
+    
+    idx = (mI == mJ + 1)
+    Lp[idx] = np.sqrt( L*(L+1) - mJ*(mJ + 1) )[idx] # raising operator
+    
+    
+    idx = (mI == mJ - 1)
+    Lm[idx] = np.sqrt( L*(L+1) - mJ*(mJ - 1) )[idx] # lowering operator
+    
+    LX = (Lp + Lm) / 2
+    LY = (Lp - Lm) / (2 * 1j) 
+    
+    return LX, LY, LZ
 
 def caseb_multistate_N(alpha, N, k, SS1, JJ1):
     """
