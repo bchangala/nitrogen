@@ -13,6 +13,8 @@ import nitrogen.constants as constants
 import numpy as np 
 import nitrogen.coordsys as coordsys 
 
+import warnings
+
 
 def loadpes(pesname):
     """
@@ -29,6 +31,9 @@ def loadpes(pesname):
         The PES as a DFun object.
 
     """
+    
+    warnings.warn("loadpes is deprecated. Import directly from nitrogen.pes.library modules",
+                  DeprecationWarning)
     
     try : 
         mod = importlib.import_module("nitrogen.pes.library." + pesname)

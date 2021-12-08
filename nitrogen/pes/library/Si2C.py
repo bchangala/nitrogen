@@ -1,5 +1,5 @@
 """
-SiCSi.py
+si2c.py
 
 Disilicon carbide, Si2C, ground state surface.
 Calculated by Changala and Baraban (``P2'').
