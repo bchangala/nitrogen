@@ -9,6 +9,10 @@ The state ordering is :math:`\\Sigma (A'), \\Pi (A'), \\Pi (A'')`\ .
 The input coordinates are :math:`R_\\text{CC}, R_\\text{CH}, \\theta`, in 
 Angstrom and degree units. The output units are :math:`\\text{cm}^{-1}`.
 
+The `PES_adiabat` DFun evaluates the adiabatic energies in order of
+the lower :math:`A'` state, the higher :math:`A'` state, and the isolated
+:math:`A''` state. The input coordinates are the same.
+
 References
 ----------
 
@@ -40,6 +44,51 @@ def Vfun(X, deriv = 0, out = None, var = None):
     """
     x = n2.dfun.X2adf(X, deriv, var)
     
+    lower = calc_V_matrix_adf(x)
+  
+    return n2.dfun.adf2array(lower, out)
+
+def Vfun_ad(X, deriv = 0, out = None, var = None):
+    """
+    expected order RCC (Angstroms), RCH (Angstroms), theta (degrees)
+    """
+    x = n2.dfun.X2adf(X, deriv, var)
+    
+    lower = calc_V_matrix_adf(x)
+    
+    # Calculate the adiabatic energies
+    #
+    # Output order:
+    # 
+    #  A' (lower state)
+    #  A' (upper state)
+    #  A'' 
+    
+    # 2 x 2 block
+    # [a c]
+    # [c b]
+    #
+    a = lower[0]
+    b = lower[2]
+    c = lower[1]
+    
+    arg = (a-b)*(a-b) + 4*(c*c)
+    rt = adf.sqrt(arg)
+    
+    # Calculate the two roots
+    #
+    ap_low = 0.5 * (a + b - rt)
+    ap_high = 0.5 * (a + b + rt)
+    
+    app = lower[5] # Isolated state
+  
+    return n2.dfun.adf2array([ap_low, ap_high, app], out)
+
+def calc_V_matrix_adf(x):
+    """
+    Calculate the lower triangle (row order)
+    of the diabatic matrix given adf input
+    """
     a0 = n2.constants.a0
     
     RCC = x[0] / a0 # C--C bond length, convert angstroms to bohr
@@ -91,8 +140,8 @@ def Vfun(X, deriv = 0, out = None, var = None):
     V32 = adf.const_like(0.0,v[0])
     
     lower = [v[0], v[3], v[1], V31, V32, v[2]]
-  
-    return n2.dfun.adf2array(lower, out)
+    
+    return lower
 
 def pows(x, pmax):
     
@@ -109,6 +158,7 @@ def pows(x, pmax):
 # Define module-scope PES DFun object
 #
 PES = n2.dfun.DFun(Vfun, nf = 6, nx = 3)
+PES_adiabat = n2.dfun.DFun(Vfun_ad, nf = 3, nx = 3)
 #
 #
 ######################################
