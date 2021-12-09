@@ -288,7 +288,7 @@ class DFun:
 
         Parameters
         ----------
-        X0 : ndarray
+        X0 : array_like
             (`nx`,) array containing the initial guess
         fidx : int 
             The DFun function index to optimize. The default is 0.
@@ -307,6 +307,8 @@ class DFun:
             The optimized function value.
 
         """
+        
+        X0 = np.array(X0)
         
         if var is None:
             var = [i for i in range(self.nx)]

@@ -52,7 +52,7 @@ def curvVib(Q0, pes, cs, masses, mode = 'bodyframe'):
 
     Parameters
     ----------
-    Q0 : ndarray
+    Q0 : array_like
         The stationary point coordinates.
     pes : DFun
         Potential energy surface function.
@@ -75,6 +75,8 @@ def curvVib(Q0, pes, cs, masses, mode = 'bodyframe'):
         The normal coordinate transformation.
         
     """
+    
+    Q0 = np.array(Q0)
     
     nQ = pes.nx # Number of coordinates
     
