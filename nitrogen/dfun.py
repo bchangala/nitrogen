@@ -988,6 +988,71 @@ class PermutedDFun(DFun):
     def __repr__(self):
         return f"PermutedDFun({self.df!r}, in_order = {self.in_order!r}, out_order = {self.out_order!r})"
 
+class ArrangedDFun(DFun):
+    """
+    Select a subset or duplicates of output functions.
+    
+    Attributes
+    ----------
+    
+    df : DFun
+        The original DFun
+    select : ndarray
+        The output functions in terms of the indices
+        of the original output functions.
+    
+    """
+    
+    def __init__(self, df, select):
+        """
+        
+        Parameters
+        ----------
+        df : DFun
+            A DFun object.
+        select : array_like of int
+            The new output functions. Repetitions are allowed.
+
+        """
+        
+        nx = df.nx 
+        
+        select = np.array(select, copy = True)
+        nf = len(select)
+            
+        if np.any(select < 0) or np.any(select >= df.nf):
+            raise ValueError("select has an element out of bounds")
+        
+        super().__init__(self._farrange, nf, nx, df.maxderiv, df.zlevel)
+        
+        self.df = df
+        self.select = select 
+        
+        return
+
+    def _farrange(self, X, deriv = 0, out = None, var = None):
+        
+        #
+        # Evaluate the complete set of functions
+        #
+        out_all = self.df.f(X, deriv = deriv, out = None, var = var) 
+        
+        # Set up output
+        nd,nvar = ndnvar(deriv, var, self.nx)
+        if out is None:
+            base_shape = X.shape[1:]
+            out = np.ndarray( (nd, self.nf) + base_shape, dtype = X.dtype)
+            
+        # Copy old output to new order 
+        for i in range(self.nf):
+            iold = self.select[i]
+            np.copyto(out[:,i], out_all[:,iold])
+            
+        return out 
+    
+    def __repr__(self):
+        return f"ArrangedDFun({self.df!r}, {self.select!r})"
+
 
 class SimpleProduct(DFun):
     """
