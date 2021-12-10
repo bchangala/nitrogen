@@ -680,6 +680,10 @@ class NonLinear(LinearOperator):
         #
         G = nitrogen.linalg.packed.inv_sp(g[0]) # value only
         #
+        # Determine which elements of G are strictly zero
+        G_is_zero = [np.max(abs(G[i])) < 1e-10 for i in range(G.shape[0])]
+        
+        #
         gtilde = [nitrogen.linalg.packed.trAB_sp(G, g[i+1]) for i in range(len(vvar))]
         gtilde = np.stack(gtilde)
         
@@ -726,6 +730,7 @@ class NonLinear(LinearOperator):
         self.bases = bases  # The basis sets
         self.Vq = Vq        # The PES quadrature grid
         self.G = G          # The inverse vibrational metric
+        self.G_is_zero = G_is_zero # Zero-mask for G elements
         self.Gammatilde = Gammatilde # The pseudo-potential terms
         self.hbar = hbar    # The value of hbar.    
         self.fbr_shape = fbr_shape # The shape of the mixed DVR-FBR product basis 
@@ -821,17 +826,20 @@ class NonLinear(LinearOperator):
                     # Get the packed-storage index for 
                     # G^{kactive, lactive}
                     kl_idx = nitrogen.linalg.packed.IJ2k(kactive,lactive)
-                    Gkl = self.G[kl_idx]
                     
-                    # Apply G^kl 
-                    Gkl_dl = Gkl * dtilde_l
-                    
-                    # Now finish with (dtilde_k)
-                    # and put results in quadrature representation
-                    #
-                    # include the final factor of -hbar**2 / 2
-                    yq[r] += hbar**2 * 0.25 * self.Gammatilde[kactive] * Gkl_dl 
-                    yq[r] += hbar**2 * 0.50 * self.bases[ax_k].dH_grid(Gkl_dl, sc_k, ax_k)
+                    if not self.G_is_zero[kl_idx]: # If G element is non-zero
+                        
+                        Gkl = self.G[kl_idx]
+                        
+                        # Apply G^kl 
+                        Gkl_dl = Gkl * dtilde_l
+                        
+                        # Now finish with (dtilde_k)
+                        # and put results in quadrature representation
+                        #
+                        # include the final factor of -hbar**2 / 2
+                        yq[r] += hbar**2 * 0.25 * self.Gammatilde[kactive] * Gkl_dl 
+                        yq[r] += hbar**2 * 0.50 * self.bases[ax_k].dH_grid(Gkl_dl, sc_k, ax_k)
                     
                     kactive += 1
                     
@@ -859,20 +867,22 @@ class NonLinear(LinearOperator):
                     
                     # G^ab term
                     ab_idx = nitrogen.linalg.packed.IJ2k(nact + a, nact + b) 
-                    Gab = self.G[ab_idx] 
-                            
-                    for rp in range(NJ):
-                        for r in range(NJ):
-                            # <rp | ... | r > rotational block
-                            rot_me = self.iJiJ[a][b][rp,r] # the rotational matrix element
-                            
-                            if rot_me == 0:
-                                continue # a zero rotational matrix element
-                            
-                            # otherwise, add contribution from
-                            # effective inverse inertia tensor
-                            yq[rp] += (symfactor * rot_me * (-hbar**2) * 0.25) * (Gab * xq[r])
-                            
+                    
+                    if not self.G_is_zero[ab_idx]: # If G element is non-zero
+                        Gab = self.G[ab_idx] 
+                                
+                        for rp in range(NJ):
+                            for r in range(NJ):
+                                # <rp | ... | r > rotational block
+                                rot_me = self.iJiJ[a][b][rp,r] # the rotational matrix element
+                                
+                                if rot_me == 0:
+                                    continue # a zero rotational matrix element
+                                
+                                # otherwise, add contribution from
+                                # effective inverse inertia tensor
+                                yq[rp] += (symfactor * rot_me * (-hbar**2) * 0.25) * (Gab * xq[r])
+                                
             #
             # 3) Rotation-vibration coupling
             #
@@ -897,18 +907,20 @@ class NonLinear(LinearOperator):
                             
                             # calculate index of G^ak
                             ak_idx = nitrogen.linalg.packed.IJ2k(nact + a, kactive)
-                            Gak = self.G[ak_idx] 
                             
-                            # First, do the psi' (dtilde_k psi) term
-                            dk_x = self.bases[ax_k].d_grid(xq[r], sc_k, ax_k)
-                            
-                            dtilde_k = dk_x + 0.5 * self.Gammatilde[kactive] * xq[r]
-                            yq[rp] += (rot_me * (-hbar**2) * 0.50) * Gak * dtilde_k
-                            
-                            # Now, do the -(dtilde_k psi') * psi term
-                            yq[rp] += (rot_me * (+hbar**2) * 0.25) * self.Gammatilde[kactive] * Gak * xq[r] 
-                            yq[rp] += (rot_me * (+hbar**2) * 0.50) * self.bases[ax_k].dH_grid(Gak * xq[r], sc_k, ax_k)
-                            
+                            if not self.G_is_zero[ak_idx]:
+                                Gak = self.G[ak_idx] 
+                                
+                                # First, do the psi' (dtilde_k psi) term
+                                dk_x = self.bases[ax_k].d_grid(xq[r], sc_k, ax_k)
+                                
+                                dtilde_k = dk_x + 0.5 * self.Gammatilde[kactive] * xq[r]
+                                yq[rp] += (rot_me * (-hbar**2) * 0.50) * Gak * dtilde_k
+                                
+                                # Now, do the -(dtilde_k psi') * psi term
+                                yq[rp] += (rot_me * (+hbar**2) * 0.25) * self.Gammatilde[kactive] * Gak * xq[r] 
+                                yq[rp] += (rot_me * (+hbar**2) * 0.50) * self.bases[ax_k].dH_grid(Gak * xq[r], sc_k, ax_k)
+                                
                             kactive += 1
         
         # yq contains the complete 
@@ -1331,6 +1343,10 @@ class AzimuthalLinear(LinearOperator):
         #
         #G,detg = nitrogen.dfun.sym2invdet(g, 1, len(vvar))
         G = nitrogen.linalg.packed.inv_sp(g[0])
+        # Determine which elements of G are strictly zero
+        G_is_zero = [np.max(abs(G[i])) < 1e-10 for i in range(G.shape[0])]
+        
+        
         #
         # Calculate the log. deriv. of det(g)
         #
@@ -1401,6 +1417,7 @@ class AzimuthalLinear(LinearOperator):
         self.axis_of_coord = axis_of_coord 
         self.Gammatilde = Gammatilde 
         self.G = G 
+        self.G_is_zero = G_is_zero
         self.hbar = hbar 
         self.nact = len(vvar) # The number of active coordinates 
         
@@ -1538,17 +1555,19 @@ class AzimuthalLinear(LinearOperator):
                     # Get the packed-storage index for 
                     # G^{kactive, lactive}
                     kl_idx = nitrogen.linalg.packed.IJ2k(kact, lact)
-                    Gkl = self.G[kl_idx]
                     
-                    # Apply G^kl 
-                    Gkl_dl = Gkl * dtilde_l
-                    
-                    # Now finish with (dtilde_k)
-                    # and put results in quadrature representation
-                    #
-                    # include the final factor of -hbar**2 / 2
-                    yq[r] += (hbar**2 * 0.25) * self.Gammatilde[kact] * Gkl_dl 
-                    dyq[kact][r] += (hbar**2 * 0.50) * Gkl_dl 
+                    if not self.G_is_zero[kl_idx]:
+                        Gkl = self.G[kl_idx]
+                        
+                        # Apply G^kl 
+                        Gkl_dl = Gkl * dtilde_l
+                        
+                        # Now finish with (dtilde_k)
+                        # and put results in quadrature representation
+                        #
+                        # include the final factor of -hbar**2 / 2
+                        yq[r] += (hbar**2 * 0.25) * self.Gammatilde[kact] * Gkl_dl 
+                        dyq[kact][r] += (hbar**2 * 0.50) * Gkl_dl 
 
         #      
         if J > 0:
@@ -1573,20 +1592,22 @@ class AzimuthalLinear(LinearOperator):
                     
                     # G^ab term
                     ab_idx = nitrogen.linalg.packed.IJ2k(nact + a, nact + b) 
-                    Gab = self.G[ab_idx] 
-                            
-                    for rp in range(NJ):
-                        for r in range(NJ):
-                            # <rp | ... | r > rotational block
-                            rot_me = self.iJiJ[a][b][rp,r] # the rotational matrix element
-                            
-                            if rot_me == 0:
-                                continue # a zero rotational matrix element
-                            
-                            # otherwise, add contribution from
-                            # effective inverse inertia tensor
-                            yq[rp] += (symfactor * rot_me * (-hbar**2) * 0.25) * (Gab * xq[r])
-                            
+                    
+                    if not self.G_is_zero[ab_idx]:
+                        Gab = self.G[ab_idx] 
+                                
+                        for rp in range(NJ):
+                            for r in range(NJ):
+                                # <rp | ... | r > rotational block
+                                rot_me = self.iJiJ[a][b][rp,r] # the rotational matrix element
+                                
+                                if rot_me == 0:
+                                    continue # a zero rotational matrix element
+                                
+                                # otherwise, add contribution from
+                                # effective inverse inertia tensor
+                                yq[rp] += (symfactor * rot_me * (-hbar**2) * 0.25) * (Gab * xq[r])
+                                
             #
             # 3) Rotation-vibration coupling
             #
@@ -1607,18 +1628,20 @@ class AzimuthalLinear(LinearOperator):
     
                             # calculate index of G^ak
                             ak_idx = nitrogen.linalg.packed.IJ2k(nact + a, kact)
-                            Gak = self.G[ak_idx] 
                             
-                            # First, do the psi' (dtilde_k psi) term
-
-                            dtilde_k = dxq[kact][r] + 0.5 * self.Gammatilde[kact] * xq[r]
-                            yq[rp] += (rot_me * (-hbar**2) * 0.50) * Gak * dtilde_k
-                            
-                            # Now, do the -(dtilde_k psi') * psi term
-                            Gak_xq = Gak * xq[r] 
-                            yq[rp] += (rot_me * (+hbar**2) * 0.25) * self.Gammatilde[kact] * Gak_xq
-                            dyq[kact][rp] += (rot_me * (+hbar**2) * 0.50) * Gak_xq
-                            
+                            if not self.G_is_zero[ak_idx]:
+                                Gak = self.G[ak_idx] 
+                                
+                                # First, do the psi' (dtilde_k psi) term
+    
+                                dtilde_k = dxq[kact][r] + 0.5 * self.Gammatilde[kact] * xq[r]
+                                yq[rp] += (rot_me * (-hbar**2) * 0.50) * Gak * dtilde_k
+                                
+                                # Now, do the -(dtilde_k psi') * psi term
+                                Gak_xq = Gak * xq[r] 
+                                yq[rp] += (rot_me * (+hbar**2) * 0.25) * self.Gammatilde[kact] * Gak_xq
+                                dyq[kact][rp] += (rot_me * (+hbar**2) * 0.50) * Gak_xq
+                                
         #######################################################
         #
         # 4) Convert from the quadrature representation to the
@@ -2204,6 +2227,9 @@ class AzimuthalLinearRT(LinearOperator):
         #
         #G,detg = nitrogen.dfun.sym2invdet(g, 1, len(vvar))
         G = nitrogen.linalg.packed.inv_sp(g[0])
+        # Determine which elements of G are strictly zero
+        G_is_zero = [np.max(abs(G[i])) < 1e-10 for i in range(G.shape[0])]
+        
         #
         # Calculate the log. deriv. of det(g)
         #
@@ -2318,6 +2344,7 @@ class AzimuthalLinearRT(LinearOperator):
         self.axis_of_coord = axis_of_coord 
         self.Gammatilde = Gammatilde 
         self.G = G 
+        self.G_is_zero = G_is_zero 
         self.hbar = hbar 
         self.nact = len(vvar) # The number of active coordinates 
         
@@ -2472,17 +2499,19 @@ class AzimuthalLinearRT(LinearOperator):
                     # Get the packed-storage index for 
                     # G^{kactive, lactive}
                     kl_idx = nitrogen.linalg.packed.IJ2k(kact, lact)
-                    Gkl = self.G[kl_idx]
                     
-                    # Apply G^kl 
-                    Gkl_dl = Gkl * dtilde_l
-                    
-                    # Now finish with (dtilde_k)
-                    # and put results in quadrature representation
-                    #
-                    # include the final factor of -hbar**2 / 2
-                    yq[sre] += (hbar**2 * 0.25) * self.Gammatilde[kact] * Gkl_dl 
-                    dyq[kact][sre] += (hbar**2 * 0.50) * Gkl_dl 
+                    if not self.G_is_zero[kl_idx]:
+                        Gkl = self.G[kl_idx]
+                        
+                        # Apply G^kl 
+                        Gkl_dl = Gkl * dtilde_l
+                        
+                        # Now finish with (dtilde_k)
+                        # and put results in quadrature representation
+                        #
+                        # include the final factor of -hbar**2 / 2
+                        yq[sre] += (hbar**2 * 0.25) * self.Gammatilde[kact] * Gkl_dl 
+                        dyq[kact][sre] += (hbar**2 * 0.50) * Gkl_dl 
 
         #      
         # Rotational-electronic angular momentum terms
@@ -2516,33 +2545,36 @@ class AzimuthalLinearRT(LinearOperator):
                 
                 # G^ab term
                 ab_idx = nitrogen.linalg.packed.IJ2k(nact + a, nact + b) 
-                Gab = self.G[ab_idx] 
                 
-                #
-                # {Na-La, Nb-Lb} = 
-                #  {Na, Nb} + {La, Lb} - 2(NaLb + NbLa)
-                # 
-                # (N and L commute)
-                # N has closure
-                N_ac = self.Ni[a] @ self.Ni[b] + self.Ni[b] @ self.Ni[a]
-                L_ac = self.LiLj_ac[a,b]
-                cross = self.Ni[a] @ self.Li[b] + self.Ni[b] @ self.Li[a] 
+                if not self.G_is_zero[ab_idx]:
+                    
+                    Gab = self.G[ab_idx] 
                 
-                anticom = -(N_ac + L_ac - 2*cross)  # {1j(Na-La), 1j(Nb-Lb)}
-                                                    # (minus sign from 1j*1j)
-                        
-                for srep in range(Nsre):
-                    for sre in range(Nsre):
-                        #
-                        # < sre' | ... |  sre > spin-rot-elec block
-                        #
-                        sre_me = anticom[srep,sre]
-                        
-                        if sre_me == 0:
-                            continue # a zero spin-rot-elec matrix element 
-                        # otherwise, add contribution from
-                        # effective inverse inertia tensor
-                        yq[srep] += (symfactor * sre_me * (-hbar**2) * 0.25) * (Gab * xq[sre])
+                    #
+                    # {Na-La, Nb-Lb} = 
+                    #  {Na, Nb} + {La, Lb} - 2(NaLb + NbLa)
+                    # 
+                    # (N and L commute)
+                    # N has closure
+                    N_ac = self.Ni[a] @ self.Ni[b] + self.Ni[b] @ self.Ni[a]
+                    L_ac = self.LiLj_ac[a,b]
+                    cross = self.Ni[a] @ self.Li[b] + self.Ni[b] @ self.Li[a] 
+                    
+                    anticom = -(N_ac + L_ac - 2*cross)  # {1j(Na-La), 1j(Nb-Lb)}
+                                                        # (minus sign from 1j*1j)
+                            
+                    for srep in range(Nsre):
+                        for sre in range(Nsre):
+                            #
+                            # < sre' | ... |  sre > spin-rot-elec block
+                            #
+                            sre_me = anticom[srep,sre]
+                            
+                            if sre_me == 0:
+                                continue # a zero spin-rot-elec matrix element 
+                            # otherwise, add contribution from
+                            # effective inverse inertia tensor
+                            yq[srep] += (symfactor * sre_me * (-hbar**2) * 0.25) * (Gab * xq[sre])
                         
         #
         # 3) Rotation-vibration coupling
@@ -2568,18 +2600,21 @@ class AzimuthalLinearRT(LinearOperator):
 
                         # calculate index of G^ak
                         ak_idx = nitrogen.linalg.packed.IJ2k(nact + a, kact)
-                        Gak = self.G[ak_idx] 
                         
-                        # First, do the psi' (dtilde_k psi) term
-
-                        dtilde_k = dxq[kact][sre] + 0.5 * self.Gammatilde[kact] * xq[sre]
-                        yq[srep] += (sre_me * (-hbar**2) * 0.50) * Gak * dtilde_k
-                        
-                        # Now, do the -(dtilde_k psi') * psi term
-                        Gak_xq = Gak * xq[sre] 
-                        yq[srep] += (sre_me * (+hbar**2) * 0.25) * self.Gammatilde[kact] * Gak_xq
-                        dyq[kact][srep] += (sre_me * (+hbar**2) * 0.50) * Gak_xq
-                        
+                        if not self.G_is_zero[ak_idx]:
+                            
+                            Gak = self.G[ak_idx] 
+                            
+                            # First, do the psi' (dtilde_k psi) term
+    
+                            dtilde_k = dxq[kact][sre] + 0.5 * self.Gammatilde[kact] * xq[sre]
+                            yq[srep] += (sre_me * (-hbar**2) * 0.50) * Gak * dtilde_k
+                            
+                            # Now, do the -(dtilde_k psi') * psi term
+                            Gak_xq = Gak * xq[sre] 
+                            yq[srep] += (sre_me * (+hbar**2) * 0.25) * self.Gammatilde[kact] * Gak_xq
+                            dyq[kact][srep] += (sre_me * (+hbar**2) * 0.50) * Gak_xq
+                            
         #####################################
         # Spin terms
         #
