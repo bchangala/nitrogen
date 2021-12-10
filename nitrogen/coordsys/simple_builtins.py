@@ -11,16 +11,15 @@ class Valence3(CoordSys):
     A triatomic valence coordinate system.
     
     The coordinates are :math:`r_1`, :math:`r_2`, and :math:`\\theta`.
-    The first atom is at :math:`(0, 0, -r_1)`.
-    The second atom is at the origin.
-    The third atom is at :math:`(0, r_2 \sin\\theta, -r_2 \cos\\theta )`.
+    See Notes for embedding conventions.
     
     If `supplementary` then :math:`\\theta \\leftarrow \\pi - \\theta` is
     used.
     
     """
     
-    def __init__(self, name = 'Triatomic valence', angle = 'rad', supplementary = False):
+    def __init__(self, name = 'Triatomic valence', angle = 'rad', supplementary = False,
+                 embedding_mode = 0):
         
         """
         Create a new Valence3 object.
@@ -33,6 +32,29 @@ class Valence3(CoordSys):
             The degree units. The default is radians ('rad').
         supplementary : bool, optional
             If True, then the angle supplement is used. The default is False.
+        embedding_mode : int, optional
+            Select the frame embedding convention. The default is 0. See 
+            Notes for details.
+            
+            
+        Notes
+        -----
+        
+        For `embedding_mode` = 0, the Cartesian coordinates are
+        
+        ..  math::
+            
+            X_0 &= (0, 0, -r_1) \\\\
+            X_1 &= (0, 0, 0) \\\\
+            X_2 &= (0, r_2  \\sin \\theta, -r_2 \\cos\\theta)
+        
+        For `embedding_mode` = 1, the Cartesian coordinates are
+        
+        ..  math::
+            
+            X_0 &= (r_1 \\cos \\theta/2, 0, r_1 \\sin \\theta/2) \\\\
+            X_1 &= (0, 0, 0) \\\\
+            X_2 &= (r_2 \\cos \\theta/2, 0, -r_2 \\sin \\theta/2)
         
         """
         
@@ -47,7 +69,11 @@ class Valence3(CoordSys):
         else:
             raise ValueError('angle must be rad or deg')
             
+        if not embedding_mode in [0,1]:
+            raise ValueError('unexpected embedding_mode')
+            
         self.supplementary = supplementary 
+        self.embedding_mode = embedding_mode 
         
     def _csv3_q2x(self, Q, deriv = 0, out = None, var = None):
         """
@@ -100,9 +126,17 @@ class Valence3(CoordSys):
         if self.supplementary:
             q[2] = np.pi - q[2] # theta <-- pi - theta 
         
-        np.copyto(out[:,2], (-q[0]).d ) # -r1
-        np.copyto(out[:,7], (q[1] * adf.sin(q[2])).d ) #  r2 * sin(theta)
-        np.copyto(out[:,8], (-q[1] * adf.cos(q[2])).d ) # -r2 * cos(theta)
+        if self.embedding_mode == 0:
+            np.copyto(out[:,2], (-q[0]).d ) # -r1
+            np.copyto(out[:,7], (q[1] * adf.sin(q[2])).d ) #  r2 * sin(theta)
+            np.copyto(out[:,8], (-q[1] * adf.cos(q[2])).d ) # -r2 * cos(theta)
+        elif self.embedding_mode == 1:
+            np.copyto(out[:,0], (q[0] * adf.cos(q[2]/2)).d ) # r1 * cos(theta/2)
+            np.copyto(out[:,2], (q[0] * adf.sin(q[2]/2)).d ) # r1 * sin(theta/2)
+            np.copyto(out[:,6], (q[1] * adf.cos(q[2]/2)).d ) # r2 * cos(theta/2)
+            np.copyto(out[:,8], (-q[1] * adf.sin(q[2]/2)).d ) # -r2 * sin(theta/2)
+        else:
+            raise RuntimeError("Unexpected embedding_mode")
         
         return out
 
