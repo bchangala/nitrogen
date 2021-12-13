@@ -2148,6 +2148,8 @@ class AzimuthalLinearRT(LinearOperator):
         if len(vvar) == 0:
             raise ValueError("there must be an active coordinate!") 
             
+        print(f"Total basis set size = {NH:d}")
+            
         ################################################    
         # Evaluate quadrature grid quantities
         
