@@ -827,7 +827,7 @@ def caseb_multistate_S(alpha, N, k, SS1, JJ1):
     # Calculate the Cartesian components
     # from the spherical tensor components
     #
-    Sx = (Sq[1] - Sq[-1]) / np.sqrt(2) 
+    Sx = (-Sq[1] + Sq[-1]) / np.sqrt(2) 
     Sy = 1j * (Sq[1] + Sq[-1]) / np.sqrt(2) 
     Sz = Sq[0].copy()  
     
