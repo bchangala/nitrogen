@@ -2624,13 +2624,15 @@ class AzimuthalLinearRT(LinearOperator):
                 #
                 # ASO_a,b  * L_a * S_b  term
                 #
+                LaSb = self.Li[a] @ self.Si[b] # The L.S operator in sre basis
+                
                 for srep in range(Nsre):
                     for sre in range(Nsre):
                         
                         #
                         # Calculate the spin-orbit matrix element
                         #
-                        sre_me = self.ASO[a,b] * self.Li[a][srep,sre] * self.Si[b][srep,sre] 
+                        sre_me = self.ASO[a,b] * LaSb[srep,sre] 
                         
                         if sre_me == 0:
                             continue 
