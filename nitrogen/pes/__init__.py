@@ -44,7 +44,7 @@ def loadpes(pesname):
     return mod.PES
 
 
-def curvVib(Q0, pes, cs, masses, mode = 'bodyframe'):
+def curvVib(Q0, pes, cs, masses, mode = 'bodyframe', fidx = 0):
     
     """
     Calculate curvilinear vibrational normal coordinates
@@ -65,6 +65,8 @@ def curvVib(Q0, pes, cs, masses, mode = 'bodyframe'):
         'bodyframe' treats the `cs` coordinate system as 
         the body-fixed frame.
         'bodyframe' is the default.
+    fidx : integer, optional
+        The DFun function index to use. The default is 0
 
     Returns
     -------
@@ -80,7 +82,7 @@ def curvVib(Q0, pes, cs, masses, mode = 'bodyframe'):
     
     nQ = pes.nx # Number of coordinates
     
-    F = pes.hes(Q0)[0] # Calculate PES hessian
+    F = pes.hes(Q0)[fidx] # Calculate PES hessian
     
     g = cs.Q2g(Q0, masses = masses, mode = mode) # Calculate metric tensor 
     G,_ = dfun.sym2invdet(g,0,1)                 # Invert metric tensor
