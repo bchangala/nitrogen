@@ -22,11 +22,11 @@ class JacobiChain3N(CoordSys):
     ::
     
            +
-          / \
+          / \\
          0   +
-            / \
+            / \\
            1   +
-              / \
+              / \\
              2   + 
                 ...
         
