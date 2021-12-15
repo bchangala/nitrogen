@@ -3,8 +3,29 @@ nitrogen.dfun
 -------------
 
 This module implements the class DFun, which 
-is used to wrap general differentiable, multi-variate
-functions.
+is used to interface general differentiable, multi-variate
+functions. See :doc:`tutorials/dfun` for an in-depth tutorial.
+
+
+===========================   ===================================
+**Create DFun objects from functions**
+-----------------------------------------------------------------
+:class:`DFun`                 The :class:`DFun` constructor
+:class:`FiniteDFun`           Finite-difference derivatives
+---------------------------   -----------------------------------
+**Modify single DFun objects**
+-----------------------------------------------------------------
+:class:`FixedInputDFun`       Fix input value(s).
+:class:`PermutedDFun`         Permute input and output ordering.
+:class:`ArrangedDFun`         Rearrange and duplicate outputs.
+---------------------------   -----------------------------------
+**Combine multiple DFun objects**
+-----------------------------------------------------------------
+:class:`CompositeDFun`        Function composition.
+:class:`MergedDFun`           Concatenate outputs.
+:class:`SimpleProduct`        Separable direct product.
+:class:`SelectedProduct`      Separable non-direct product.
+===========================   ===================================
 
 """
 

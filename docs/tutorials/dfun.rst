@@ -1,3 +1,5 @@
+..  _tut-dfun:
+
 Differentiable functions and the DFun class
 ===========================================
 
