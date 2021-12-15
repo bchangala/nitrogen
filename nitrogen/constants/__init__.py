@@ -32,11 +32,10 @@ The unit of mass (u, unified atomic mass unit, i.e. one-twelth the
 mass of a carbon atom), however, does not have an exact SI value. 
 The atomic unit of mass (the electron mass) has a similar status.
 
-Physical constants
-==================
-
 ===========================  =================================================================
-``kb``                       Boltzmann constant :math:`k_B`
+Physical constants
+==============================================================================================
+``kb`` (``kB``)              Boltzmann constant :math:`k_B`
 ``h``                        Planck constant :math:`h`
 ``hbar``                     reduced Planck constant :math:`\hbar = h/(2\pi)`
 ``a0``                       Bohr radius :math:`a_0`
@@ -45,10 +44,11 @@ Physical constants
 ``NA``                       Avogadro constant :math:`N_A`
 ===========================  =================================================================
 
-Unit conversions
-================
+
 
 ===========================  =================================================================
+Unit conversions
+==============================================================================================
 ``joule``                    joule, J
 ``kJ``                       kilojoule per mole, kJ/mol
 ``kcal``                     kilocalorie per mole, kcal/mol
@@ -60,6 +60,23 @@ Unit conversions
 ``debye``                    debye, D
 ===========================  =================================================================
 
+
+=======================      =======================================
+Look-up methods
+====================================================================
+:func:`constant_val`         Look up value by name.
+:func:`constant_unc`         Look up uncertainty by name.
+:func:`mass`                 Look up atomic mass by element symbol.
+=======================      =======================================
+
+
+==============================   =====================================
+Version information
+======================================================================
+:func:`constants_version`        Version string for constants data.
+:func:`mass_version`             Version string for atomic mass data.
+==============================   =====================================
+
 """
 
 from .ame2016 import _masses
@@ -70,6 +87,7 @@ from .codata2018 import _constants
 # All values are in [A,u,hc*cm^-1] unit system
 #
 kb      = _constants["kb"][0]       # Boltzman constant
+kB      = kb                        # alias for `kb`
 joule   = _constants["joule"][0]    # 1 Joule
 h       = _constants["h"][0]        # Planck constant
 hbar    = _constants["hbar"][0]     # Reduced Planck constant
