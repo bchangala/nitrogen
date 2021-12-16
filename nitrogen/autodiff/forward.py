@@ -798,11 +798,11 @@ def idxpos(a,nck):
             offset = nck[ni + k - 1, min(ni,k-1)] # The number of multi-indices with degree
                                                   # less than k
         except IndexError:
-            print(np.result_type(ni))
-            print(np.result_type(k))
-            print(np.result_type(ni+k-1))
-            print(np.result_type(min(ni,k-1)))
-            raise IndexError("yikes")
+            s1 = np.result_type(ni)
+            s2 = np.result_type(k)
+            s3 = np.result_type(ni+k-1)
+            s4 = np.result_type(min(ni,k-1))
+            raise IndexError(f"{s1:s}, {s2:s}, {s3:s}, {s4:s}, yikes!")
         posk = idxposk(a,nck)    # The position of this multi-index within
                                  # the block of multi-indices of the same degree k
         return offset + posk
