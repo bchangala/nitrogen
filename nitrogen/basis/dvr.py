@@ -127,7 +127,7 @@ class GenericDVR(GriddedBasis):
 
 class SimpleDVR(GenericDVR):
     """
-    Simple, standard 1D DVRs.
+    Standard 1D DVRs.
     
     Attributes
     ----------
@@ -153,7 +153,25 @@ class SimpleDVR(GenericDVR):
         num : int, optional
             The number of DVR grid points. The default is 10.
         basis : {'sinc','ho','fourier','legendre'}, optional
-            The DVR basis type. The default is 'sinc'.
+            The DVR basis type. The default is 'sinc'. See Notes
+            for details.
+            
+        Notes
+        -----
+        Each `basis` option constructs a one-dimensional DVR over a grid
+        defined by `start`, `stop`, and `num`. All basis types have
+        a simple :math:`dq` volume element. Descriptions for each follow:
+        
+        ========================  =========================
+        `basis` value             Description
+        ========================  =========================
+        ``'sinc'``                :math:`\\text{sinc}` basis
+        ``'ho'``                  Harmonic oscillator DVR.
+        ``'fourier'``             Fourier DVR (a periodic version of ``'sinc'``).
+        ``'legendre'``            Legendre polynomial DVR.
+        ========================  =========================
+        
+        
 
         """
         

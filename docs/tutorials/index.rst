@@ -8,4 +8,5 @@ Tutorials
    autodiff
    coordsys
    dvr
+   ndbasis
    

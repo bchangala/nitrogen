@@ -677,7 +677,7 @@ class RealSphericalHBasis(NDBasis):
     Attributes
     ----------
     m : ndarray
-        The project quantum number :math:`m`.
+        The projection quantum number :math:`m`.
     l : ndarray
         The azimuthal quantum number :math:`\ell`.
         

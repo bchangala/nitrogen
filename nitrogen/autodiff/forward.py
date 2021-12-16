@@ -6,6 +6,16 @@ This module implements a simple forward accumulation
 model for automatic differentiation. Its main object
 is the ``adarray`` class.
 
+==============================================   ====================================================
+**Constructing adarray objects**                 **Description**
+----------------------------------------------   ----------------------------------------------------
+:class:`adarray`                                 Class constructor.
+:func:`sym`                                      Create a symbol, i.e. an independent variable.
+:func:`const`                                    Create a constant.
+:func:`const_like`                               Create a constant.
+:func:`empty_like`                               Create an uninitialized :class:`adarray`.
+==============================================   ====================================================
+
 Mathematical functions implemented include
 
 ==============================================   ====================================================
@@ -43,9 +53,23 @@ Mathematical functions implemented include
 **Linear algebra**                               **Description**
 ----------------------------------------------   ----------------------------------------------------
 :func:`~nitrogen.autodiff.forward.chol_sp`       Cholesky decomposition (symmetric, packed).
-:func:`~nitrogen.autodiff.forward.int_tp`        Triangular matrix inverse (packed).
+:func:`~nitrogen.autodiff.forward.inv_tp`        Triangular matrix inverse (packed).
 :func:`~nitrogen.autodiff.forward.llt_tp`        :math:`L L^T` for triangular matrix (packed).
 :func:`~nitrogen.autodiff.forward.ltl_tp`        :math:`L^T L` for triangular matrix (packed).
+==============================================   ====================================================
+
+Low-level derivative array routines include
+
+==============================================   ====================================================
+**Function**                                     **Description**
+----------------------------------------------   ----------------------------------------------------
+:func:`mvleibniz`                                Leibniz formula for generalized product rule.
+:func:`mvchain`                                  Chain rule via Taylor expansion.
+:func:`mvrotate`                                 Linear transformation of independent variables.
+:func:`mvtranslate`                              Shift a truncated Taylor series.
+:func:`mvexpand`                                 Expand derivative array to redundant derivative grid.
+:func:`mvexpand_block`                           Expand derivative array to redundant derivative grid.
+:func:`mvcompress`                               Compress redundant derivative grid to derivative array.
 ==============================================   ====================================================
 
 """

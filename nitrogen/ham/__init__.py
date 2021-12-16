@@ -2,7 +2,29 @@
 nitrogen.ham
 ------------
 
-Hamiltonian construction routines.
+NITROGEN implements a wide variety of molecular and model Hamiltonians
+as extensions of the SciPy :class:`~scipy.sparse.linalg.LinearOperator`
+class.
+
+===================================   ====================================
+**Model Hamiltonians**
+--------------------------------------------------------------------------
+:class:`Polar2D`                      Particle in 2-d polar coordinates.
+-----------------------------------   ------------------------------------
+**General curvilinear Hamiltonians**
+--------------------------------------------------------------------------
+:class:`GeneralSpaceFixed`            Space-fixed frame embedding.
+:class:`Collinear`                    Collinear constraint.
+:class:`NonLinear`                    General non-linear molecule (single state).
+:class:`AzimuthalLinear`              General linear molecule (single state).
+:class:`AzimuthalLinearRT`            Multistate spin-rovibronic linear molecule.
+-----------------------------------   ------------------------------------
+**Simple Cartesian Hamiltonian** 
+--------------------------------------------------------------------------
+:class:`DirProdDvrCartN`              :math:`n`-dimensional Cartesian 
+:class:`DirProdDvrCartNQD`            Multistate version of :class:`DirProdDvrCartN` 
+===================================   ====================================
+
 
 """
 

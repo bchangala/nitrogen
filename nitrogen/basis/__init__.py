@@ -4,8 +4,32 @@ nitrogen.basis
 
 Basis set functions including discrete-variable 
 representations (DVRs) and finite-basis representations
-(FBRs). The main objects are the
-:class:`GenericDVR` and :class:`NDBasis` classes and sub-classes.
+(FBRs). The main objects are the :class:`GriddedBasis` class
+and its sub-classes :class:`GenericDVR` and :class:`NDBasis`.
+See :doc:`tutorials/dvr` for a tutorial.
+
+================================   ===================================
+General gridded bases
+======================================================================
+:class:`GriddedBasis`              General quadrature grid basis.
+:class:`ConcatenatedBasis`         Direct sum of :class:`GriddedBasis`
+--------------------------------   -----------------------------------
+**Discrete-variable representation bases**
+----------------------------------------------------------------------
+:class:`GenericDVR`                Parent DVR basis class.
+:class:`SimpleDVR`                 Simple one-dimensional DVRs.
+:class:`Contracted`                Contracted DVR.
+--------------------------------   -----------------------------------
+**FBR quadrature bases**
+----------------------------------------------------------------------
+:class:`NDBasis`                   Parent class for :math:`n`-d quadrature bases
+:class:`SinCosBasis`               A sine-cosine (real Fourier) basis.
+:class:`LegendreLMCosBasis`        Associated Legendre polynomials.
+:class:`RealSphericalHBasis`       Real spherical harmonics.
+:class:`Real2DHOBasis`             Two-dimensional harmonic oscillator.
+:class:`RadialHOBasis`             Radial HO basis in :math:`d` dimensions.
+================================   ===================================
+
 
 """
 
