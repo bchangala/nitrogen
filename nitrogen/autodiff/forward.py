@@ -786,24 +786,22 @@ def idxpos(a,nck):
     ncktab: Binomial coefficient table
 
     """
-        
+    
+    #
+    # To prevent unwanted int -> float conversions
+    # cast everything as uint32. This should cause
+    # no overflow issues
+    #
     k = np.uint32(np.sum(a)) # Degree of multi-index a
     ni = np.uint32(a.size)   # Number of variables
-    one = np.uint32(1)
+    one = np.uint32(1)       # 1
     
     if k == 0:
         return np.uint64(0)
     
     else:
-        try:
-            offset = nck[ni + k - one, min(ni,k-one)] # The number of multi-indices with degree
-                                                      # less than k
-        except IndexError:
-            s1 = str(np.result_type(ni)) 
-            s2 = str(np.result_type(k))
-            s3 = str(np.result_type(ni+k-one))
-            s4 = str(np.result_type(min(ni,k-one)))
-            raise IndexError(f"{s1:s}, {s2:s}, {s3:s}, {s4:s}, yikes!")
+        offset = nck[ni + k - one, min(ni,k-one)] # The number of multi-indices with degree
+                                                  # less than k
         posk = idxposk(a,nck)    # The position of this multi-index within
                                  # the block of multi-indices of the same degree k
         return offset + posk
