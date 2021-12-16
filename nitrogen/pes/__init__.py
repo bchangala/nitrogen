@@ -76,6 +76,14 @@ def curvVib(Q0, pes, cs, masses, mode = 'bodyframe', fidx = 0):
     nctrans : LinearTrans
         The normal coordinate transformation.
         
+    Notes
+    -----
+    The frequency calculation requires the inverse of the 
+    molecular moment of inertia tensor. At linear geometries,
+    this tensor is singular. Instead, its pseudo-inverse is
+    calculated, which gives the correct results at linear
+    geometries.
+        
     """
     
     Q0 = np.array(Q0)
@@ -85,9 +93,27 @@ def curvVib(Q0, pes, cs, masses, mode = 'bodyframe', fidx = 0):
     F = pes.hes(Q0)[fidx] # Calculate PES hessian
     
     g = cs.Q2g(Q0, masses = masses, mode = mode) # Calculate metric tensor 
-    G,_ = dfun.sym2invdet(g,0,1)                 # Invert metric tensor
-    G = linalg.packed.symfull(G[0])           # Convert to full value matrix
-    Gvib = G[:nQ,:nQ]                            # Extract vibrational block
+    
+    #
+    # Naive inverse breaks for linear geometries
+    #
+    #G,_ = dfun.sym2invdet(g,0,1)                 # Invert metric tensor
+    #G = linalg.packed.symfull(G[0])              # Convert to full value matrix
+    #Gvib = G[:nQ,:nQ]                            # Extract vibrational block
+    
+    g = linalg.packed.symfull(g[0]) # Convert to full matrix 
+    
+    A = g[:nQ, :nQ] # vibrational block 
+    C = g[nQ:, :nQ] # rot-vib block (lower left)
+    D = g[nQ:, nQ:] # rotation block (inertia tensor) 
+    
+    # We need to calculate Gvib, the vibrational
+    # block of the inverse of g. At linear geometries
+    # g is singular, but Gvib is still well-defined
+    # We will calculate it using block matrix inverse
+    # and using a Schur complement with a pseudo-inverse
+    iGvib = A - C.T @ np.linalg.pinv(D) @ C 
+    Gvib = np.linalg.inv(iGvib) 
 
     GF = Gvib @ F  # Calculate GF matrix
 
