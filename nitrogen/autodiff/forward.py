@@ -799,7 +799,7 @@ def idxpos(a,nck):
             offset = nck[ni + k - one, min(ni,k-one)] # The number of multi-indices with degree
                                                       # less than k
         except IndexError:
-            s1 = str(np.result_type(ni))
+            s1 = str(np.result_type(ni)) 
             s2 = str(np.result_type(k))
             s3 = str(np.result_type(ni+k-one))
             s4 = str(np.result_type(min(ni,k-one)))
