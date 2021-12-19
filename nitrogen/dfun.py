@@ -94,7 +94,7 @@ class DFun:
 
         Parameters
         ----------
-        X : ndarray
+        X : array_like
             An array of input values. `X` has shape (:attr:`nx`, ...).
         deriv : int, optional
             All derivatives up through order `deriv` are requested. The default is 0.
@@ -132,6 +132,7 @@ class DFun:
             raise ValueError('deriv is larger than maxderiv')
         
         # Check the shape of input X
+        X = np.array(X) 
         n = X.shape[0]
         if n != self.nx:
             raise ValueError(f'Expected input shape ({self.nx:d},...)')
@@ -1425,7 +1426,7 @@ class PowerExpansion(DFun):
     
     Attributes
     ----------
-    d : (nf,nd) ndarray
+    d : (nd,nf) ndarray
         The defining derivative array about the expansion point
     x0 : (nx,) ndarray
         The expansion point. 
@@ -1453,12 +1454,12 @@ class PowerExpansion(DFun):
         d = np.array(d) 
         
         if d.ndim == 1:
-            d = d.reshape((1,-1))
+            d = d.reshape((-1,1))
         
-        # d now has shape (nf, nd)
+        # d now has shape (nd, nf)
         
-        nf = d.shape[0] 
-        nd = d.shape[1] 
+        nd = d.shape[0]
+        nf = d.shape[1] 
         
         x0 = np.array(x0)
         nx = len(x0)
@@ -1541,7 +1542,7 @@ class PowerExpansion(DFun):
                     
                 iX = adf.idxpos(idxX, self.nckD)
                 
-                out[iZ,:] += c * self.d[:,iX] * Dpow
+                out[iZ,:] += c * self.d[iX,:] * Dpow
         
         return out
 
