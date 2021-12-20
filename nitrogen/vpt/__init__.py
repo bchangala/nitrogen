@@ -590,61 +590,6 @@ def corr_quad_recursion_elements(w, f, t):
     Rp = iR.T 
     Rt = R.T 
     
-    #########################################
-    #
-    # COMMENTED OUT 10/21/2021 -- PBC
-    #
-    # This naive inversion is numerically unstable
-    # at large t for unbounded modes.
-    #
-    # # Calculate time-dependent factors
-    # # These are all purely real
-    # cos = np.zeros((n,nt))     # cos(Sigma * Omega * t)
-    # sigsin = np.zeros((n,nt))  # Sigma * sin(Sigma * Omega * t)
-    # isigsin = np.zeros((n,nt)) # Sigma^-1 * sin(Sigma * Omega * t)
-
-    # for i in range(n):
-    #     if z2[i] > 0: # sigma = +1
-    #         cos[i] = np.cos(O[i,i] * t)
-    #         sigsin[i] = np.sin(O[i,i] * t)
-    #         isigsin[i] = sigsin[i] 
-    #     elif z2[i] < 0: # sigma = -i 
-    #         cos[i] = np.cosh(O[i,i] * t)
-    #         sigsin[i] = -np.sinh(O[i,i] * t)
-    #         isigsin[i] = +np.sinh(O[i,i] * t) 
-    #     else:
-    #         raise ValueError("z2 == 0! Bad!")
-    
-    # # Shape for broadcasting as diag(cos) @ M
-    # cos = (cos.T).reshape((nt,n,1))
-    # sigsin = (sigsin.T).reshape((nt,n,1))
-    # isigsin = (isigsin.T).reshape((nt,n,1))
-    
-    # # Calculate the X, Y coefficient matrices 
-    # # that propagate q(t) and p(t)
-    
-    # d = d.reshape((n,1)) 
-    
-    # Xq = Rp @ (cos * Rt) # cos * Rt generates (nt, n, n), which is then stack matmul'ed
-    # Xp = Rp @ (isigsin * iR) 
-    # X0 = d - Rp @ (cos * (Rt@d))
-    
-    # Yq = -R @ (sigsin * Rt) 
-    # Yp = R @ (cos * iR) 
-    # Y0 = R @ (sigsin * (Rt@d))
-    
-    # Na = 0.5 * (Xq - Yp - 1j*Xp - 1j*Yq)
-    # Nap = 0.5 * (Xq + Yp + 1j*Xp - 1j*Yq)
-    # N0 = np.sqrt(0.5) * (X0 - 1j*Y0)
-
-    # # Finally, calculate the recursion matrices 
-    # S = np.linalg.inv(Nap) 
-    # r = S @ N0 
-    # T = S @ Na 
-    #
-    # END COMMENT BLOCK - PBC
-    ####################################
-
     # 
     # Compute the diagonal matrices
     # Sigma**1/2 and Sigma**-1/2
