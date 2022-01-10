@@ -504,16 +504,17 @@ def autocorr_quad_finiteT(w, f, t, beta, method = 'direct'):
     else:
         raise ValueError('Invalid method option')
     
-def corr_quad_recursion_elements(w, f, t):
+def corr_quad_recursion_elements(W, f, t):
     """
     Calculate the correlation function recursion coefficients 
     for a quadratic Hamiltonian.
 
     Parameters
     ----------
-    w : array_like
-        The harmonic frequencies (in energy units) defining 
-        the dimensionless normal coordinates.
+    W : (n,) or (n,n) array_like
+        If a 1-d vector, the harmonic frequencies (in energy units) defining 
+        the dimensionless normal coordinates. If a 2-d array, then 
+        the effective inverse mass tensor.
     f : array_like
         The derivative array of the propagating surface. This must
         have at least second derivatives. (Note the factorial scaling
@@ -555,16 +556,28 @@ def corr_quad_recursion_elements(w, f, t):
        https://doi.org/10.1063/1.457553
 
     """
-    n = len(w) # The number of dimensions 
-    t = np.array(t) # The time array 
     
     # Process effective inverse mass
-    w = np.array(w)
-    # W = np.diag(w) 
-    rtW = np.diag(w**0.5) # Sqrt[W]
-    irW = np.diag(w**-0.5) # 1/Sqrt[W]
+    #
+    W = np.array(W)
+    if W.ndim == 1:
+        w = W.copy() 
+        n = len(w)
+        wU = np.eye(n)
+    elif W.ndim == 2:
+        n = W.shape[0] 
+        w,wU = np.linalg.eigh(W)
+    else:
+        raise ValueError("W must be a 1- or 2-d array")
     
-
+    #
+    # W = wU @ w @ wU.T 
+    #
+    rtW = wU @ np.diag(w**0.5) @ wU.T # Sqrt[W]
+    
+    
+    t = np.array(t) # The time array 
+   
     F,K = _partition_darray(f, n)
     
     # Calculate displacement vector
@@ -576,14 +589,36 @@ def corr_quad_recursion_elements(w, f, t):
     
     # Calculate diagonal frequencies
     omega = np.sqrt(abs(z2))
-    rtO = np.diag(np.sqrt(omega))
-    irO = np.diag(1/np.sqrt(omega))
-    
     # Calculate sigma for each mode
     #  1 for bounded modes
     # -i for unbounded modes
     sig = np.array([1 if z2[i] > 0 else -1j for i in range(n)])
 
+    r, S, T = _corr_quad_recursion_elements_inner(w, wU, d, omega, sig, L, t)
+    
+    return r, S, T 
+
+def _corr_quad_recursion_elements_inner(w, wU, d, omega, sig, L, t):
+    """
+    w : eigenvalues of W (usually the initial state frequencies)
+    wU: eigenvectros of W (usually identity)
+    d : quadratic displacement vector (-hessian @ gradient)
+    omega : propagation frequencies
+    sig : propagation sigma (1 or -1j)
+    L : propagation L matrix 
+    t : time vector 
+    """
+    
+    #
+    # W = wU @ diag(w) @ wU.T
+    
+    n = len(w) 
+    
+    rtW = wU @ np.diag(w**0.5) @ wU.T # Sqrt[W]
+    irW = wU @ np.diag(w**-0.5) @ wU.T # 1/Sqrt[W]
+    rtO = np.diag(np.sqrt(omega))
+    irO = np.diag(1/np.sqrt(omega))
+    
     # Weighted transformation matrix
     R = irW @ L @ rtO
     iR = irO @ L.T @ rtW 
@@ -659,6 +694,7 @@ def corr_quad_recursion_elements(w, f, t):
     T = T1 + T2 
     
     return r, S, T 
+    
 
 def corr_quad_ratio_table(r, S, T, nmax):
     """
