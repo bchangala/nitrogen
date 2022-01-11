@@ -72,7 +72,7 @@ def autocorr_linear(w, f, t):
     
     return C 
 
-def autocorr_quad(w, f, t, method = 'direct'):
+def autocorr_quad(W, f, t, method = 'direct'):
     
     """
     Calculate the vacuum state autocorrelation function 
@@ -81,8 +81,9 @@ def autocorr_quad(w, f, t, method = 'direct'):
     
     Parameters
     ----------
-    w : array_like
-        The harmonic frequency (in energy units) of each mode.
+    W : (n,) or (n,n) array_like
+        The harmonic frequency (in energy units) of each mode, or the 
+        inverse mass tensor. 
     f : array_like
         The derivative array, including up to at least second derivatives.
     t : array_like
@@ -123,7 +124,11 @@ def autocorr_quad(w, f, t, method = 'direct'):
 
     """
     
-    n = len(w)
+    W = np.array(W)
+    if W.ndim == 1:
+        W = np.diag(W) 
+    
+    n = W.shape[0] 
     
     # Extract the gradient and hessian 
     F,K = _partition_darray(f, n)
@@ -147,16 +152,16 @@ def autocorr_quad(w, f, t, method = 'direct'):
             
         #
         # Calculate the correlator recursion coefficients
-        r,S,T = corr_quad_recursion_elements(w, f, t)
+        r,S,T = corr_quad_recursion_elements(W, f, t)
         
         # Calculate the ODE coefficient sum
         sumIH = 0
         for i in range(n):
-            sumIH += 0.25 * ( (w[i] + K[i,i]) - (w[i] - K[i,i])*(r[:,i]**2 - T[:,i,i]))
+            sumIH += 0.25 * ( (W[i,i] + K[i,i]) - (W[i,i] - K[i,i])*(r[:,i]**2 - T[:,i,i]))
             sumIH += (-np.sqrt(0.5)) * F[i] * r[:,i] 
             
             for j in range(i): # j < i 
-                sumIH += 0.5 * K[i,j] * (r[:,i] * r[:,j] - T[:,i,j]) 
+                sumIH += 0.5 * (K[i,j] - W[i,j]) * (r[:,i] * r[:,j] - T[:,i,j]) 
                 
         g = (-1j) * sumIH # the derivative of the logarithm
         #
@@ -188,8 +193,13 @@ def autocorr_quad(w, f, t, method = 'direct'):
         
         # First, calculate the propagation normal
         # modes
-        rtW = np.diag(np.sqrt(w))
-        irW = np.diag(1/np.sqrt(w))
+        
+        w,wU = np.linalg.eigh(W)
+        #
+        # W = wU @ w @ wU.T 
+        #
+        rtW = wU @ np.diag(np.sqrt(w)) @ wU.T
+        irW = wU @ np.diag(1/np.sqrt(w)) @ wU.T
 
         z2,L = np.linalg.eigh(rtW @ K @ rtW)
         # Force L to have positive determinant! 
@@ -503,7 +513,7 @@ def autocorr_quad_finiteT(w, f, t, beta, method = 'direct'):
         
     else:
         raise ValueError('Invalid method option')
-    
+   
 def corr_quad_recursion_elements(W, f, t):
     """
     Calculate the correlation function recursion coefficients 
@@ -601,7 +611,7 @@ def corr_quad_recursion_elements(W, f, t):
 def _corr_quad_recursion_elements_inner(w, wU, d, omega, sig, L, t):
     """
     w : eigenvalues of W (usually the initial state frequencies)
-    wU: eigenvectros of W (usually identity)
+    wU: eigenvectors of W (usually identity)
     d : quadratic displacement vector (-hessian @ gradient)
     omega : propagation frequencies
     sig : propagation sigma (1 or -1j)
