@@ -5,7 +5,7 @@ import scipy.fft
 
 __all__ = ['eigstrp','aslinearoperator','bounds',
            'chebauto', 'chebspec', 'chebwindow',
-           'full']
+           'full', 'msqrth']
 
 def eigstrp(H, k = 5, pad = 10, tol = 1e-10, maxiter = None, v0 = None,
             rper = 20, P = None, pper = 1, printlevel = 0, eigval = 'smallest'):
@@ -690,3 +690,36 @@ def full(H):
     
     n = H.shape[0] # the matrix rank
     return H.matmat(np.eye(n))
+
+def msqrth(A):
+    """
+    Calculate the square-root matrix of a hermitian
+    matrix, A.
+    
+    Parameters
+    ----------
+    A : array_like
+        The matrix
+    
+    Returns
+    -------
+    rtA : ndarray
+        The square-root matrix.
+        
+    Notes
+    -----
+    The square root is calculated via eigendecomposition. The
+    square root of each eigenvalue is determined via NumPy's sqrt
+    function, which defines the branch convention.
+    """
+    
+    w,U = np.linalg.eigh(A)
+    # w are the eigenvalues
+    # U is the orthogonal eigenvector matrix
+    
+    # A = U @ w @ U.T 
+    
+    rtA = U @ np.diag(np.sqrt(w)) @ U.T  
+    rtA = 0.5 * (rtA + np.conj(rtA.T)) # Enforce exact hermiticity.
+    
+    return rtA 
