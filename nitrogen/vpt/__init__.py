@@ -705,6 +705,82 @@ def _corr_quad_recursion_elements_inner(w, wU, d, omega, sig, L, t):
     
     return r, S, T 
     
+def corr_quad_ratio_table_edge(r, S, T, nmax):
+    """
+    Calculate correlation function ratios of
+    type <m|...|0> using
+    the quadratic recursion elements.
+
+    Parameters
+    ----------
+    r, S, T : ndarray
+        Quadratic recursion coefficients.
+    nmax : int
+        The maximum total quantum number.
+
+    Returns
+    -------
+    Im0 : (...,ns) ndarray
+        The edge correlator ratios. `ns` is the number of
+        states.
+    qns : (ns, n) ndarray
+        The quantum number table for `n` modes.
+
+    See Also
+    --------
+    corr_quad_recursion_elements : Calculate the recursion coefficients.
+    corr_quad_ratio_table : Calculate all correlator ratios.
+
+    """
+    if nmax < 0:
+        raise ValueError('nmax must be a non-negative integer')
+    nmodes = r.shape[-1] # The number of modes 
+    
+    # Calculate the list of quantum numbers
+    # for states to include in the table
+    qns = adf_idxtab(nmax, nmodes) 
+    ns = qns.shape[0] # The number of states in the table
+    
+    nck = adf_ncktab(nmodes+nmax, min(nmodes,nmax)) # A binomial coefficient table
+    
+    base_shape = r.shape[:-1]
+    Im0 = np.zeros(base_shape + (ns,), dtype = np.complex128)
+    
+    ###########################
+    # Calculate the m,0 elements
+    # on the edge of the table
+    #
+    # The 0,0 element is always unity.
+    if nmax >= 0:
+        Im0[...,0] = 1.0 
+    # Continue with higher states
+    for M in range(1,ns):
+        mp1 = qns[M] # < ... m+1 ... |
+        #
+        # Identify the first non-zero quantum number's position
+        i = np.nonzero(mp1)[0][0]
+        m = mp1.copy()
+        m[i] -= 1 
+        # m is quantum number vector of < m | 0 >
+        
+        ratio = 0 
+        #
+        # -r_i < m | 0 >  term
+        ratio += -r[...,i] * Im0[...,adf_idxpos(m,nck)]
+        
+        for j in range(nmodes):
+            if m[j] > 0:
+                mm1 = m.copy()
+                mm1[j] -= 1 
+                # add -T_ij sqrt(m_j) < ... m_j-1 ... | 0 > term
+                ratio += -T[...,i,j] * np.sqrt(m[j]) * Im0[...,adf_idxpos(mm1,nck)]
+        
+        #
+        #
+        Im0[...,M] = ratio / np.sqrt(m[i]+1)
+        
+    
+    return Im0, qns
 
 def corr_quad_ratio_table(r, S, T, nmax):
     """
@@ -721,7 +797,7 @@ def corr_quad_ratio_table(r, S, T, nmax):
     Returns
     -------
     Imn : (...,ns,ns) ndarray
-        The recursion coefficients. `ns` is the number of
+        The correlator ratios. `ns` is the number of
         states.
     qns : (ns, n) ndarray
         The quantum number table for `n` modes.
@@ -729,6 +805,7 @@ def corr_quad_ratio_table(r, S, T, nmax):
     See Also
     --------
     corr_quad_recursion_elements : Calculate the recursion coefficients.
+    corr_quad_ratio_table_edge : Calculate the edge of the ratio table.
 
     """
     if nmax < 0:
