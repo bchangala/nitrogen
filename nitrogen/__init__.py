@@ -22,7 +22,7 @@ from . import special
 from . import math 
 from . import vpt 
 
-__version__ = '2.1.dev5' 
+__version__ = '2.1.1' 
 
 import numpy as np 
 
