@@ -278,6 +278,12 @@ class CFOUR(dfun.DFun):
                 # 
                 # VIB=ANALYTIC stores this in FCM
                 #
+                # As far as I can tell, FCM stores 
+                # in the "symmetrized" atomic order, while
+                # FCMFINAL uses the original ZMAT order
+                # Both appear to be in QCOMP coordinates, not
+                # the ZMAT's original QCOM coordinates
+                #
                 try:
                     fcm_raw = np.loadtxt(os.path.join(jobdir,'FCMFINAL'), 
                                          skiprows=1)
@@ -296,7 +302,70 @@ class CFOUR(dfun.DFun):
                 # Convert from Eh/a0**2 to cm**-1 / Angstrom**2
                 fcm_full *= nitrogen.constants.Eh / (nitrogen.constants.a0**2) 
                 
+                #
+                # Now we need to parse the OMAT transformation
+                # matrix between QCOMP and QCOM
+                #
+                # This starts 2 lines after
+                #      Transformation matrix between QCOM and QCOMP (OMAT)
+                # and is a 3 x 3 matrix
+                #
+                
+                found = False
+                with open(os.path.join(jobdir, 'out'), 'r') as file:
+                    for line in file:
+                        if re.search('Transformation matrix between QCOM and QCOMP (OMAT)', line):
+                            # found it
+                            found = True
+                            break 
+                    if not found:
+                        raise RuntimeError(f"Cannot find a CFOUR OMAT in {jobstr}.")
+                
+                    # Now parse gradient lines
+                    # First, burn one line
+                    file.readline()
+                    #
+                    OMAT = np.zeros((3,3))
+                    for j in range(3):
+                        omat_str = file.readline().split() 
+                        for k in range(3):
+                            # Save the x, y, z components
+                            OMAT[j,k] = float(omat_str[k]) 
+                
+                #
+                # A 3x1 QCOMP atomic vector and a 
+                # 3x1 QCOM atomic vector appear to be
+                # related as
+                #
+                #    QCOMP = OMAT @ QCOM
+                #
+                # This is the ***opposite*** of the printed description
+                # in the CFOUR output file. I expect it is just
+                # a mistake in the text.
+                #
+                
+                # The Hessian I want is therefore
+                #
+                # O.T @ fcm_full @ O
+                
+                # 
+                # Build a block diagonal matrix with
+                # OMAT on each diagonal block
+                #
+                Om = np.zeros((self.nx, self.nx))
+                for a in range(self.natoms):
+                    # Atomic block (a,a)
+                    for j in range(3):
+                        for k in range(3):
+                            Om[a*3 + j, a*3 + k] = OMAT[j,k] 
+                        
+                fcm_full = Om.T @ fcm_full @ Om
+                
+                ###################
                 # Copy to output buffer 
+                # We now take into account that 
+                # only the variables in `var` are requested
+                #
                 idx = len(var) + 1 # The starting index for second derivatives
                 for k1 in range(len(var)):
                     for k2 in range(k1, len(var)):
