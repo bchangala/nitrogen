@@ -304,7 +304,7 @@ class DFun:
             
         return out
     
-    def optimize(self, X0, fidx = 0, var = None, mode = 'min'):
+    def optimize(self, X0, fidx = 0, var = None, mode = 'min', disp = False):
         """
         Optimize an output value of a diff. function.
 
@@ -320,6 +320,8 @@ class DFun:
         mode : {'min'}, optional
             The optimization mode. 'min' determines the function
             minimum. The default is 'min'.
+        disp : bool
+            If True, messages will be displayed.
 
         Returns
         -------
@@ -358,7 +360,7 @@ class DFun:
         
         if mode == 'min':
             res = spopt.minimize(fun, X0[var], method = 'BFGS', 
-                                 jac = jac) #, hess = hess)
+                                 jac = jac, disp = disp) #, hess = hess)
         
             Xopt = X0.copy()
             Xopt[var] = res.x 
