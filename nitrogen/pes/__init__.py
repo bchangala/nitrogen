@@ -16,6 +16,12 @@ import nitrogen.coordsys as coordsys
 import warnings
 
 
+from . import cfour
+from .cfour import *
+
+__all__ = ['loadpes', 'curvVib']
+__all__ += cfour.__all__
+
 def loadpes(pesname):
     """
     Load built-in PES.
