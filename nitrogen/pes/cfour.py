@@ -279,10 +279,10 @@ class CFOUR(dfun.DFun):
                 # VIB=ANALYTIC stores this in FCM
                 #
                 try:
-                    fcm_raw = np.loadtxt(os.path.join(jobdir,'FCM'), 
+                    fcm_raw = np.loadtxt(os.path.join(jobdir,'FCMFINAL'), 
                                          skiprows=1)
                 except:
-                    raise RuntimeError(f"Cannot find a CFOUR FCM file in {jobstr}.")
+                    raise RuntimeError(f"Cannot find a CFOUR FCMFINAL file in {jobstr}.")
                 if fcm_raw.shape != (3 * self.natoms**2 , 3):
                     raise RuntimeError(f"Unexpected FCM shape in {jobstr}.")
                 
