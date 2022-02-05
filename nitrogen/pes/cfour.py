@@ -63,9 +63,12 @@ class CFOUR(dfun.DFun):
         
         All elements in `params` will be added as keywords to the
         ``*CFOUR()`` section of a CFOUR ``ZMAT`` input file. The
-        ``COORD``,``UNITS``, ``DERIV_LEV``, and ``PRINT``
+        ``COORD``,``UNITS``, ``DERIV_LEV``, ``PRINT``, and ``VIB``
         keywords are handled automatically.
-        These should not be supplied by the user.
+        These should not be supplied by the user. Only methods
+        for which ``VIB=ANALYTIC`` (i.e. analytic Hessians) is
+        available are supported. For other methods, use
+        lower CFOUR derivatives with NITROGEN finite difference drivers.
         
         """
         
@@ -214,7 +217,7 @@ class CFOUR(dfun.DFun):
                             found = True
                 
                 if not found:
-                    raise RuntimeError("Cannot find a CFOUR energy.")
+                    raise RuntimeError(f"Cannot find a CFOUR energy in {jobstr}")
                 
                 # Save energy
                 # converting from hartree to cm**-1
@@ -247,7 +250,7 @@ class CFOUR(dfun.DFun):
                             found = True
                             break 
                     if not found:
-                        raise RuntimeError("Cannot find a CFOUR gradient.")
+                        raise RuntimeError(f"Cannot find a CFOUR gradient in {jobstr}.")
                 
                     # Now parse gradient lines
                     grad_all = np.zeros((self.nx,))
@@ -279,9 +282,9 @@ class CFOUR(dfun.DFun):
                     fcm_raw = np.loadtxt(os.path.join(jobdir,'FCM'), 
                                          skiprows=1)
                 except:
-                    raise RuntimeError("Cannot find a CFOUR FCM file.")
+                    raise RuntimeError(f"Cannot find a CFOUR FCM file in {jobstr}.")
                 if fcm_raw.shape != (3 * self.natoms**2 , 3):
-                    raise RuntimeError("Unexpected FCM shape.")
+                    raise RuntimeError(f"Unexpected FCM shape in {jobstr}.")
                 
                 fcm_1d = np.zeros((self.nx**2,))
                 for j in range(3*self.natoms**2):
