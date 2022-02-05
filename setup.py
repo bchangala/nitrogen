@@ -29,6 +29,12 @@ __version__ = get_version("nitrogen/__init__.py")
 # False -> build extensions from C file
 # 'auto' -> build with Cython if available, otherwise from C
 #
+# To build cython code in-place from source
+# (e.g. with a clone of the source repository)
+# run setuptools as
+#
+# >> python setup.py build_ext --inplace
+#
 use_cython = True #'auto'
 #
 #
