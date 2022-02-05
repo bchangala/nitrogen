@@ -145,10 +145,10 @@ class CFOUR(dfun.DFun):
                     file.write('nitrogen-cfour-interface\n')
                     # 
                     # Write Cartesian coordinates
-                    for i in range(self.natoms):
+                    for j in range(self.natoms):
                         file.write(self.atomic_symbols[i] + " ")
-                        for j in range(3):
-                            xval = X[3*i+j]
+                        for k in range(3):
+                            xval = Xflat[3*j+k, i] # Atom j, coordinate k = x,y,z
                             file.write(f'{xval:.15f} ')
                         
                         file.write("\n")
