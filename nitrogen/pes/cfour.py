@@ -170,15 +170,7 @@ class CFOUR(dfun.DFun):
                     file.write(keyword + "=" + value)
                     
                 # Write the deriviative level keyword
-                file.write("\nDERIV_LEV=") 
-                if deriv == 0:
-                    file.write("ZERO")
-                elif deriv == 1:
-                    file.write("ONE")
-                elif deriv == 2:
-                    file.write("TWO")
-                else:
-                    raise ValueError("Unexpected deriv level")
+                file.write(f"\nDERIV_LEV={deriv:d}") 
                 
                 # Write the PRINT keyword
                 file.write("\nPRINT=")
