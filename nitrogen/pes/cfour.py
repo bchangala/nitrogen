@@ -63,7 +63,8 @@ class CFOUR(dfun.DFun):
         
         All elements in `params` will be added as keywords to the
         ``*CFOUR()`` section of a CFOUR ``ZMAT`` input file. The
-        ``COORD`` and ``UNITS`` keywords are handled automatically.
+        ``COORD``,``UNITS``, ``DERIV_LEV``, and ``PRINT``
+        keywords are handled automatically.
         These should not be supplied by the user.
         
         """
@@ -73,8 +74,13 @@ class CFOUR(dfun.DFun):
         nx = 3*natoms # number of coordinates 
         
         # Initialize the DFun object
+        #
+        # We hard-code the maxderiv to 2,
+        # which is all CFOUR will except 
+        # via the DERIV_LEVEL keyword
+        #
         super().__init__(self._f_cfour, nf = 1, nx = nx,
-                         maxderiv = 0, zlevel = None)
+                         maxderiv = 2, zlevel = None)
         
         
         # Make sure Cartesian coordinates are on
@@ -133,69 +139,82 @@ class CFOUR(dfun.DFun):
                 os.makedirs(jobdir)
             
             
+            # Energy calculation only
             
-            
-            if deriv == 0:
-                # Energy calculation only
-                
-                #
-                # Create the ZMAT text file
-                # for a single-point energy
-                #
-                with open(os.path.join(jobdir, 'ZMAT'), 'w') as file:
-                    file.write('nitrogen-cfour-interface\n')
-                    # 
-                    # Write Cartesian coordinates
-                    for j in range(self.natoms):
-                        file.write(self.atomic_symbols[j] + " ")
-                        for k in range(3):
-                            xval = Xflat[3*j+k, i] # Atom j, coordinate k = x,y,z
-                            file.write(f'{xval:.15f} ')
-                        
-                        file.write("\n")
+            #
+            # Create the ZMAT text file
+            # for a single-point energy
+            #
+            with open(os.path.join(jobdir, 'ZMAT'), 'w') as file:
+                file.write('nitrogen-cfour-interface\n')
+                # 
+                # Write Cartesian coordinates
+                for j in range(self.natoms):
+                    file.write(self.atomic_symbols[j] + " ")
+                    for k in range(3):
+                        xval = Xflat[3*j+k, i] # Atom j, coordinate k = x,y,z
+                        file.write(f'{xval:.15f} ')
+                    
                     file.write("\n")
-                    
-                    # Write options
-                    file.write("*CFOUR(")
-                    
-                    first = True
-                    for keyword, value in self.params.items():
-                        if not first:
-                            file.write("\n") # new line
-                        else:
-                            first = False 
-                        file.write(keyword + "=" + value)
-                    file.write(")\n")
-                    
-                # Save current word dir 
-                current_wd = os.getcwd()
-                # Now change to the job directory
-                os.chdir(jobdir)
-                # Execute cfour
-                os.system('xcfour > out')
-                # and go back
-                os.chdir(current_wd) 
+                file.write("\n")
                 
-                #
-                # Find the energy in the string
-                #
-                #   "The final electronic energy is     XXXXXXXXXXXXXXXXX a.u."
-                #
-                found = False
-                with open(os.path.join(jobdir, 'out'), 'r') as file:
-                    for line in file:
-                        if re.search('final electronic energy', line):
-                            energy = line.split()[5] # The sixth field is the energy, a.u.
-                            found = True
+                # Write options
+                file.write("*CFOUR(")
                 
-                if not found:
-                    raise RuntimeError("CFOUR appears to have a problem.")
+                first = True
+                for keyword, value in self.params.items():
+                    if not first:
+                        file.write("\n") # new line
+                    else:
+                        first = False 
+                    file.write(keyword + "=" + value)
                     
-                out_flat[0,0,i] = energy
+                # Write the deriviative level keyword
+                file.write("\nDERIV_LEV=") 
+                if deriv == 0:
+                    file.write("ZERO")
+                elif deriv == 1:
+                    file.write("ONE")
+                elif deriv == 2:
+                    file.write("TWO")
+                else:
+                    raise ValueError("Unexpected deriv level")
                 
-            else:
-                raise ValueError('Unexpected deriv level for CFOUR interface')
+                # Write the PRINT keyword
+                file.write("\nPRINT=")
+                if deriv == 0:
+                    file.write("0")
+                else:
+                    file.write("1")
                 
+                file.write(")\n")
+                
+            # Save current word dir 
+            current_wd = os.getcwd()
+            # Now change to the job directory
+            os.chdir(jobdir)
+            # Execute cfour
+            os.system('xcfour > out')
+            # and go back
+            os.chdir(current_wd) 
+            
+            #
+            # Find the energy in the string
+            #
+            #   "The final electronic energy is     XXXXXXXXXXXXXXXXX a.u."
+            #
+            found = False
+            with open(os.path.join(jobdir, 'out'), 'r') as file:
+                for line in file:
+                    if re.search('final electronic energy', line):
+                        energy = line.split()[5] # The sixth field is the energy, a.u.
+                        found = True
+            
+            if not found:
+                raise RuntimeError("CFOUR appears to have a problem.")
+                
+            out_flat[0,0,i] = energy
+
             #
             # Remove job directory
             #
