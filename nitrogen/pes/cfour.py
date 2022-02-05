@@ -325,6 +325,8 @@ class CFOUR(dfun.DFun):
                     # First, burn one line
                     file.readline()
                     #
+                    # Store OMAT as printed
+                    #
                     OMAT = np.zeros((3,3))
                     for j in range(3):
                         omat_str = file.readline().split() 
