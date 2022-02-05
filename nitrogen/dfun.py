@@ -360,7 +360,7 @@ class DFun:
         
         if mode == 'min':
             res = spopt.minimize(fun, X0[var], method = 'BFGS', 
-                                 jac = jac, disp = disp) #, hess = hess)
+                                 jac = jac, options = {'disp':disp} ) #, hess = hess)
         
             Xopt = X0.copy()
             Xopt[var] = res.x 
