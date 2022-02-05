@@ -2,6 +2,7 @@
 doodle*
 scratch/
 nitrogen/cython/*.c
+nitrogen/cython/*.html
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
