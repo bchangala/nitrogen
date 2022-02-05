@@ -148,7 +148,8 @@ class CFOUR(dfun.DFun):
                     for i in range(self.natoms):
                         file.write(self.atomic_symbols[i] + " ")
                         for j in range(3):
-                            file.write(f"{X[3*i+j]:15.10f} ")
+                            xval = X[3*i+j]
+                            file.write(f"{xval:15.10f} ")
                         
                         file.write("\n")
                     file.write("\n")
