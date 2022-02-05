@@ -200,6 +200,12 @@ class CFOUR(dfun.DFun):
         # and copy to out buffer
         np.copyto(out, out_flat.reshape((nd, self.nf) + base_shape))
         
+        #
+        # Finally, convert energy units
+        # from Hartree to cm^-1
+        #
+        out *= n2.constants.Eh 
+        
         return out
         
     def __repr__(self):
