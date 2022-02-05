@@ -211,8 +211,10 @@ class CFOUR(dfun.DFun):
                 
                 if not found:
                     raise RuntimeError("CFOUR cannot find an energy.")
-                    
-                out_flat[0,0,i] = energy
+                
+                # Save energy
+                # converting from hartree to cm**-1
+                out_flat[0,0,i] = energy * nitrogen.constants.Eh
             
             if deriv >= 1:
                 #
@@ -253,9 +255,15 @@ class CFOUR(dfun.DFun):
                     
                 # Now copy the requested derivatives to
                 # the output buffer, per the `var` order
+                #
+                # The CFOUR printed values are in units
+                # of hartree/bohr. Convert this to 
+                # cm**-1 / Angstrom
+                #
+                coeff = nitrogen.constants.Eh / nitrogen.constants.a0
                 for k in range(len(var)):
                     # The derivative w.r.t. var[k]
-                    out_flat[k+1,0,i] = grad_all[var[k]] 
+                    out_flat[k+1,0,i] = grad_all[var[k]] * coeff 
 
             #
             # Remove job directory
@@ -267,12 +275,6 @@ class CFOUR(dfun.DFun):
         # Reshape output data to correct base_shape
         # and copy to out buffer
         np.copyto(out, out_flat.reshape((nd, self.nf) + base_shape))
-        
-        #
-        # Finally, convert energy units
-        # from Hartree to cm^-1
-        #
-        out *= nitrogen.constants.Eh 
         
         return out
         
