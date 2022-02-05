@@ -5,6 +5,7 @@ CFOUR interface
 """
 
 import nitrogen.dfun as dfun
+import nitrogen.constants 
 import numpy as np
 
 import os 
@@ -210,7 +211,7 @@ class CFOUR(dfun.DFun):
         # Finally, convert energy units
         # from Hartree to cm^-1
         #
-        out *= n2.constants.Eh 
+        out *= nitrogen.constants.Eh 
         
         return out
         
