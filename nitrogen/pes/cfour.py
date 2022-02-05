@@ -172,15 +172,19 @@ class CFOUR(dfun.DFun):
                         first = False 
                     file.write(keyword + "=" + value)
                     
-                # Write the deriviative level keyword
-                file.write(f"\nDERIV_LEV={deriv:d}") 
-                
-                # Write the PRINT keyword
-                file.write("\nPRINT=")
+                # Write the necessary keywords based
+                # on deriv level
+                #
                 if deriv == 0:
-                    file.write("0")
-                else:
-                    file.write("1")
+                    file.write("\nDERIV_LEV=0") 
+                    file.write("\nPRINT=0")
+                elif deriv == 1:
+                    file.write("\nDERIV_LEV=1") 
+                    file.write("\nPRINT=1")
+                elif deriv == 2:
+                    file.write("\nDERIV_LEV=2") 
+                    file.write("\nPRINT=1")
+                    file.write("\nVIB=ANALYTIC")
                 
                 file.write(")\n")
                 
@@ -210,7 +214,7 @@ class CFOUR(dfun.DFun):
                             found = True
                 
                 if not found:
-                    raise RuntimeError("CFOUR cannot find an energy.")
+                    raise RuntimeError("Cannot find a CFOUR energy.")
                 
                 # Save energy
                 # converting from hartree to cm**-1
@@ -243,7 +247,7 @@ class CFOUR(dfun.DFun):
                             found = True
                             break 
                     if not found:
-                        raise RuntimeError("CFOUR cannot find the gradient.")
+                        raise RuntimeError("Cannot find a CFOUR gradient.")
                 
                     # Now parse gradient lines
                     grad_all = np.zeros((self.nx,))
@@ -265,6 +269,48 @@ class CFOUR(dfun.DFun):
                     # The derivative w.r.t. var[k]
                     out_flat[k+1,0,i] = grad_all[var[k]] * coeff 
 
+            if deriv >= 2:
+                #
+                # Parse the Hessian data
+                # 
+                # VIB=ANALYTIC stores this in FCM
+                #
+                try:
+                    fcm_raw = np.loadtxt(os.path.join(jobdir,'FCM'), 
+                                         skiprows=1)
+                except:
+                    raise RuntimeError("Cannot find a CFOUR FCM file.")
+                if fcm_raw.shape != (3 * self.natoms**2 , 3):
+                    raise RuntimeError("Unexpected FCM shape.")
+                
+                fcm_1d = np.zeros((self.nx**2,))
+                for j in range(3*self.natoms**2):
+                    for k in range(3):
+                        fcm_1d[j*3 + k] = fcm_raw[j,k]
+                fcm_full = fcm_1d.reshape((self.nx, self.nx)) 
+                
+                #
+                # Convert from Eh/a0**2 to cm**-1 / Angstrom**2
+                fcm_full *= nitrogen.constants.Eh / (nitrogen.constants.a0**2) 
+                
+                # Copy to output buffer 
+                idx = len(var) + 1 # The starting index for second derivatives
+                for k1 in range(len(var)):
+                    for k2 in range(k1, len(var)):
+                        v1 = var[k1]
+                        v2 = var[k2] 
+                        # need the v1,v2 derivative
+                        out_flat[idx, 0, i] = fcm_full[v1,v2] 
+                        if v1 == v2:
+                            out_flat[idx,0,i] *= 0.5 
+                            # derivative array format includes
+                            # 1/2! factor of diagonal second derivative
+                        idx += 1 
+                # done
+                #########
+                
+                    
+                    
             #
             # Remove job directory
             #
