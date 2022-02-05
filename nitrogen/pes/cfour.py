@@ -146,7 +146,7 @@ class CFOUR(dfun.DFun):
                     # 
                     # Write Cartesian coordinates
                     for j in range(self.natoms):
-                        file.write(self.atomic_symbols[i] + " ")
+                        file.write(self.atomic_symbols[j] + " ")
                         for k in range(3):
                             xval = Xflat[3*j+k, i] # Atom j, coordinate k = x,y,z
                             file.write(f'{xval:.15f} ')
@@ -180,11 +180,16 @@ class CFOUR(dfun.DFun):
                 #
                 #   "The final electronic energy is     XXXXXXXXXXXXXXXXX a.u."
                 #
+                found = False
                 with open(os.path.join(jobdir, 'out'), 'r') as file:
                     for line in file:
                         if re.search('final electronic energy', line):
                             energy = line.split()[5] # The sixth field is the energy, a.u.
-                            
+                            found = True
+                
+                if not found:
+                    raise RuntimeError("CFOUR appears to have a problem.")
+                    
                 out_flat[0,0,i] = energy
                 
             else:
