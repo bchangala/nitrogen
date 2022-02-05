@@ -314,7 +314,7 @@ class CFOUR(dfun.DFun):
                 found = False
                 with open(os.path.join(jobdir, 'out'), 'r') as file:
                     for line in file:
-                        if re.search('Transformation matrix between QCOM and QCOMP (OMAT)', line):
+                        if re.search('matrix between QCOM and QCOMP (OMAT)', line):
                             # found it
                             found = True
                             break 
