@@ -122,6 +122,9 @@ class CFOUR(dfun.DFun):
         Xflat = np.reshape(X, (self.nx, -1))
         npts = Xflat.shape[1] # The number of jobs 
         
+        # Intermediate storage:
+        # Flatten the base_shape to one dimension
+        #
         out_flat = np.zeros((nd, self.nf, npts))
         
         for i in range(npts):
@@ -190,22 +193,69 @@ class CFOUR(dfun.DFun):
             # and go back
             os.chdir(current_wd) 
             
-            #
-            # Find the energy in the string
-            #
-            #   "The final electronic energy is     XXXXXXXXXXXXXXXXX a.u."
-            #
-            found = False
-            with open(os.path.join(jobdir, 'out'), 'r') as file:
-                for line in file:
-                    if re.search('final electronic energy', line):
-                        energy = line.split()[5] # The sixth field is the energy, a.u.
-                        found = True
-            
-            if not found:
-                raise RuntimeError("CFOUR appears to have a problem.")
+            ######################
+            # Parse CFOUR output
+            ######################
+            if deriv >= 0:
+                #
+                # Find the energy in the string
+                #
+                #   "The final electronic energy is     XXXXXXXXXXXXXXXXX a.u."
+                #
+                found = False
+                with open(os.path.join(jobdir, 'out'), 'r') as file:
+                    for line in file:
+                        if re.search('final electronic energy', line):
+                            energy = float(line.split()[5]) # The sixth field is the energy, a.u.
+                            found = True
                 
-            out_flat[0,0,i] = energy
+                if not found:
+                    raise RuntimeError("CFOUR cannot find an energy.")
+                    
+                out_flat[0,0,i] = energy
+            
+            if deriv >= 1:
+                #
+                # Find the gradient
+                # 
+                # This will be headed by 
+                #       reordered gradient in QCOM coords for ZMAT order
+                # followed by a line for each atom 
+                # in the original ZMAT ordering we provided
+                #
+                # Note:
+                #  "QCOMP" is the computation coordinates used by 
+                #  CFOUR for most of its work
+                #  "QCOM" (no "P") are the original coordinates passed
+                #  in ZMAT translated to the COM frame
+                #  
+                #  Because energies and gradients are independent
+                #  of total translations, we can use QCOM 
+                #  derivatives.
+                #
+                found = False
+                with open(os.path.join(jobdir, 'out'), 'r') as file:
+                    for line in file:
+                        if re.search('reordered gradient', line):
+                            # found it
+                            found = True
+                            break 
+                    if not found:
+                        raise RuntimeError("CFOUR cannot find the gradient.")
+                
+                    # Now parse gradient lines
+                    grad_all = np.zeros((self.nx,))
+                    for j in range(self.natoms):
+                        grad_str = file.readline().split() 
+                        for k in range(3):
+                            # Save the x, y, z components
+                            grad_all[j*3 + k] = float(grad_str[k]) 
+                    
+                # Now copy the requested derivatives to
+                # the output buffer, per the `var` order
+                for k in range(len(var)):
+                    # The derivative w.r.t. var[k]
+                    out_flat[k+1,0,i] = grad_all[var[k]] 
 
             #
             # Remove job directory
