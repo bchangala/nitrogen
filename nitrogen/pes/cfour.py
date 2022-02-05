@@ -35,7 +35,7 @@ class CFOUR(dfun.DFun):
     """
     
     def __init__(self, atomic_symbols, params, 
-                 work_dir = '.\scratch',
+                 work_dir = './scratch',
                  cleanup = True, units = 'angstrom'):
         
         """
