@@ -304,6 +304,51 @@ class DFun:
             
         return out
     
+    def vj(self, X, var = None):
+        """
+        Wrapper for diff. function value and Jacobian
+
+        Parameters
+        ----------
+        X : ndarray
+            An (:attr:`nx`, ...) array of input values.
+        var : list of int
+            Variable list (see `var` in :func:`DFun.f`).
+            
+        Returns
+        -------
+        val : ndarray
+            The (nf,...) value.
+        jac : ndarray
+            The (nf,nv,...) Jacobian
+
+        """
+        
+        if var is None:
+            nvar = self.nx 
+        else:
+            nvar = len(var) 
+            
+        base_shape = X.shape[1:]
+        
+        d = self.f(X, deriv = 1, var = var) # Calculate 0th, 1st, and 2nd derivs
+        
+        #
+        # d has shape (nd, nf, ...)
+        #
+        
+        # Copy 0th derivatives to value
+        val = d[0,:].copy() 
+        
+        # Copy 1st derivatives to jacobian
+        # Notice swapping order of nd/nf from ndarray to jacobian
+        #
+        jac = np.ndarray( (self.nf, nvar,) + base_shape, dtype = d.dtype)
+        for i in range(self.nf):
+            np.copyto(jac[i,:], d[1:(nvar+1),i])
+     
+        return val, jac
+    
     def vjh(self, X, var = None):
         """
         Wrapper for diff. function value, Jacobian, and Hessian
