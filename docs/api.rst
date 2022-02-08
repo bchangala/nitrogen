@@ -34,6 +34,9 @@ NITROGEN API reference
 .. automodule:: nitrogen.ham
    :members:
 
+.. automodule:: nitrogen.pes 
+   :members:
+
 .. automodule:: nitrogen.angmom
    :members:
    
