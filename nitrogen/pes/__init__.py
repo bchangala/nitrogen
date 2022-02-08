@@ -18,9 +18,12 @@ import warnings
 
 from . import cfour
 from .cfour import *
+from . import opt 
+from .opt import * 
 
 __all__ = ['loadpes', 'curvVib']
 __all__ += cfour.__all__
+__all__ += opt.__all__
 
 def loadpes(pesname):
     """
