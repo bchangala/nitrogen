@@ -304,6 +304,70 @@ class DFun:
             
         return out
     
+    def vjh(self, X, var = None):
+        """
+        Wrapper for diff. function value, Jacobian, and Hessian
+
+        Parameters
+        ----------
+        X : ndarray
+            An (:attr:`nx`, ...) array of input values.
+        var : list of int
+            Variable list (see `var` in :func:`DFun.f`).
+            
+        Returns
+        -------
+        val : ndarray
+            The (nf,...) value.
+        jac : ndarray
+            The (nf,nv,...) Jacobian
+        hes : ndarray
+            The (nf,nv,nv,...) Hessian
+
+        """
+        
+        if var is None:
+            nvar = self.nx 
+        else:
+            nvar = len(var) 
+            
+        base_shape = X.shape[1:]
+        
+        d = self.f(X, deriv = 2, var = var) # Calculate 0th, 1st, and 2nd derivs
+        
+        #
+        # d has shape (nd, nf, ...)
+        #
+        
+        # Copy 0th derivatives to value
+        val = d[0,:].copy() 
+        
+        # Copy 1st derivatives to jacobian
+        # Notice swapping order of nd/nf from ndarray to jacobian
+        #
+        jac = np.ndarray( (self.nf, nvar,) + base_shape, dtype = d.dtype)
+        for i in range(self.nf):
+            np.copyto(jac[i,:], d[1:(nvar+1),i])
+        
+        # Copy 2nd derivatives to hessian
+        hes = np.ndarray( (self.nf, nvar, nvar) + base_shape, dtype = d.dtype)
+        
+        idx = nvar + 1 
+        for i in range(nvar):
+            for j in range(i,nvar):
+                # (i,j) derivative
+                
+                if i == j:
+                    np.copyto(hes[:,i,j], 2.0 * d[idx,:])
+                else:
+                    np.copyto(hes[:,i,j], d[idx,:])
+                    np.copyto(hes[:,j,i], d[idx,:])
+                    
+                idx = idx + 1
+        
+        return val, jac, hes 
+        
+    
     def optimize(self, X0, fidx = 0, var = None, mode = 'min', disp = False):
         """
         Optimize an output value of a diff. function.
