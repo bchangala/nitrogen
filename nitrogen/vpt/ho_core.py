@@ -4,6 +4,10 @@ Core harmonic oscillator algebra functions
 
 import numpy as np 
 
+
+__all__ = ['a_ap_matrix', 'q_matrix', 'p_matrix']
+
+
 def a_ap_matrix(n):
     """
     Calculate the matrix representations 
