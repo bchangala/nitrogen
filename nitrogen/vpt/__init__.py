@@ -12,6 +12,8 @@ from nitrogen.autodiff.forward import idxpos as adf_idxpos
 from nitrogen.autodiff.forward import ncktab as adf_ncktab 
 import numpy as np 
 
+from . import ho_core
+from .ho_core import *  # Import the core namespace
 
 def autocorr_linear(w, f, t):
     """
