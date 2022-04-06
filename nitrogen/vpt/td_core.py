@@ -9,9 +9,7 @@ Time-dependent harmonic oscillator/VPT core functions
 
 import nitrogen.math 
 import numpy as np 
-from nitrogen.autodiff.forward import idxtab as adf_idxtab
-from nitrogen.autodiff.forward import idxpos as adf_idxpos 
-from nitrogen.autodiff.forward import ncktab as adf_ncktab 
+import nitrogen.autodiff.forward as adf
 
 __all__ = ['autocorr_linear', 'autocorr_quad', 'autocorr_quad_finiteT',
            'corr_quad_recursion_elements', 'corr_quad_ratio_table_edge',
@@ -1014,13 +1012,15 @@ def cubic_gradient_estimate(Vi,Vf,n):
     #
     # Extract the necessary derivatives
     # from the derivative arrays
-    
+    if len(Vf) < 1 + n:
+        raise ValueError('Vf must contain at least gradients')
+    if len(Vi) < adf.nderiv(3,n):
+        raise ValueError('Vi must contain at least cubic derivatives')
     
     #
     # Upper state gradients
     #
-    if len(Vf) < 1 + n:
-        raise ValueError('Vf must contain at least gradients')
+    
     f = Vf[1:(n+1)] 
     
     # 
@@ -1035,7 +1035,7 @@ def cubic_gradient_estimate(Vi,Vf,n):
     #
     # Extract (i,i,i) cubic derivatives
     #
-    nck = adf_ncktab(n+3, min(n,3)) # Calculate a binomial table
+    nck = adf.ncktab(n+3, min(n,3)) # Calculate a binomial table
     midx = np.zeros((n,), dtype = np.uint32)
     
     
@@ -1044,7 +1044,7 @@ def cubic_gradient_estimate(Vi,Vf,n):
         
         midx[i] = 3 # Set multi-index to (...,0, 3_i, 0,...)
 
-        phi3[i] = 6 * Vf[adf_idxpos(midx, nck)] # Calculate phi_iii derivative
+        phi3[i] = 6 * Vf[adf.idxpos(midx, nck)] # Calculate phi_iii derivative
         
         midx[i] = 0 # Reset to zeros
         
@@ -1063,7 +1063,7 @@ def cubic_gradient_estimate(Vi,Vf,n):
             midx[j] = 2 
             
             # Calculate phi_ijj derivative
-            phi12[i,j] = 2 * Vf[adf_idxpos(midx, nck)]
+            phi12[i,j] = 2 * Vf[adf.idxpos(midx, nck)]
             
             # Reset multi-index
             midx[i] = 0 
