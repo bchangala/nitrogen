@@ -1,6 +1,10 @@
 """
+nitrogen.vpt
+
 td_core.py
+
 Time-dependent harmonic oscillator/VPT core functions
+
 """
 
 import nitrogen.math 
@@ -11,7 +15,8 @@ from nitrogen.autodiff.forward import ncktab as adf_ncktab
 
 __all__ = ['autocorr_linear', 'autocorr_quad', 'autocorr_quad_finiteT',
            'corr_quad_recursion_elements', 'corr_quad_ratio_table_edge',
-           'corr_quad_ratio_table']
+           'corr_quad_ratio_table',
+           'cubic_gradient_estimate']
 
 def autocorr_linear(w, f, t):
     """
@@ -961,3 +966,125 @@ def _partition_darray(f,n):
             idx += 1 
     
     return F, K 
+
+def cubic_gradient_estimate(Vi,Vf,n):
+    """
+    Calculate the estimated spectral shift due to 
+    first-order cubic corrections of the lower
+    state vacuum with the upper state gradient.
+
+    Parameters
+    ----------
+    Vi : ndarray
+        The derivative array of the lower state containing
+        at least cubic derivatives.
+    Vf : ndarray
+        The deriative array of the upper state containing
+        at least gradients.
+    n : int
+        The number of coordinates.
+
+    Returns
+    -------
+    deltaE : float
+        The approximate spectral shift.
+        
+    Notes
+    -----
+    The shift is estimated as the product of the
+    first-order displacement of the initial wavefunction
+    with the final state gradient,
+    
+    ..  math::
+        
+        \\Delta E \\approx \\sum_i \\langle q_i \\rangle f_i,
+        
+    where :math:`f_i` is the final state gradient. The 
+    coordinate displacements are evaluated to first-order as
+    
+    ..  math::
+        
+        \\langle q_i \\rangle \\approx -\\frac{1}{4 \\omega_i}
+            \\left[\\phi_{iii} + \\sum_{j \\neq i} \\phi_{ijj} \\right],
+            
+    where :math:`\\phi_{ijk}` are the *unscaled* cubic derivatives. 
+        
+    """
+
+    #
+    # Extract the necessary derivatives
+    # from the derivative arrays
+    
+    
+    #
+    # Upper state gradients
+    #
+    if len(Vf) < 1 + n:
+        raise ValueError('Vf must contain at least gradients')
+    f = Vf[1:(n+1)] 
+    
+    # 
+    # Lower state harmonic frequencies 
+    #
+    w = np.zeros((n,)) 
+    idx = 1 + n
+    for i in range(n):
+       w[i] = 2 * Vi[idx] # (i i) derivative
+       idx += (n-i)
+     
+    #
+    # Extract (i,i,i) cubic derivatives
+    #
+    nck = adf_ncktab(n+3, min(n,3)) # Calculate a binomial table
+    midx = np.zeros((n,), dtype = np.uint32)
+    
+    
+    phi3 = np.zeros((n,))
+    for i in range(n):
+        
+        midx[i] = 3 # Set multi-index to (...,0, 3_i, 0,...)
+
+        phi3[i] = 6 * Vf[adf_idxpos(midx, nck)] # Calculate phi_iii derivative
+        
+        midx[i] = 0 # Reset to zeros
+        
+    # 
+    # Extract (i,j,j) cubic derivatives
+    #
+    phi12 = np.zeros((n,n)) 
+    for i in range(n):
+        for j in range(n):
+            
+            if i == j:
+                continue # only i neq j  needed
+            
+            # Set multi-index to (..., 1_i, 2_j, ...)
+            midx[i] = 1 
+            midx[j] = 2 
+            
+            # Calculate phi_ijj derivative
+            phi12[i,j] = 2 * Vf[adf_idxpos(midx, nck)]
+            
+            # Reset multi-index
+            midx[i] = 0 
+            midx[j] = 0 
+    
+    #
+    # Finally, calculate the gradient-cubic sum
+    #
+    deltaE = 0.0 
+    for i in range(n):
+        
+        temp = phi3[i] # phi_iii 
+        for j in range(n):
+            if i == j: # i neq j 
+                continue 
+            temp += phi12[i,j] 
+        
+        #
+        # temp = phi_iii + sum_i!=j phi_ijj
+        #
+        
+        deltaE += -f[i] * temp / (4 * w[i])
+        
+    return deltaE 

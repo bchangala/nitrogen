@@ -1,5 +1,10 @@
 """
-Core harmonic oscillator algebra functions
+nitrogen.vpt
+
+ho_core.py
+
+Core harmonic oscillator routines
+
 """
 
 import numpy as np 
@@ -23,10 +28,10 @@ def a_ap_matrix(n):
     Returns
     -------
     a : ndarray
-        The (`n`,`n`) matrix representation of 
+        The (`n`, `n`) matrix representation of 
         :math:`a`.
     ap : ndarray
-        The (`n`,`n`) matrix representation of
+        The (`n`, `n`) matrix representation of
         :math:`a^\\dagger`.
 
     """
