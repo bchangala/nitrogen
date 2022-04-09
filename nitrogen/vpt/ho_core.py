@@ -13,7 +13,7 @@ import nitrogen.autodiff.forward as adf
 
 
 __all__ = ['a_ap_matrix', 'q_matrix', 'p_matrix',
-           'cubic_firstorder_vacuum']
+           'cubic_firstorder_vacuum', 'linear_on_general']
 
 
 def a_ap_matrix(n):
@@ -267,3 +267,99 @@ def cubic_firstorder_vacuum(V,n):
     
     return c 
             
+
+def linear_on_general(L,C,n):
+    """
+    Calculate the action of a general linear 
+    coordinate polynomial on a general 
+    HO expansion.
+    
+    Parameters
+    ----------
+    L : ndarray
+        The derivative array, including at least gradients
+    C : ndarray
+        The coefficient array
+    n : int
+        The number of coordinates 
+        
+    Returns
+    -------
+    Z : ndarray
+        The coefficient array of L|C>
+    
+    """
+    
+    if len(L) < n+1 :
+        raise ValueError("L must contain at least gradients") 
+    
+    # Figure out the max quantum of the 
+    # general expansion C
+    nC = len(C)
+    
+    vmax = 0
+    while True:
+        # Calculate the number of states 
+        # for n coordinates and sum(v) <= vmax
+        #
+        nd = adf.nderiv(vmax, n)
+        if nC == nd:
+            break # We have found vmax
+        elif nC < nd:
+            raise ValueError(f"The length of C is invalid for n={n:d} coordinates.")
+        
+        vmax += 1 
+        
+    
+    #########
+    # The new expansion will
+    # have vmax+1
+    #
+    nZ = adf.nderiv(vmax+1,n)
+    Z = np.zeros((nZ,), dtype = C.dtype) 
+    #
+    #########
+    
+    #########
+    # Begin evaluating the operator action
+    #
+    # The constant term L[0] is easy:
+    #
+    Z[:nC] = L[0] * C 
+    #
+    ##########
+    
+    ##########
+    # Now loop over each element
+    # and act with the gradient terms
+    #
+    qns = adf.idxtab(vmax+1, n) 
+    nck = adf.ncktab(vmax+n, min(vmax,n))
+    
+    for i in range(nC):
+        Cidx = qns[i,:] # The quantum numbers for the C coefficient
+        
+        if C[i] == 0:
+            continue 
+        
+        for k in range(n):
+            # 
+            # The L[k+1] * q_k term
+            #    = L[k+1] * sqrt(1/2) * (a + a^dagger)
+            #
+            # 1) Do the annihilation term
+            vk = Cidx[k]
+            if vk > 0:
+                Cidx[k] -= 1 
+                Z[adf.idxpos(Cidx, nck)] += L[k+1] * np.sqrt(0.5 * vk) * C[i]
+                Cidx[k] += 1 
+            #
+            # 2) Do the creation term
+            Cidx[k] += 1 
+            Z[adf.idxpos(Cidx, nck)] += L[k+1] * np.sqrt(0.5 * (vk+1)) * C[i] 
+            Cidx[k] -= 1 
+            
+    return Z 
+            
+        
+        
