@@ -15,7 +15,7 @@ __all__ = ['autocorr_linear', 'autocorr_quad', 'autocorr_quad_finiteT',
            'corr_quad_recursion_elements', 'corr_quad_ratio_table_edge',
            'corr_quad_ratio_table','corr_quad_ratio_table_rectangular',
            'cubic_gradient_estimate', 'autocorr_cubic_initial_firstorder',
-           'autocorr_linearHT']
+           'autocorr_linearHT', 'autocorr_cubic_initial_firstorder_linearHT']
 
 def autocorr_linear(w, f, t):
     """
@@ -1415,4 +1415,96 @@ def autocorr_linearHT(w, f, mu, t):
                 CHT += 2.0 * c[i]*c[j] * Imn[...,i,j] 
     
     return CHT 
-                    
+
+
+def autocorr_cubic_initial_firstorder_linearHT(V, f, mu, n, t):
+    """
+    Calculate the first-order corrections to the 
+    quadratic auto-correlation function
+    due to cubic force constants in the initial
+    state and include linear Herzberg-Teller terms.
+    
+    Parameters
+    ----------
+    V : ndarray
+        The derivative array of the initial state, including
+        up to cubic derivatives.
+    f : ndarray
+        The derivative array of the final state, including 
+        up to quadratic derivatives.
+    mu : array_like
+        The dipole surface, including up to gradients.
+    n : int
+        The number of coordinates 
+    t : ndarray
+        The time array.
+    
+    Returns
+    -------
+    C1LHT : ndarray
+        The dipole autocorrelation function relative to C0.
+        
+    Notes
+    -----
+    
+
+    
+    """
+    
+   
+    # First, extract the harmonic frequencies
+    # of the initial state from V 
+    _,K = _partition_darray(V, n)
+    w = np.diag(K) # The harmonic frequencies 
+    
+    # Calculate the recursion coefficients
+    # for quadratic correlation functions
+    r,S,T = corr_quad_recursion_elements(w, f, t)
+    
+    # Calculate the rectangular ratio table
+    # Cubic corrections alone require [0 x 3]
+    # but linear HT dipole terms increase this to
+    # [1 x 4]
+    #
+    Imn,_ = corr_quad_ratio_table_rectangular(r, S, T, 1, 4) 
+    
+    # Calculate the first-order coefficients
+    # for the initial state vacuum wavefunction
+    #
+    # This has standard lexical state ordering
+    # (same as derivative arrays)
+    c1 = nitrogen.vpt.ho_core.cubic_firstorder_vacuum(V, n)
+    
+    # Now calculate the coefficients of
+    # mu|0> and mu|c1>
+    #
+    # 1) Calculate mu |0>
+    #
+    mu0 = np.zeros((n+1,))
+    mu0[0] = mu[0] # mu_e * |0>
+    for i in range(n):
+        mu0[i+1] = mu[i+1] * np.sqrt(0.5) # dmu/dq * q terms 
+    #
+    # 2) Calculate mu |1> 
+    #
+    mu1 = nitrogen.vpt.ho_core.linear_on_general(mu, c1, n)
+    
+    C1LHT = np.zeros_like(t, dtype = np.complex128) 
+    
+    #
+    # Compute 0th + 1st order contributions
+    #
+    # <mu0|exp(...)|mu0> + 2*<mu0|exp(...)|mu1>
+    #
+    # Zeroth order contribution:
+    for i in range(len(mu0)):
+        for j in range(len(mu0)):
+            C1LHT += mu0[i] * mu0[j] * Imn[...,i,j]
+    #
+    # First order contribution:
+    for i in range(len(mu0)):
+        for j in range(len(mu1)):
+            C1LHT += 2.0 * mu0[i] * mu1[j] * Imn[...,i,j]
+    
+    
+    return C1LHT                  
