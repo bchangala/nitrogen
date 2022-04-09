@@ -13,8 +13,9 @@ import nitrogen.autodiff.forward as adf
 
 __all__ = ['autocorr_linear', 'autocorr_quad', 'autocorr_quad_finiteT',
            'corr_quad_recursion_elements', 'corr_quad_ratio_table_edge',
-           'corr_quad_ratio_table',
-           'cubic_gradient_estimate']
+           'corr_quad_ratio_table','corr_quad_ratio_table_rectangular',
+           'cubic_gradient_estimate', 'autocorr_cubic_initial_firstorder',
+           'autocorr_linearHT']
 
 def autocorr_linear(w, f, t):
     """
@@ -590,6 +591,7 @@ def corr_quad_recursion_elements(W, f, t):
     
     
     t = np.array(t) # The time array 
+    f = np.array(f)
    
     F,K = _partition_darray(f, n)
     
@@ -741,10 +743,10 @@ def corr_quad_ratio_table_edge(r, S, T, nmax):
     
     # Calculate the list of quantum numbers
     # for states to include in the table
-    qns = adf_idxtab(nmax, nmodes) 
+    qns = adf.idxtab(nmax, nmodes) 
     ns = qns.shape[0] # The number of states in the table
     
-    nck = adf_ncktab(nmodes+nmax, min(nmodes,nmax)) # A binomial coefficient table
+    nck = adf.ncktab(nmodes+nmax, min(nmodes,nmax)) # A binomial coefficient table
     
     base_shape = r.shape[:-1]
     Im0 = np.zeros(base_shape + (ns,), dtype = np.complex128)
@@ -769,14 +771,14 @@ def corr_quad_ratio_table_edge(r, S, T, nmax):
         ratio = 0 
         #
         # -r_i < m | 0 >  term
-        ratio += -r[...,i] * Im0[...,adf_idxpos(m,nck)]
+        ratio += -r[...,i] * Im0[...,adf.idxpos(m,nck)]
         
         for j in range(nmodes):
             if m[j] > 0:
                 mm1 = m.copy()
                 mm1[j] -= 1 
                 # add -T_ij sqrt(m_j) < ... m_j-1 ... | 0 > term
-                ratio += -T[...,i,j] * np.sqrt(m[j]) * Im0[...,adf_idxpos(mm1,nck)]
+                ratio += -T[...,i,j] * np.sqrt(m[j]) * Im0[...,adf.idxpos(mm1,nck)]
         
         #
         #
@@ -817,10 +819,10 @@ def corr_quad_ratio_table(r, S, T, nmax):
     
     # Calculate the list of quantum numbers
     # for states to include in the table
-    qns = adf_idxtab(nmax, nmodes) 
+    qns = adf.idxtab(nmax, nmodes) 
     ns = qns.shape[0] # The number of states in the table
     
-    nck = adf_ncktab(nmodes+nmax, min(nmodes,nmax)) # A binomial coefficient table
+    nck = adf.ncktab(nmodes+nmax, min(nmodes,nmax)) # A binomial coefficient table
     
     base_shape = r.shape[:-1]
     Imn = np.zeros(base_shape + (ns,ns), dtype = np.complex128)
@@ -845,14 +847,14 @@ def corr_quad_ratio_table(r, S, T, nmax):
         ratio = 0 
         #
         # -r_i < m | 0 >  term
-        ratio += -r[...,i] * Imn[...,adf_idxpos(m,nck), 0]
+        ratio += -r[...,i] * Imn[...,adf.idxpos(m,nck), 0]
         
         for j in range(nmodes):
             if m[j] > 0:
                 mm1 = m.copy()
                 mm1[j] -= 1 
                 # add -T_ij sqrt(m_j) < ... m_j-1 ... | 0 > term
-                ratio += -T[...,i,j] * np.sqrt(m[j]) * Imn[...,adf_idxpos(mm1,nck),0]
+                ratio += -T[...,i,j] * np.sqrt(m[j]) * Imn[...,adf.idxpos(mm1,nck),0]
         
         #
         #
@@ -884,7 +886,7 @@ def corr_quad_ratio_table(r, S, T, nmax):
         m = mp1.copy()
         m[i] -= 1
         
-        m_pos = adf_idxpos(m,nck)
+        m_pos = adf.idxpos(m,nck)
         
         for N in range(1,M+1):
             # Calculate
@@ -906,13 +908,13 @@ def corr_quad_ratio_table(r, S, T, nmax):
                 if n[j] > 0:
                     nm1 = n.copy()
                     nm1[j] -= 1 
-                    nm1_pos = adf_idxpos(nm1,nck) # position of |...n_j - 1 ...>
+                    nm1_pos = adf.idxpos(nm1,nck) # position of |...n_j - 1 ...>
                     ratio += S[...,i,j] * np.sqrt(n[j]) * Imn[...,m_pos,nm1_pos]
                 
                 if m[j] > 0:
                     mm1 = m.copy()
                     mm1[j] -= 1 
-                    mm1_pos = adf_idxpos(mm1,nck) # position of < ... m_j - 1 |
+                    mm1_pos = adf.idxpos(mm1,nck) # position of < ... m_j - 1 |
                     ratio += -T[...,i,j] * np.sqrt(m[j]) * Imn[...,mm1_pos, n_pos]
             
             Imn[...,M,N] = ratio / np.sqrt(m[i] + 1)
@@ -924,7 +926,188 @@ def corr_quad_ratio_table(r, S, T, nmax):
     #
     
     return Imn, qns
+
+def corr_quad_ratio_table_rectangular(r, S, T, mmax, nmax):
+    """
+    Calculate correlation function ratios using
+    the quadratic recursion elements for a 
+    rectangularly shaped table.
+
+    Parameters
+    ----------
+    r, S, T : ndarray
+        Quadratic recursion coefficients.
+    mmax : int 
+        The maximum total quantum number (left index).
+    nmax : int
+        The maximum total quantum number (right index).
+
+    Returns
+    -------
+    Imn : (...,nsm,nsn) ndarray
+        The correlator ratios.
+    qns : (ns, n) ndarray
+        The quantum number table for `n` modes. `ns` is the greater of
+        `nsm` and `nsn`.
+
+    See Also
+    --------
+    corr_quad_recursion_elements : Calculate the recursion coefficients.
+    corr_quad_ratio_table_edge : Calculate the edge of the ratio table.
+    corr_quad_ratio_table : Calculate a square ratio table.
+
+    """
+    if nmax < 0 or mmax < 0:
+        raise ValueError('nmax and mmax must be non-negative integers')
+    nmodes = r.shape[-1] # The number of modes 
     
+    # Calculate the list of quantum numbers
+    # for states to include in the table
+    totmax = max(mmax, nmax) # The maximum of m and n max's.
+    totmin = min(mmax, nmax) # The minimum of m and n max's. 
+    
+    qns = adf.idxtab(totmax, nmodes) 
+    nsm = adf.nderiv(mmax, nmodes) # The dimension of the first index
+    nsn = adf.nderiv(nmax, nmodes) # The dimension of the second index
+    
+    ns = max(nsm, nsn) 
+    ns_min = min(nsm, nsn) 
+    
+    nck = adf.ncktab(nmodes+totmax, min(nmodes,totmax)) # A binomial coefficient table
+    
+    base_shape = r.shape[:-1]
+    Imn = np.zeros(base_shape + (nsm,nsn), dtype = np.complex128)
+    
+    ###########################
+    # First, calculate the m,0 and 0,n elements
+    # on the edges of the table
+    #
+    # The 0,0 element is always unity.
+    if totmin >= 0: # should always be true 
+        Imn[...,0,0] = 1.0 
+    # Continue with higher states
+    for M in range(1,ns):
+        mp1 = qns[M] # < ... m+1 ... |
+        #
+        # Identify the first non-zero quantum number's position
+        i = np.nonzero(mp1)[0][0]
+        m = mp1.copy()
+        m[i] -= 1 
+        # m is quantum number vector of < m | 0 >
+        
+        ratio = 0 
+        #
+        # -r_i < m | 0 >  
+        if mmax > nmax:
+            ratio += -r[...,i] * Imn[...,adf.idxpos(m,nck), 0]
+        else:
+            ratio += -r[...,i] * Imn[...,0, adf.idxpos(m,nck)]
+        
+        for j in range(nmodes):
+            if m[j] > 0:
+                mm1 = m.copy()
+                mm1[j] -= 1 
+                # add -T_ij sqrt(m_j) < ... m_j-1 ... | 0 > term
+                if mmax > nmax:
+                    ratio += -T[...,i,j] * np.sqrt(m[j]) * Imn[...,adf.idxpos(mm1,nck),0]
+                else:
+                    ratio += -T[...,i,j] * np.sqrt(m[j]) * Imn[...,0,adf.idxpos(mm1,nck)]
+        
+        # The final table entry
+        entry = ratio / np.sqrt(m[i]+1)
+        #
+        #
+        if M < nsm:
+            Imn[...,M,0] = entry
+        #
+        # Table is symmetric
+        if M < nsn:
+            Imn[...,0,M] = entry
+    
+    #
+    # Now compute interior entries in
+    # the table
+    #   
+    #   0XXXXXXXX
+    #   Xxxx|
+    #   Xxxx|
+    #   XxxxV
+    #   X-->.
+    #
+    # The block of the table with column and rows
+    # less than the current position will always
+    # be calculated already. Once the M = N
+    # diagonal position is reached, this is still
+    # true because the current column will be
+    # complete at that point. 
+    #
+    for M in range(1,ns):
+        mp1 = qns[M]
+        i = np.nonzero(mp1)[0][0]
+        m = mp1.copy()
+        m[i] -= 1
+        
+        m_pos = adf.idxpos(m,nck)
+        
+        for N in range(1,M+1):
+            #
+            # Check rectangular boundaries
+            if N >= ns_min:
+                continue
+            
+            
+            # Calculate
+            # < m | n >
+            # Both m and n are non-zero 
+            n = qns[N]
+            n_pos = N
+            
+            #
+            ratio = 0 
+            #
+            # -r term
+            if m_pos < nsm and n_pos < nsn:
+                ratio += -r[...,i] * Imn[...,m_pos,n_pos]
+            else:
+                ratio += -r[...,i] * Imn[...,n_pos,m_pos]
+            #
+            # 
+            for j in range(nmodes):
+                # 
+                # S and T terms
+                if n[j] > 0:
+                    nm1 = n.copy()
+                    nm1[j] -= 1 
+                    nm1_pos = adf.idxpos(nm1,nck) # position of |...n_j - 1 ...>
+                    if m_pos < nsm and nm1_pos < nsn:
+                        ratio += S[...,i,j] * np.sqrt(n[j]) * Imn[...,m_pos,nm1_pos]
+                    else:
+                        ratio += S[...,i,j] * np.sqrt(n[j]) * Imn[...,nm1_pos,m_pos]
+                
+                if m[j] > 0:
+                    mm1 = m.copy()
+                    mm1[j] -= 1 
+                    mm1_pos = adf.idxpos(mm1,nck) # position of < ... m_j - 1 |
+                    if mm1_pos < nsm and n_pos < nsn:
+                        ratio += -T[...,i,j] * np.sqrt(m[j]) * Imn[...,mm1_pos, n_pos]
+                    else:
+                        ratio += -T[...,i,j] * np.sqrt(m[j]) * Imn[...,n_pos, mm1_pos]
+            
+            entry = ratio / np.sqrt(m[i] + 1)
+            
+            # Figure out which block(s) to place entry
+            # I[M,N] = I[N,M] by symmetry 
+            
+            if M < nsm and N < nsn:
+                Imn[...,M,N] = entry # lower triangle
+            if N < nsm and M < nsn:
+                Imn[...,N,M] = entry # upper triangle 
+     
+    #
+    # The table is now completely filled
+    #
+    
+    return Imn, qns    
                             
     
 def _partition_darray(f,n):
@@ -934,8 +1117,10 @@ def _partition_darray(f,n):
     
     Parameters
     ----------
-    f : derivative array
-    n : the number of coordinates
+    f : ndarray
+        derivative array
+    n : int
+        the number of coordinates
     
     Returns
     -------
@@ -1044,7 +1229,7 @@ def cubic_gradient_estimate(Vi,Vf,n):
         
         midx[i] = 3 # Set multi-index to (...,0, 3_i, 0,...)
 
-        phi3[i] = 6 * Vf[adf.idxpos(midx, nck)] # Calculate phi_iii derivative
+        phi3[i] = 6 * Vi[adf.idxpos(midx, nck)] # Calculate phi_iii derivative
         
         midx[i] = 0 # Reset to zeros
         
@@ -1063,7 +1248,7 @@ def cubic_gradient_estimate(Vi,Vf,n):
             midx[j] = 2 
             
             # Calculate phi_ijj derivative
-            phi12[i,j] = 2 * Vf[adf.idxpos(midx, nck)]
+            phi12[i,j] = 2 * Vi[adf.idxpos(midx, nck)]
             
             # Reset multi-index
             midx[i] = 0 
@@ -1088,3 +1273,146 @@ def cubic_gradient_estimate(Vi,Vf,n):
         deltaE += -f[i] * temp / (4 * w[i])
         
     return deltaE 
+
+def autocorr_cubic_initial_firstorder(V, f, n, t):
+    """
+    Calculate the first-order corrections to the 
+    quadratic auto-correlation function
+    due to cubic force constants in the initial
+    state.
+    
+    Parameters
+    ----------
+    V : ndarray
+        The derivative array of the initial state, including
+        up to cubic derivatives.
+    f : ndarray
+        The derivative array of the final state, including 
+        up to quadratic derivatives.
+    n : int
+        The number of coordinates 
+    t : ndarray
+        The time array.
+    
+    Returns
+    -------
+    
+    C1 : ndarray
+        The first-order correction relative to C0.
+        
+    Notes
+    -----
+    
+    The returned value `C1` is the ratio of the first-order
+    correction to the zeroth-order quadratic correlator.
+    The total result is :math:`\\left[ 1+C_1(t)\\right] \\times C_0(t)`.
+    
+    """
+    
+   
+    # First, extract the harmonic frequencies
+    # of the initial state from V 
+    _,K = _partition_darray(V, n)
+    w = np.diag(K) # The harmonic frequencies 
+    
+    # Calculate the recursion coefficients
+    # for quadratic correlation functions
+    r,S,T = corr_quad_recursion_elements(w, f, t)
+    
+    # Calculate the edge of the 
+    # ratio table up to 3 quanta
+    #
+    Im0,_ = corr_quad_ratio_table_edge(r, S, T, 3)
+    
+    # Calculate the first-order coefficients
+    # for the initial state vacuum wavefunction
+    #
+    # This has the same state ordering as 
+    # Im0 (the standard derivative array lexical ordering)
+    c1 = nitrogen.vpt.ho_core.cubic_firstorder_vacuum(V, n)
+    
+    
+    C1 = np.zeros_like(t, dtype = np.complex128) 
+    
+    for i in range(len(c1)):
+        C1 += c1[i] * Im0[...,i]
+    
+    C1 *= 2.0 # Factor of two from first-order expansion 
+    
+    return C1 
+    
+def autocorr_linearHT(w, f, mu, t):
+    """
+    Calculate the harmonic vacuum autocorrelation
+    function including linear Herzberg-Teller 
+    dipole terms.
+    
+    Parameters
+    ----------
+    w : array_like
+        The harmonic frequency (in energy units) of each mode.
+    f : array_like
+        The derivative array of the final state, including at least second derivatives.
+    mu : array_like
+        The derivative array of the dipole function, including at least gradients.
+    t : array_like
+        The time array.
+    
+    Returns
+    -------
+    
+    CHT: ndarray
+        The dipole autocorrelation function relative to C0.
+        
+    Notes
+    -----
+    
+    The returned value `CHT` is the ratio of the dipole 
+    correlation function relative to the quadratic correlator, `C0`.
+    The total result is :math:`\\left[ 1+C_1(t)\\right] \\times C_0(t)`.
+
+    See also
+    --------
+    autocorr_quad : Quadratic autocorrelation function.
+
+    """
+    
+    t = np.array(t) 
+    
+    n = len(w)  # The number of coordinates
+    if len(mu) < n+1:
+        raise ValueError('mu must contain at least gradients') 
+    
+    # Calculate recursion elements
+    r, S, T = corr_quad_recursion_elements(w, f, t)
+    
+    # Calculate full ratio table for v = 0,1
+    Imn,_ = corr_quad_ratio_table(r, S, T, 1) 
+    
+    # Calculate the mu|0> wavefunction in the HO basis
+    c = np.zeros((n+1,)) 
+    c[0] = mu[0] # mu_e |0>
+    for i in range(n):
+        c[i+1] = mu[i+1] * np.sqrt(0.5) # dmu/dqi * sqrt(1/2) |1_i>
+    
+    CHT = np.zeros(t.shape, dtype = np.complex128) 
+    
+    #
+    # 
+    # Calculate <0|mu . exp[-iHt] . mu|0>
+    #
+    # The c coefficients are Real
+    # and the Imn ratios are symmetric
+    #
+    for i in range(n+1):
+        for j in range(i+1):
+            
+            if i == j:
+                CHT += c[i]**2 * Imn[...,i,i]
+            else:
+                # i neq j 
+                # Factor of 2 from symmetric sum 
+                CHT += 2.0 * c[i]*c[j] * Imn[...,i,j] 
+    
+    return CHT 
+                    
