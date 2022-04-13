@@ -17,9 +17,13 @@ from .ho_core import *  # Import the core namespace
 from . import td_core
 from .td_core import *  # Import the core namespace
 
+from . import cfour_vib
+from .cfour_vib import * 
+
 __all__ = ['calc_rectilinear_modes']
 __all__ += ho_core.__all__
 __all__ += td_core.__all__
+__all__ += cfour_vib.__all__
     
 def calc_rectilinear_modes(hes, mass, hbar = None, norm = 'dimensionless'):
     """
