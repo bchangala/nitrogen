@@ -1,5 +1,5 @@
 """
-cfour_vib.py
+cfourvib.py
 
 CFOUR vibrational file processing and
 interface routines.
