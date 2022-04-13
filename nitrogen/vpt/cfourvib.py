@@ -10,9 +10,6 @@ import numpy as np
 import nitrogen.constants
 import nitrogen.autodiff.forward as adf 
 
-__all__ = ['read_QUADRATURE']
-
-
 
 def read_QUADRATURE(filename, use_bohr = False):
     """
