@@ -1725,7 +1725,10 @@ def _composite_zlevel(zlevelA, zlevelB):
     elif zlevelA < 1: # If A is zero or constant
         zlevel = zlevelA # then H is zero or constant
     else:
-        zlevel = zlevelA * zlevelB # composite polynomials
+        if zlevelB is None:
+            zlevel = None 
+        else:
+            zlevel = zlevelA * zlevelB # composite polynomials
     
     return zlevel
 
