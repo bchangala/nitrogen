@@ -8,6 +8,8 @@ General mathematical tools and functions
 
 import numpy as np 
 
+import nitrogen.autodiff.forward as adf 
+
 def cumsimp(y, x, axis = 0):
     """
     Calculate the cumulative integral by Simpson's Rule
@@ -224,3 +226,123 @@ def gaussianFWHM(x, fwhm, norm = 'area'):
         raise ValueError('unexpected norm keyword')
     
     return y 
+
+
+def mpolyfit(x, y, deg):
+    """
+    Multivariable polynomial least-squares fitting.
+
+    Parameters
+    ----------
+    x : (N,nx) or (N,) array_like
+        The input coordinates.
+    y : (N,) array_like
+        The output coordinates
+    deg : int
+        The degree of the polynomial
+
+    Returns
+    -------
+    p : (nt,) ndarray
+        The polynomial coefficients
+    res : (N,) ndarray
+        The residuals.
+    
+    Notes
+    -----
+    The polynomial is ordered using the standard 
+    lexical ordering defined by the ``autodiff``
+    and ``DFun`` modules.
+
+    """
+    
+    y = np.array(y)
+    N = y.shape[0] # The number of data points
+    x = np.array(x)
+    x = x.reshape((N,-1)) # Force to 2-dim
+    nx = x.shape[1]  # The number of variables 
+    
+    # Calculate the powers
+    # in standard lexical ordering
+    pows = adf.idxtab(deg, nx) 
+    nt = pows.shape[0] # the number of terms
+    
+    # Create the least-squares array
+    # Initialize to all ones
+    C = np.ones((N,nt), dtype = x.dtype)
+    
+    # Calculate the powers of the inputs
+    xpow = [ [ x[:,i] ** k for k in range(deg+1)] for i in range(nx)]
+    
+    for r in range(nt):
+        pr = pows[r,:] # the powers of this term 
+        for i in range(nx):        
+            C[:,r] *= xpow[i][pr[i]]
+    
+    # Now solve the linear least-squares problem
+    p,_,_,_ = np.linalg.lstsq(C, y, rcond=None)
+    
+    res = y - C @ p
+    
+    return p, res
+        
+def mpolyval(p, x):
+    """
+    Evaluate a polynomial in standard lexical order.
+    
+    Parameters
+    ----------
+    p : array_like
+        The polynomial coefficients.
+    x : (N,nx) or (N,) array_like
+        The input values.
+
+    Returns
+    -------
+    y : (N,) ndarray
+        The polynomial value.
+
+    """
+    
+    p = np.array(p)
+    x = np.array(x)
+    
+    if x.ndim != 2:
+        # Assume (N,) shaped
+        x = x.reshape((-1,1))
+        
+    N = x.shape[0] # The number of data points
+    nx = x.shape[1] # The number of variables 
+    
+    nt = len(p) # The number of terms
+    
+    # Figure out the degree of the polynomial
+    deg = 0 
+    while True:
+        if nt == adf.nderiv(deg, nx):
+            break # found 
+        elif nt < adf.nderiv(deg, nx):
+            raise ValueError("The length of p appears inconsistent with x.")
+        deg += 1 
+    
+    # Calculate the powers
+    # in standard lexical ordering
+    pows = adf.idxtab(deg, nx) 
+
+    # Calculate the powers of the inputs
+    xpow = [ [ x[:,i] ** k for k in range(deg+1)] for i in range(nx)]
+    
+    
+    y = np.zeros((N,), dtype = np.result_type(p,x))
+    
+    for r in range(len(p)):
+        
+        term = p[r] # The coefficient
+        for i in range(nx):        
+            term *= xpow[i][pows[r,i]]
+            
+        y += term 
+        
+    return y 
+
+            
