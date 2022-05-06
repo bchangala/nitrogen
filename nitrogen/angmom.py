@@ -482,7 +482,7 @@ def X2PAS(X, mass):
     -------
     XPAS : ndarray
         A (3*N,...) array of the positions in the
-        PAS frame.
+        PAS frame with axes ordered :math:`a`, :math:`b`, :math:`c`.
     R : ndarray
         A (3,3,...) orthogonal array containing the transformation
         matrix from the original axes to the principal
@@ -497,7 +497,10 @@ def X2PAS(X, mass):
     
     ..  math::
         
-        \\vec{x}_\\text{PAS} = \\mathbf{R}(\\vec{x} - \\vec{x}_\\text{COM})
+        \\vec{x}_\\text{PAS} = \\mathbf{R}(\\vec{x} - \\vec{x}_\\text{COM}).
+        
+    The rows of :math:`\\mathbf{R}` equal the unit vectors of the principal
+    axes with respect to the input coordinate frame.
     
     """
     
