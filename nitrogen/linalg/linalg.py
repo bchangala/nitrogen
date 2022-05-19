@@ -2,6 +2,7 @@ import numpy as np
 from scipy.sparse.linalg import LinearOperator
 from scipy.sparse.linalg import aslinearoperator
 import scipy.fft 
+import scipy.linalg
 
 __all__ = ['eigstrp','aslinearoperator','bounds',
            'chebauto', 'chebspec', 'chebwindow',
@@ -723,3 +724,43 @@ def msqrth(A):
     rtA = 0.5 * (rtA + np.conj(rtA.T)) # Enforce exact hermiticity.
     
     return rtA 
+
+
+def simple_corr(H, dt, n, v0):
+    """
+    Simple finite time-step propagation for 
+    an autocorrelation function.
+
+    Parameters
+    ----------
+    H : ndarray
+        The Hamiltonian matrix.
+    dt : float
+        The time step (in units of :math:`t/\\hbar`)
+    n : integer
+        The number of time steps.
+    v0 : ndarray
+        The initial vector.
+        
+    Returns
+    -------
+    C : ndarray
+        The autocorrelation function.
+
+    """
+     
+    
+    # Calculate the small step propagator
+    #    exp[-iH * dt]
+    eHt = scipy.linalg.expm(-1j * H * dt)
+    
+    # Initialize the auto-correlation function
+    C = np.zeros((n,), dtype = np.complex128)
+    
+    vt = v0  # The initial wavefunction 
+    for i in range(n):
+        C[i] = np.vdot(v0, vt) # Calculate overlap with initial wavefunction
+        vt = eHt @ vt          # Propagate one step
+    
+    return C 
+ 
