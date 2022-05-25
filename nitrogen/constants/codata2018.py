@@ -109,4 +109,10 @@ _constants = {
     # Frequency-energy equivalent (exact)
     "hHz" : (1e-6/29979.2458, 0),
     
+    # electron-proton mass ratio, dimensionless
+    "memp" : (5.44617021487e-4, 3.3e-14),
+    
+    # proton mass, in u 
+    "mp"   : (1.007276466621, 5.3e-11),
+    
     }

@@ -42,6 +42,8 @@ Physical constants
 ``c``                        speed of light
 ``me``                       electron mass
 ``NA``                       Avogadro constant :math:`N_A`
+``memp``                     electron-to-proton mass ratio, :math:`m_e/m_p`
+``mp``                       proton mass, :math:`m_p`
 ===========================  =================================================================
 
 
@@ -103,6 +105,8 @@ kJ      = _constants["kJ"][0]       # kJ/mol
 kcal    = _constants["kcal"][0]     # kcal/mol
 t_au    = _constants["t_au"][0]     # atomic unit of time (hbar/Eh)
 hHz     = _constants["hHz"][0]      # h * Hz
+memp    = _constants["memp"][0]     # electron-to-proton mass ratio 
+mp      = _constants["mp"][0]       # proton mass in u 
 
 
 #############################
