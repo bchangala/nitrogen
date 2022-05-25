@@ -237,7 +237,7 @@ def mpolyfit(x, y, deg):
     x : (N,nx) or (N,) array_like
         The input coordinates.
     y : (N,) array_like
-        The output coordinates
+        The output value
     deg : int
         The degree of the polynomial
 
@@ -285,7 +285,122 @@ def mpolyfit(x, y, deg):
     res = y - C @ p
     
     return p, res
+
+def mpolyfit_grad(x, y, yg, deg, scale = None):
+    """
+    Multivariable polynomial least-squares fitting including
+    gradient constraints.
+
+    Parameters
+    ----------
+    x : (N,nx) or (N,) array_like
+        The input coordinates.
+    y : (N,) array_like
+        The output value
+    yg : (N,nx) array_like
+        The output gradient
+    deg : int
+        The degree of the polynomial
+    scale : (nx,) array_like, optional
+        The coordinate scale. The default is 1 for each
+        coordinate.
+
+    Returns
+    -------
+    p : (nt,) ndarray
+        The polynomial coefficients
+    res : (N,nx+1) ndarray
+        The residuals. The first column is the `y` residual.
+        The second is the gradient residual including
+        `scale`.
+    
+    Notes
+    -----
+    The polynomial is ordered using the standard 
+    lexical ordering defined by the ``autodiff``
+    and ``DFun`` modules.
+    
+    The gradient data is premultiplied by `scale`
+    for each coordinate before least-squares
+    optimization.
+
+    """
+    
+    y = np.array(y)
+    N = y.shape[0] # The number of data points
+    x = np.array(x)
+    x = x.reshape((N,-1)) # Force to 2-dim
+    nx = x.shape[1]  # The number of variables 
+    
+    yg = np.array(yg) # (N,nx) 
+    if yg.ndim != 2:
+        raise ValueError('yg must be 2-d')
+    if yg.shape[0] != N or yg.shape[1] != nx:
+        raise ValueError('unexpected shape for yg')
+    
+    if scale is None:
+        scale = [1.0 for i in range(nx)]
+    scale = np.array(scale)
+    if scale.ndim != 1 or len(scale) != nx:
+        raise ValueError("scale must be 1-d array of length nx")
+    
+    # Calculate the powers
+    # in standard lexical ordering
+    pows = adf.idxtab(deg, nx) 
+    nt = pows.shape[0] # the number of terms
+    
+    # Create the least-squares array
+    # Initialize to all ones
+    C = np.ones((nx+1,N,nt), dtype = x.dtype)
+    
+    # Calculate the powers of the inputs
+    xpow = [ [ x[:,i] ** k for k in range(deg+1)] for i in range(nx)]
+    
+    for r in range(nt):
+        # For each term
+        pr = pows[r,:] # the powers of this term 
+        #
+        # Compute the zeroth derivative (value)
+        for i in range(nx):        
+            C[0,:,r] *= xpow[i][pr[i]]
         
+        # Compute the first derivative for each coordinate k
+        for k in range(nx): 
+            for i in range(nx):
+                if i == k:
+                    #
+                    # derivative of (xi)**p equals
+                    # p * (xi)**(p-1)
+                    #
+                    # if p == 0, then the array index is -1,
+                    # but that's okay because p is zero anyway
+                    #
+                    C[k+1,:,r] *= (pr[i] * xpow[i][pr[i]-1])
+                else:
+                    C[k+1,:,r] *= xpow[i][pr[i]]
+    
+    
+    Y = np.concatenate((y.reshape((1,N)), yg.T), axis = 0).copy() # (nx+1, N)
+    
+    # Scale the gradient bits
+    for k in range(nx):
+        C[k+1] *= scale[k] 
+        Y[k+1] *= scale[k] 
+        
+    # Reshape for matrix least-squares
+    Y = Y.reshape( (-1,) )
+    C = C.reshape( (-1, nt) )
+    
+    # Now solve the linear least-squares problem
+    p,_,_,_ = np.linalg.lstsq(C, Y, rcond=None)
+    
+    res = Y - C @ p # residual
+    
+    res = np.reshape(res, (nx+1, N))
+    res = res.T  # (N, nx+1)
+    
+    return p, res        
+
 def mpolyval(p, x):
     """
     Evaluate a polynomial in standard lexical order.
