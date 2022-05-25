@@ -6,7 +6,7 @@ import scipy.linalg
 
 __all__ = ['eigstrp','aslinearoperator','bounds',
            'chebauto', 'chebspec', 'chebwindow',
-           'full', 'msqrth']
+           'full', 'msqrth', 'simple_corr']
 
 def eigstrp(H, k = 5, pad = 10, tol = 1e-10, maxiter = None, v0 = None,
             rper = 20, P = None, pper = 1, printlevel = 0, eigval = 'smallest'):
