@@ -134,6 +134,7 @@ def autocorr_quad(W, f, t, method = 'direct'):
     
     n = W.shape[0] 
     
+    f = np.array(f) 
     # Extract the gradient and hessian 
     F,K = _partition_darray(f, n)
     h0 = f[0] # The energy offset
@@ -1369,7 +1370,7 @@ def autocorr_linearHT(w, f, mu, t):
     
     The returned value `CHT` is the ratio of the dipole 
     correlation function relative to the quadratic correlator, `C0`.
-    The total result is :math:`\\left[ 1+C_1(t)\\right] \\times C_0(t)`.
+    The total result is :math:`C_{HT}(t)\\times C_0(t)`.
 
     See also
     --------
