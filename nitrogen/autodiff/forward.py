@@ -1150,7 +1150,7 @@ def mvleibniz(X, Y, k, ni, nck, idx, out=None, Xzlevel = None, Yzlevel = None,
     ----------
     X,Y : ndarray
         Derivative array factors (e.g. :attr:`adarray.d`). These
-        must have matching shapes.
+        must have broadcastable base-shapes.
     k : int
         Maximum derivative order of `X` and `Y`
     ni : int
@@ -1197,7 +1197,8 @@ def mvleibniz(X, Y, k, ni, nck, idx, out=None, Xzlevel = None, Yzlevel = None,
     # Initialize result Z to zero
     res_type = np.result_type(X.dtype, Y.dtype)
     if out is None:
-        out = np.zeros(X.shape, dtype = res_type)
+        base_shape = np.broadcast_shapes(X.shape[1:], Y.shape[1:])
+        out = np.zeros(X.shape[0] + base_shape, dtype = res_type)
     else:
         if out.dtype != res_type:
             raise TypeError("out data-type is incompatible with X * Y")
@@ -1260,6 +1261,9 @@ def mvleibniz(X, Y, k, ni, nck, idx, out=None, Xzlevel = None, Yzlevel = None,
             
             # Add this term to Z
             # Use of '+=' with ndarrays will not create a new copy
+            #
+            # Numpy broadcasting is applied to this element-wise
+            # multiplication 
             Z[iZ] += X[iX] * Y[iY]
             
     return Z
@@ -1506,7 +1510,7 @@ def sym(value,i,k,ni,nck = None, idx = None):
     
     return x
 
-def empty_like(x, dtype = None):
+def empty_like(x, dtype = None, baseshape = None):
     """
     Create an *uninitialized* adarray with the same properties as `x`,
     including base array data-type. The zlevel will be maximum.
@@ -1518,6 +1522,10 @@ def empty_like(x, dtype = None):
         
     dtype : dtype, optional
         Base data-type. If None, then `x.d.dtype` is used.
+        
+    baseshape : tuple, optional
+        The base shape. If None, then the base shape of
+            `x` is used.
 
     Returns
     -------
@@ -1530,8 +1538,10 @@ def empty_like(x, dtype = None):
     """
     if dtype is None:
         dtype = x.d.dtype
+    if baseshape is None:
+        baseshape = x.d.shape[1:] 
         
-    return adarray(x.d.shape[1:], x.k, x.ni, x.nck, x.idx, dtype)
+    return adarray(baseshape, x.k, x.ni, x.nck, x.idx, dtype)
 
 def const_like(value, x, dtype = None):
     """
@@ -1590,12 +1600,19 @@ def add(x, y, out = None):
     
     res_type = np.result_type(x.d, y.d)
     if out is None:
-        out = empty_like(x, dtype = res_type)
+        base_shape = np.broadcast_shapes(x.d.shape[1:], y.d.shape[1:])
+        out = empty_like(x, dtype = res_type, baseshape=base_shape)
     
     if res_type != out.d.dtype:
         raise TypeError("output data-type incompatible with x + y")
     
-    np.add(x.d, y.d, out = out.d)
+    # Perform addition
+    # To broadcast correctly over the base_shape,
+    # we use a view with the derivative axis moved
+    # to the back. 
+    np.add(np.moveaxis(x.d,0,-1), 
+           np.moveaxis(y.d,0,-1),
+           out = np.moveaxis(out.d,0,-1))
     out.zlevel = max(x.zlevel, y.zlevel)
     out.zlevels = np.maximum(x.zlevels, y.zlevels) 
     
@@ -1629,12 +1646,15 @@ def subtract(x, y, out = None):
     
     res_type = np.result_type(x.d, y.d)
     if out is None:
-        out = empty_like(x, dtype = res_type)
+        base_shape = np.broadcast_shapes(x.d.shape[1:], y.d.shape[1:])
+        out = empty_like(x, dtype = res_type, baseshape=base_shape)
     
     if res_type != out.d.dtype:
         raise TypeError("output data-type incompatible with x - y")
     
-    np.subtract(x.d, y.d, out = out.d)
+    np.subtract(np.moveaxis(x.d,0,-1), 
+                np.moveaxis(y.d,0,-1),
+                out = np.moveaxis(out.d,0,-1))
     out.zlevel = max(x.zlevel, y.zlevel)
     out.zlevels = np.maximum(x.zlevels, y.zlevels) 
     
@@ -1668,7 +1688,8 @@ def mul(x, y, out = None):
     
     res_type = np.result_type(x.d, y.d)
     if out is None:
-        out = empty_like(x, dtype = res_type)
+        base_shape = np.broadcast_shapes(x.d.shape[1:], y.d.shape[1:])
+        out = empty_like(x, dtype = res_type, baseshape=base_shape)
         
     if res_type != out.d.dtype:
         raise TypeError("output data-type incompatible with x * y")
@@ -1721,7 +1742,8 @@ def div(x, y, out = None):
     
     res_type = np.result_type(x.d, y.d)
     if out is None:
-        out = empty_like(x, dtype = res_type)
+        base_shape = np.broadcast_shapes(x.d.shape[1:], y.d.shape[1:])
+        out = empty_like(x, dtype = res_type, baseshape=base_shape)
         
     if res_type != out.d.dtype:
         raise TypeError("output data-type incompatible with x / y")
