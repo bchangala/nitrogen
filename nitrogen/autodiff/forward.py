@@ -317,6 +317,111 @@ class adarray:
         """ z = other - self """
         return (-self).__add__(other)
     
+    # MATRIX MULTIPLICATION
+    def __matmul__(self,other):
+        """ z = self @ other"""
+        if type(other) == type(self):
+            raise NotImplementedError("matmul for adarray @ adarray not yet implemented")
+        else:
+            # z = adarray @ constant
+            if self.d.ndim <= 1:
+                raise ValueError("matmul requires non-scalar base shape")
+                
+            pre,post = False,False 
+            
+            if self.d.ndim == 2:
+                # Insert 1 in shape 
+                # between derivative axis and 
+                # vector axis 
+                pre = True 
+                A = np.expand_dims(self.d, axis = 1)
+            else:
+                A = self.d 
+            
+            other = np.array(other)
+            if other.ndim == 1 : 
+                # Append 1 
+                other = np.expand_dims(other, axis = 1) 
+                post = True 
+            
+            # A @ other is now
+            # (nd,...,m,n) @ (...,n,k) 
+            #
+            # Reshape to 
+            # (...,nd,m,n) @ (...,1,n,k) 
+            # for correct broadcasting
+            A = np.moveaxis(A, 0, -3)
+            other = np.expand_dims(other, axis = -3) 
+            
+            result = A @ other 
+            
+            # result has shape (...,nd,m,k)
+            #
+            # Remove added singletons 
+            if pre:
+                result = np.squeeze(result, axis = -2)
+            if post:
+                result = np.squeeze(result, axis = -1) 
+            
+            z = array(result, self.k, self.ni,
+                      zlevel = self.zlevel, zlevels = self.zlevels,
+                      nck = self.nck, idx = self.idx)
+            
+            return z 
+    
+    def __rmatmul__(self,other):
+        """ z = other @ self """
+        if type(other) == type(self):
+            raise NotImplementedError("matmul for adarray @ adarray not yet implemented")
+        else:
+            # z = constant @ adarrau 
+            if self.d.ndim <= 1:
+                raise ValueError("matmul requires non-scalar base shape")
+                
+            pre,post = False,False 
+            
+            if self.d.ndim == 2:
+                # Insert 1 in shape 
+                # between derivative axis and 
+                # vector axis 
+                post = True 
+                A = np.expand_dims(self.d, axis = -1)
+            else:
+                A = self.d 
+            
+            other = np.array(other)
+            if other.ndim == 1 : 
+                # Prepend 1
+                other = np.expand_dims(other, axis = 0) 
+                pre = True 
+            
+            # other @ A is now
+            # (...,m,n) @ (nd,...,n,k)
+            # 
+            # Reshape to 
+            # (...,1,m,n) @ (...,nd,n,k) 
+            # for correct broadcasting
+            
+            A = np.moveaxis(A, 0, -3)
+            other = np.expand_dims(other, axis = -3) 
+            
+            result = other @ A 
+            
+            # result has shape (...,nd,m,k)
+            #
+            # Remove added singletons 
+            if pre:
+                result = np.squeeze(result, axis = -2)
+            if post:
+                result = np.squeeze(result, axis = -1) 
+            
+            z = array(result, self.k, self.ni,
+                      zlevel = self.zlevel, zlevels = self.zlevels,
+                      nck = self.nck, idx = self.idx)
+            
+            return z 
+                
+    
     # UNARY OPERATIONS
     def __neg__(self):
         """ z = -self """
@@ -2962,3 +3067,47 @@ def cost(k,ni, quiet = False):
      
     
     return
+
+def block2(arrays):
+    """
+    Assemble an array from 2-D nested list of sub-arrays
+    
+    Parameters
+    ----------
+    arrays : list of list of adarray
+        The blocks 
+    
+    Returns
+    -------
+    adarray
+        The assembled array
+        
+    Notes
+    -----
+    This performs numpy.block on the base arrays of the 
+    adarray objects
+    
+    """
+    
+    nd = arrays[0][0].nd # The number of derivatives 
+    
+    
+    for k in range(nd):
+        # Assemble the block matrix for this derivative 
+        
+        blocks = [ [X.d[k] for X in row] for row in arrays] 
+        # 
+        # The base array for this derivative
+        Md = np.block(blocks) 
+        
+        if k==0: 
+            # Create the output array 
+            M = empty_like(arrays[0][0], baseshape=Md.shape)
+        
+        # Copy Md to the appropriate derivative sub-array
+        np.copyto(M.d[k], Md)
+    
+    
+    return M 
+            
+            
