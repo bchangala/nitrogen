@@ -254,6 +254,81 @@ class adarray:
             
         return out
         
+    def reshape_base(self, new_shape):
+        """
+        Reshape base array
+        
+        Parameters
+        ----------
+        newshape : tuple of ints
+        
+        Notes
+        -----
+        This method re-assigns the derivative array
+        attribute to the return value of numpy.reshape
+        
+        """
+        
+        nd = self.nd
+        
+        self.d = np.reshape(self.d, (nd,) + new_shape) 
+
+        return self
+    
+    def moveaxis_base(self,source,destination):
+        """
+        Move axes of base array
+        
+        Parameters
+        ----------
+        source : int or sequence of int 
+            Original positions of axes
+        destination : int or sequence of int
+            Desination positions of axes
+        
+        Notes
+        -----
+        This method re-assigns the derivative array
+        attribute to the return value of numpy.moveaxis
+        
+        """
+
+        # The axis labels passed in the parameters refer
+        # to those of the base shape. Before moveaxis'ing
+        # the raw derivative array, the positive entries
+        # need to be incremented by 1 to account for the
+        # leading derivative axis. The negative entries
+        # can remain the same.
+        #
+        source_new = [ s+1 if s >= 0 else s for s in source ]
+        dest_new = [s+1 if s >=0 else s for s in destination]
+        
+        self.d = np.moveaxis(self.d, source_new, dest_new)
+        
+        return self
+    
+    def transpose_base(self):
+        """
+        Transpose base array
+        
+        Notes
+        -----
+        This method re-assigns the derivative 
+        array to the return value of numpy.transpose
+        with all base axes reversed
+        """
+        
+        ndim = self.d.ndim - 1 
+        
+        #
+        # axes should be [0,ndim,ndim-1,ndim-2,...,1]
+        #
+        axes = (0,) + tuple(range(ndim,0,-1))
+        self.d = np.transpose(self.d, axes=axes)
+        
+        return self 
+        
+        
     # Define binary operators: +, -, ...
     # ADDITION
     def __add__(self,other):
@@ -321,7 +396,9 @@ class adarray:
     def __matmul__(self,other):
         """ z = self @ other"""
         if type(other) == type(self):
-            raise NotImplementedError("matmul for adarray @ adarray not yet implemented")
+            # adarray @ adarray
+            # use ad matmul
+            return matmul(self,other)
         else:
             # z = adarray @ constant
             if self.d.ndim <= 1:
@@ -356,7 +433,9 @@ class adarray:
             result = A @ other 
             
             # result has shape (...,nd,m,k)
-            #
+            # Move derivative axis back to front
+            result = np.moveaxis(result, -3, 0)
+            
             # Remove added singletons 
             if pre:
                 result = np.squeeze(result, axis = -2)
@@ -372,9 +451,10 @@ class adarray:
     def __rmatmul__(self,other):
         """ z = other @ self """
         if type(other) == type(self):
-            raise NotImplementedError("matmul for adarray @ adarray not yet implemented")
+            # This should never be reached, anyway...
+            return matmul(other,self) 
         else:
-            # z = constant @ adarrau 
+            # z = constant @ adarray 
             if self.d.ndim <= 1:
                 raise ValueError("matmul requires non-scalar base shape")
                 
@@ -408,7 +488,9 @@ class adarray:
             result = other @ A 
             
             # result has shape (...,nd,m,k)
-            #
+            # Move derivative axis back to front
+            result = np.moveaxis(result, -3, 0)
+            
             # Remove added singletons 
             if pre:
                 result = np.squeeze(result, axis = -2)
@@ -1245,9 +1327,60 @@ def mvtranslate(X, D, k, ni, nck, idx, out = None,
     
     return Z 
             
+def broadcast_shape(sX,sY,mode = 'normal'):
+    """
+    Calculate the broadcasted shape for different multiplication
+    modes.
+
+    Parameters
+    ----------
+    sX,sY : tuple of int
+        The base shapes
+    mode : {'normal','matmul'}
+        The multiplication mode.
+
+    Returns
+    -------
+    shape : tuple
+        The base shape of the broadcasted result
+
+    """
+    
+    if mode == 'normal':
+        return np.broadcast_shapes(sX,sY)
+    elif mode == 'matmul':
+        
+        if len(sX) == 0 or len(sY) == 0:
+            raise ValueError("Cannot matmul scalars")
+        pre,post = False,False
+        if len(sX) == 1:
+            sX = (1,) + sX # Prepend a singleton
+            pre = True 
+        if len(sY) == 1:
+            sY = sY + (1,) # Append a singleton
+            post = True 
+        
+        if sX[-1] != sY[-2]:
+            raise ValueError("Cannot matmul these shapes")
+        
+        newshape = np.broadcast_shapes(sX[:-2], sY[:-2]) + (sX[-2],sY[-1])
+        
+        if pre :
+            # Remove second-to-last
+            newshape = newshape[:-2] + (newshape[-1],)
+        if post :
+            # remove last
+            newshape = newshape[:-1] 
+        
+        return newshape 
+        
+    else:
+        raise ValueError("Unrecognized mode")
+        
+    return 
 
 def mvleibniz(X, Y, k, ni, nck, idx, out=None, Xzlevel = None, Yzlevel = None,
-              Xzlevels = None, Yzlevels = None):
+              Xzlevels = None, Yzlevels = None, mode = 'normal'):
     """
     Multivariate Leibniz formula for derivative arrays.
 
@@ -1275,6 +1408,8 @@ def mvleibniz(X, Y, k, ni, nck, idx, out=None, Xzlevel = None, Yzlevel = None,
     Xzlevels, Yzlevels : ndarray, optional
         The zero-levels for each variable. If None, this is assumed
         to be `k` for all. The default is None. 
+    mode : {'normal','matmul'}, optional
+        The multiplication mode. 
 
     Returns
     -------
@@ -1302,8 +1437,8 @@ def mvleibniz(X, Y, k, ni, nck, idx, out=None, Xzlevel = None, Yzlevel = None,
     # Initialize result Z to zero
     res_type = np.result_type(X.dtype, Y.dtype)
     if out is None:
-        base_shape = np.broadcast_shapes(X.shape[1:], Y.shape[1:])
-        out = np.zeros(X.shape[0] + base_shape, dtype = res_type)
+        base_shape = broadcast_shape(X.shape[1:], Y.shape[1:], mode = mode)
+        out = np.zeros((X.shape[0],) + base_shape, dtype = res_type)
     else:
         if out.dtype != res_type:
             raise TypeError("out data-type is incompatible with X * Y")
@@ -1322,6 +1457,13 @@ def mvleibniz(X, Y, k, ni, nck, idx, out=None, Xzlevel = None, Yzlevel = None,
     Z = out # Reference only
    
     nd,_ = idx.shape
+    
+    if mode == 'normal':
+        func = np.multiply
+    elif mode == 'matmul':
+        func = np.matmul
+    else:
+        raise ValueError("multiplication mode unrecognized")
     
     #
     # Sum through all derivatives of X and Y
@@ -1369,7 +1511,7 @@ def mvleibniz(X, Y, k, ni, nck, idx, out=None, Xzlevel = None, Yzlevel = None,
             #
             # Numpy broadcasting is applied to this element-wise
             # multiplication 
-            Z[iZ] += X[iX] * Y[iY]
+            Z[iZ] += func(X[iX],Y[iY])
             
     return Z
 
@@ -1817,6 +1959,58 @@ def mul(x, y, out = None):
         out.zlevels = np.minimum(x.zlevels + y.zlevels, x.k) 
     
     return out
+
+def matmul(x, y, out = None):
+    """
+    Matrix multiply x @ y
+    
+    Parameters
+    ----------
+    x,y : adarray
+        Input argument
+    out : adarray, optional
+        Output buffer. If None, this will be created.
+        The default is None.
+
+    Returns
+    -------
+    adarray
+        Result.
+        
+    Notes
+    -----
+    The usual NumPy matmul broadcasting rules apply
+    to the base shapes of the derivative arrays.
+    """
+    
+    res_type = np.result_type(x.d, y.d)
+    if out is None:
+        base_shape = broadcast_shape(x.d.shape[1:], y.d.shape[1:], mode = 'matmul')
+        out = empty_like(x, dtype = res_type, baseshape=base_shape)
+        
+    if res_type != out.d.dtype:
+        raise TypeError("output data-type incompatible with x * y")
+
+    mvleibniz(x.d,y.d,x.k,x.ni,x.nck,x.idx, out = out.d,
+              Xzlevel = x.zlevel, Yzlevel = y.zlevel,
+              Xzlevels = x.zlevels, Yzlevels = y.zlevels,
+              mode = 'matmul')
+    
+    if x.zlevel < 0 or y.zlevel < 0 :
+        # Either of the factors is identically zero
+        # So is the result.
+        out.zlevel = -1
+    else:
+        # Both zlevels are >= 0
+        out.zlevel = min(x.zlevel + y.zlevel, x.k)
+    
+    if (x.zlevels < 0).any() or (y.zlevels < 0).any():
+        out.zlevels = np.array([-1] * x.ni) 
+    else:
+        out.zlevels = np.minimum(x.zlevels + y.zlevels, x.k) 
+    
+    return out
+    
 
 def div(x, y, out = None):
     """
@@ -3110,4 +3304,44 @@ def block2(arrays):
     
     return M 
             
-            
+def block4(arrays):
+    """
+    Assemble an array from 4-D nested list of sub-arrays
+    
+    Parameters
+    ----------
+    arrays : nested list of adarray
+        The blocks 
+    
+    Returns
+    -------
+    adarray
+        The assembled array
+        
+    Notes
+    -----
+    This performs numpy.block on the base arrays of the 
+    adarray objects
+    
+    """
+    
+    nd = arrays[0][0][0][0].nd # The number of derivatives 
+    
+    
+    for k in range(nd):
+        # Assemble the block matrix for this derivative 
+        
+        blocks = [[[[block.d[k] for block in list3] for list3 in list2] for list2 in list1] for list1 in arrays]
+        # 
+        # The base array for this derivative
+        Md = np.block(blocks) 
+        
+        if k==0: 
+            # Create the output array 
+            M = empty_like(arrays[0][0][0][0], baseshape=Md.shape)
+        
+        # Copy Md to the appropriate derivative sub-array
+        np.copyto(M.d[k], Md)
+    
+    
+    return M 
