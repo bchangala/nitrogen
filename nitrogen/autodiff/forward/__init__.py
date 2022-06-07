@@ -74,8 +74,12 @@ Low-level derivative array routines include
 
 """
 
+from . import linalg 
+
 import numpy as np
 import warnings 
+
+
 
 class adarray:
     
