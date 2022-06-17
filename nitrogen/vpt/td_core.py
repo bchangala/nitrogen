@@ -15,7 +15,8 @@ __all__ = ['autocorr_linear', 'autocorr_quad', 'autocorr_quad_finiteT',
            'corr_quad_recursion_elements', 'corr_quad_ratio_table_edge',
            'corr_quad_ratio_table','corr_quad_ratio_table_rectangular',
            'cubic_gradient_estimate', 'autocorr_cubic_initial_firstorder',
-           'autocorr_linearHT', 'autocorr_cubic_initial_firstorder_linearHT']
+           'autocorr_linearHT', 'autocorr_cubic_initial_firstorder_linearHT',
+           'analyze_vertff']
 
 def autocorr_linear(w, f, t):
     """
@@ -1509,3 +1510,86 @@ def autocorr_cubic_initial_firstorder_linearHT(V, f, mu, n, t):
     
     
     return C1LHT                  
+
+def analyze_vertff(w,f):
+    """
+    Analyze a vertical harmonic force field
+    
+    Parameters
+    ----------
+    w : (n,) array_like
+        The initial state harmonic frequencies
+    f : (...,) array_like
+        The vertical derivative array up to at least quadratic
+    
+    Returns
+    -------
+    
+    omega : ndarray
+        The absolute magnitude of the upper state frequencies
+    sigma : ndarray
+        The imaginary coefficient of the upper state frequencies.
+        (1 or minus i)
+    d : ndarray
+        The location of the upper state stationary point with 
+        respect to the lower state coordinates
+    v0 : float
+        The stationary point energy. 
+    """
+    
+    w = np.array(w)
+    n = len(w)
+    
+    
+    f = np.array(f)
+    # Extract the gradient and hessian 
+    # w.r.t. lower state coordinates 
+    F,K = _partition_darray(f, n)
+    h0 = f[0] # The energy offset
+    
+    rtW = np.diag(np.sqrt(w))
+    irW = np.diag(1/np.sqrt(w))
+    
+    z2,L = np.linalg.eigh(rtW @ K @ rtW)
+    # Force L to have positive determinant! 
+    if np.linalg.det(L) < 0:
+        L[:,0] *= -1 
+    
+    omega = np.sqrt(np.abs(z2))
+    sigma = np.array([1 if z2[i] > 0 else -1j for i in range(n)])
+    
+    d = -np.linalg.inv(K) @ F
+    v0 = h0 + 0.5 * np.dot(F, d)
+    
+    
+    ###################
+    # Print results
+    
+    print("======================================")
+    print("Vertical Force Field Harmonic Analysis")
+    print("======================================")
+    print("")
+    print(f" The vertical energy is  {h0:.4f}     ")
+    print(f" The stationary point is {v0:.4f}    ")
+    print("")
+    print(" The stationary point displacements w.r.t. ")
+    print(" the lower state coordinates are ")
+    print("")
+    print("            q*      ")
+    print("       -----------  ")
+    for i in range(n):
+        print(f" {i+1:>2d}    {d[i] :10.4f}")
+    print("")
+    print("")
+    print("      Lower state      Upper state    ")
+    print("      -----------      -----------    ")
+    for i in range(n):
+        print(f" {i+1:>2d}    {w[i]:10.4f}      {omega[i]:10.4f}", end = "")
+        if sigma[i] == -1j:
+            print(" x -1j", end = "")
+        print("")
+        
+    
+    
+    return omega, sigma, d, v0 
+    
