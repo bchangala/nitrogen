@@ -132,7 +132,7 @@ class adarray:
     
     
     The accounting arrays, `nck`, `idx`, and `zlevels` should be considered
-    immutable. They might be shared by multiple adarrays, unlike `d`. In general,
+    immutable. They might be shared by multiple adarrays. Even `d` might be. In general,
     do not modify adarray attributes directly. 
     
     """
@@ -238,6 +238,11 @@ class adarray:
         adarray
             An adarray object, with ``d`` attribute
             copied via ``d.copy()``.
+            
+        Notes
+        -----
+        The `d` and `zlevels` attributes are hard-copied.
+        The `nck` and `idx` attributes still share references.
 
         """
         if out is None:
@@ -247,15 +252,42 @@ class adarray:
                     dtype = self.d.dtype,
                     d = self.d.copy(), # Copy the derivative ndarray itself
                     zlevel = self.zlevel, 
-                    zlevels = self.zlevels)
+                    zlevels = self.zlevels.copy() )
         else:
             # We assume out has the right shape, data-type, and that
             # nck and idx are already provided
             #
             np.copyto(out.d, self.d)
             out.zlevel = self.zlevel 
-            out.zlevels = self.zlevels 
+            out.zlevels = self.zlevels.copy() 
             
+        return out
+    
+    def view(self):
+        """
+        Creat an adarray object whose derivative array is 
+        a view of this one.
+        
+        Returns
+        -------
+        adarray
+            An adarray object, with ``d`` attribute
+            viewed via ``d.view()``.
+            
+        Notes
+        -----
+        The `d` attribute is a view of the original.
+        The `zlevels` attribute is just a reference assignment.
+
+        """
+        out = adarray(self.d.shape[1:],self.k,self.ni,
+                nck = self.nck,
+                idx = self.idx,
+                dtype = self.d.dtype,
+                d = self.d.view(), # View the derivative ndarray
+                zlevel = self.zlevel, 
+                zlevels = self.zlevels)
+        
         return out
         
     def reshape_base(self, new_shape):
@@ -266,18 +298,20 @@ class adarray:
         ----------
         newshape : tuple of ints
         
-        Notes
-        -----
-        This method re-assigns the derivative array
-        attribute to the return value of numpy.reshape
+        Returns
+        -------
+        adarray
+            A view adarray with the deriative array
+            referencing the return value of np.reshape
         
         """
         
         nd = self.nd
         
-        self.d = np.reshape(self.d, (nd,) + new_shape) 
+        out = self.view()
+        out.d = np.reshape(out.d, (nd,) + new_shape) 
 
-        return self
+        return out 
     
     def moveaxis_base(self,source,destination):
         """
@@ -288,12 +322,13 @@ class adarray:
         source : int or sequence of int 
             Original positions of axes
         destination : int or sequence of int
-            Desination positions of axes
-        
-        Notes
-        -----
-        This method re-assigns the derivative array
-        attribute to the return value of numpy.moveaxis
+            Destination positions of axes
+            
+        Returns
+        -------
+        adarray
+            A view adarray with the derivative array
+            referencing the return value of np.moveaxis
         
         """
 
@@ -307,30 +342,48 @@ class adarray:
         source_new = [ s+1 if s >= 0 else s for s in source ]
         dest_new = [s+1 if s >=0 else s for s in destination]
         
-        self.d = np.moveaxis(self.d, source_new, dest_new)
+        out = self.view()
+        out.d = np.moveaxis(out.d, source_new, dest_new)
         
-        return self
+        return out
     
-    def transpose_base(self):
+    def transpose_base(self, axes = None):
         """
         Transpose base array
         
-        Notes
-        -----
-        This method re-assigns the derivative 
-        array to the return value of numpy.transpose
-        with all base axes reversed
+        Parameters
+        ----------
+        axes : tuple or list of ints, optional
+            The same as ndarray transpose. The axis indices
+            reference the base shape of the derivative array.
+            If None, the default is to reverse base axes.
+            
+        Returns
+        -------
+        adarray 
+            A view ndarray with the derivative array
+            referencing the return value of np.transpose
+        
         """
         
         ndim = self.d.ndim - 1 
         
-        #
+        # Default:
         # axes should be [0,ndim,ndim-1,ndim-2,...,1]
         #
-        axes = (0,) + tuple(range(ndim,0,-1))
-        self.d = np.transpose(self.d, axes=axes)
+        if axes is None:
+            axes = (0,) + tuple(range(ndim,0,-1))
+        else:
+            # axes is provided. Positive indices need to 
+            # be incremented by 1 to account for the 
+            # derivative index
+            axes = [0] + [ i+1 if i >= 0 else i for i in axes ]
+            
+            
+        out = self.view()
+        out.d = np.transpose(out.d, axes=axes)
         
-        return self 
+        return out
         
         
     # Define binary operators: +, -, ...
@@ -356,7 +409,11 @@ class adarray:
             z = mul(self, other)
         else:
             z = self.copy()
-            z.d *= other # Attempt ndarray imul
+            try:
+                z.d *= other # Attempt ndarray imul
+            except:
+                # Cannot imul, try re-assignment 
+                z.d = z.d * other 
             # assuming other to be constant.
             # NumPy broadcasting is important here.
             # If other is a scalar, then everything is multiplied
@@ -379,7 +436,11 @@ class adarray:
             z = div(self,other)
         else:
             z = self.copy()
-            z.d /= other # ndarray idiv, using broadcasting
+            try: 
+                z.d /= other # ndarray idiv, using broadcasting
+            except:
+                # cannot idiv, try re-assignment 
+                z.d = z.d / other 
             # zlevel is unchanged by constant division
             # zlevels " "  " 
         return z
@@ -1365,7 +1426,7 @@ def broadcast_shape(sX,sY,mode = 'normal'):
             post = True 
         
         if sX[-1] != sY[-2]:
-            raise ValueError("Cannot matmul these shapes")
+            raise ValueError(f"Cannot matmul these shapes : {sX} x {sY}")
         
         newshape = np.broadcast_shapes(sX[:-2], sY[:-2]) + (sX[-2],sY[-1])
         
@@ -1384,7 +1445,7 @@ def broadcast_shape(sX,sY,mode = 'normal'):
     return 
 
 def mvleibniz(X, Y, k, ni, nck, idx, out=None, Xzlevel = None, Yzlevel = None,
-              Xzlevels = None, Yzlevels = None, mode = 'normal'):
+              Xzlevels = None, Yzlevels = None, mode = 'normal', customfun = None):
     """
     Multivariate Leibniz formula for derivative arrays.
 
@@ -1412,9 +1473,11 @@ def mvleibniz(X, Y, k, ni, nck, idx, out=None, Xzlevel = None, Yzlevel = None,
     Xzlevels, Yzlevels : ndarray, optional
         The zero-levels for each variable. If None, this is assumed
         to be `k` for all. The default is None. 
-    mode : {'normal','matmul'}, optional
+    mode : {'normal','matmul','custom'}, optional
         The multiplication mode. 
-
+    customfun : function
+        A function of two arguments.
+        
     Returns
     -------
     out : ndarray
@@ -1466,6 +1529,8 @@ def mvleibniz(X, Y, k, ni, nck, idx, out=None, Xzlevel = None, Yzlevel = None,
         func = np.multiply
     elif mode == 'matmul':
         func = np.matmul
+    elif mode == 'custom':
+        func = customfun 
     else:
         raise ValueError("multiplication mode unrecognized")
     
@@ -3349,3 +3414,84 @@ def block4(arrays):
     
     
     return M 
+
+
+def tensordot(A,B,axes=2):
+    """
+    Perform a tensor dot product of base axes
+    
+    Parameters
+    ----------
+    A,B : adarray
+        Tensors to contract
+    
+    axes : int or (2,) array_like
+        The contraction axes. See numpy.tensordot
+        
+    Returns
+    -------
+    adarray
+        The tensor dot result
+        
+    """
+    
+    A_base = A.d.shape[1:] # The base shape of A
+    B_base = B.d.shape[1:] # The base shape of B 
+    
+    idx = A.idx # The index table 
+    nck = A.nck # The binomial coefficient table 
+    
+    if np.isscalar(axes): # A scalar
+         # The last N axes of A and the first
+         # N axes of B will be contracted. The resulting
+         # shape is whatever is left over
+         
+         C_base = A_base[:-axes] + B_base[axes:]
+    else: 
+        if len(axes) != 2:
+            raise ValueError("axes must be a (2,) array_like")
+        if len(axes[0]) != len(axes[1]):
+            raise ValueError("Each element of axes must be the same length")
+        
+        A_con = np.zeros((len(A_base),) , dtype = bool)
+        B_con = np.zeros((len(B_base),) , dtype = bool)
+        A_con[list(axes[0])] = True  # marked contracted indices as True
+        B_con[list(axes[1])] = True 
+        
+        A_leftover = tuple(np.array(A_base)[~A_con]) # leftover dimensions
+        B_leftover = tuple(np.array(B_base)[~B_con])
+        
+        C_base = A_leftover + B_leftover
+    
+    res_type = np.result_type(A.d, B.d)
+    
+    # Allocate the result derivative array 
+    out = empty_like(A, dtype = res_type, baseshape=C_base)
+    
+    tensordot_fun = lambda X, Y : np.tensordot(X,Y, axes = axes)
+    
+    mvleibniz(A.d, B.d, A.k, A.ni, nck, idx, out = out.d,
+              Xzlevel = A.zlevel, Yzlevel = B.zlevel,
+              Xzlevels = A.zlevels, Yzlevels = B.zlevels, 
+              mode = 'custom', customfun = tensordot_fun)
+    
+    
+    # Do zlevel logic
+    
+    if A.zlevel < 0 or B.zlevel < 0 :
+        # Either of the factors is identically zero
+        # So is the result.
+        out.zlevel = -1
+    else:
+        # Both zlevels are >= 0
+        out.zlevel = min(A.zlevel + B.zlevel, A.k)
+    
+    if (A.zlevels < 0).any() or (B.zlevels < 0).any():
+        out.zlevels = np.array([-1] * A.ni) 
+    else:
+        out.zlevels = np.minimum(A.zlevels + B.zlevels, A.k) 
+        
+    return out 
+        
+        
+       
