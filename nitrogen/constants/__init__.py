@@ -209,4 +209,47 @@ def mass(label):
             val = label # assume a literal float
         
     return val
+
+def charge(label):
+    """
+    Retrieve the nuclear charge (atomic number).
+
+    Parameters
+    ----------
+    label : str or list of str
+        Atomic label(s).
+
+    Returns
+    -------
+    int or list of int
+        The nuclear charge.
+        
+    Notes
+    -----
+    Literal values can be passed as `label`. They will be
+    returned as is.
+
+    """
+    
+    if isinstance(label, list):
+        val = []
+        for item in label:
+            if isinstance(item, str):
+                try:
+                    val.append(_masses[item][3])
+                except KeyError:
+                    raise ValueError(f"There is no atomic entry for {item:s}")
+            else:
+                val.append(item) # assume a literal float
+            
+    else: # Not a list, assume a single label
+        if isinstance(label, str):
+            try:
+                val = _masses[label][3]
+            except KeyError:
+                    raise ValueError(f"There is no atomic entry for {label:s}")
+        else:
+            val = label # assume a literal float
+        
+    return val
     
