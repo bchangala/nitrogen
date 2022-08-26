@@ -24,6 +24,13 @@ class ZMAT(CoordSys):
         The units (degrees or radians) used for angular coordinates.
     supplementary
         
+    Notes
+    -----
+    The embedding convention places the first atom at the origin,
+    the second atom on the :math:`+z` axis, and the third atom in 
+    the :math:`(z,+x)` plane (for a bond angle between :math:`0` and 
+    :math:`\\pi`).
+        
     """
     
     def __init__(self, zmatrix, angles = 'deg', supplementary = False):

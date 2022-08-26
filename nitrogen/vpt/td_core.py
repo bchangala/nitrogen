@@ -1561,6 +1561,15 @@ def analyze_vertff(w,f):
     d = -np.linalg.inv(K) @ F
     v0 = h0 + 0.5 * np.dot(F, d)
     
+    # Calculate the location of the vertical geometry 
+    # w.r.t. to Q displacements from the stationary point
+    rtO = np.diag(np.sqrt(omega))
+    irO = np.diag(1/np.sqrt(omega))
+    R = irW @ L @ rtO
+    Qstar = -R.T @ d 
+    
+    iR = irO @ L.T @ rtW 
+    FQ = iR @ F 
     
     ###################
     # Print results
@@ -1572,15 +1581,27 @@ def analyze_vertff(w,f):
     print(f" The vertical energy is  {h0:.4f}     ")
     print(f" The stationary point is {v0:.4f}    ")
     print("")
-    print(" The stationary point displacements w.r.t. ")
-    print(" the lower state coordinates are ")
+    print(" The stationary point and vertical geometries ")
+    print(" in the converse coordinates are ")
     print("")
-    print("            q*      ")
-    print("       -----------  ")
+    print("           q(sp)       Q(vert)     ")
+    print("        ----------   ----------    ")
     for i in range(n):
-        print(f" {i+1:>2d}    {d[i] :10.4f}")
+        print(f" {i+1:>2d}    {d[i] :10.4f}   {Qstar[i] :10.4f}")
     print("")
     print("")
+    print(" The vertical gradient in the lower and ")
+    print(" upper state coordinates is ")
+    print("")
+    print("           dV/dq       dV/dQ       ")
+    print("        ----------   ----------    ")
+    for i in range(n):
+        print(f" {i+1:>2d}    {F[i] :10.4f}   {FQ[i] :10.4f}")
+    print("")
+    print("")
+    print("      ----------------------------    ")
+    print("          Harmonic frequencies        ")
+    print("      ----------------------------    ")
     print("      Lower state      Upper state    ")
     print("      -----------      -----------    ")
     for i in range(n):
@@ -1588,7 +1609,7 @@ def analyze_vertff(w,f):
         if sigma[i] == -1j:
             print(" x -1j", end = "")
         print("")
-        
+    print("")
     
     
     return omega, sigma, d, v0 
