@@ -627,13 +627,13 @@ def array(d,k,ni,copyd = False,zlevel = None, zlevels = None,
         
     # Check the length of the first dimension
     if np.ndim(d) < 1:
-        return ValueError("d must have at least 1 dimension")
+        raise ValueError("d must have at least 1 dimension")
     
     if nck is None:
         nck = ncktab(k + ni, min(k,ni))
         
     if d.shape[0] != nck[k+ni,min(k,ni)]:
-        return ValueError("The first dimension of d has an incorrect length")
+        raise ValueError("The first dimension of d has an incorrect length")
     
     if zlevel is None:    
         zlevel = k
