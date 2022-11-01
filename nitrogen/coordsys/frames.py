@@ -13,7 +13,7 @@ import nitrogen.angmom
 
 
 __all__ = ['PermutedAxisCoordSys', 'RotatedCoordSys', 'MovingFrameCoordSys',
-           'calcRASangle','calcRASseries','SingleAxisR3DFun']
+           'calcRASangle','calcRASseries','SingleAxisR3DFun','EckartCoordSys']
 
 
 class PermutedAxisCoordSys(CoordSys):
@@ -812,4 +812,255 @@ class SingleAxisR3DFun(nitrogen.dfun.DFun):
         
         return out 
             
+class EckartCoordSys(CoordSys):
+    """
+    
+    An Eckart frame coordinate system. This method
+    uses the quaternion-based algorithm of [Kras2014]_.
+    
+    
+    Attributes
+    ----------
+    cs : CoordSys
+        The original coordinate system
+    X0 : (3*N,) ndarray
+        The reference Cartesian configuration
+    mass : (N,) ndarray
+        The atomic masses used to calculate the 
+        Eckart frame
+        
+        
+    References
+    ----------
+    
+    References
+    ----------
+    .. [Kras2014] S. Krasnoshchekov, E. Isayeva, and N. Stepanov,
+       "Determination of the Eckart molecule-fixed frame by use of the
+       apparatus of quaternion algebra," J. Chem. Phys., 140, 154104 (2014).
+       https://doi.org/10.1063/1.4870936
+     
             
+    """
+    
+    def __init__(self, cs, X0, mass):
+        """
+        Create an EckartCoordSys object.
+
+        Parameters
+        ----------
+        cs : CoordSys
+            The original coordinate system
+        X0 : (3*N,) array_like
+            The reference Cartesian configuration. The center-of-
+            mass will be shifted to the origin.
+        mass : (N,) array_like
+            The mass of each atom. (This does not have to 
+            equal the masses used for KEOs, but it should
+            in practice for a useful Eckart frame.)
+
+        """
+        
+        if not cs.isatomic:
+            raise ValueError("Eckart frames must use atomic coordinate systems.")
+            
+        # Create new xyz labels
+        temp = [["x'{0}".format(i),"y'{0}".format(i),"z'{0}".format(i)] for i in range(cs.natoms) ]
+        Xstr = [val for sub in temp for val in sub]
+            
+        super().__init__(self._csEckartFrame_q2x,
+                         nQ = cs.nQ, nX = cs.nX, name = 'Eckart frame',
+                         Qstr = cs.Qstr, Xstr = Xstr, isatomic = cs.isatomic,
+                         maxderiv = cs.maxderiv, zlevel = None)
+        
+        
+        # Shift X0 to center of mass 
+        N = cs.natoms 
+        X0 = np.array(X0)
+        mass = np.array(mass)
+        Xcom = np.sum(X0.reshape((N,3)) * mass.reshape((N,1)), axis = 0) / sum(mass)
+        
+        for i in range(N):
+            for j in range(3):
+                X0[3*i + j] -= Xcom[j] 
+        
+        self.cs = cs 
+        self.X0 = X0
+        self.mass = mass
+        
+        
+    
+    def _csEckartFrame_q2x(self, Q, deriv = 0, out = None, var = None):
+        
+        # 
+        # Eckart frame Q2X function
+        #
+        # This function is similar to MovingFrameCoordSys
+        #
+        # The Cartesian coordinates in the original 
+        # frame will be evaluated. Then the Eckart
+        # rotation matrix and its derivatives will
+        # be computed from those using the supplied
+        # reference configuration X0.
+        #
+        # Then the rotation matrix will rotate
+        # the original Cartesians
+        # 
+        
+        # Evaluate original coordinate system
+        # Use same deriv, out, and var
+        #
+        X = self.cs.Q2X(Q, deriv = deriv, out = out, var = var)
+        # X: (nd, N*3, ...)
+        
+        base_shape = X.shape[2:]
+        nd = X.shape[0] 
+        
+        if var is None:
+            nvar = self.nQ 
+        else:
+            nvar = len(var) 
+        
+        N = self.natoms # The number of atoms 
+        
+        # Subtract the center-of-mass 
+        xcom = np.zeros((nd, 3) + base_shape, dtype = X.dtype) 
+        xcom = np.sum(X.reshape((nd,N,3) + base_shape) * self.mass.reshape((1,N,1) + base_shape), axis = 1) / sum(self.mass)
+        # xcom has shape (nd,3,...)
+        for i in range(N):
+            for j in range(3):
+                X[:,3*i + j] -= xcom[:,j] 
+        # X is now the center-of-mass frame 
+        
+        # Make adarray objects for the x,y,z coordinates
+        x = [adf.array(X[:,3*i + 0], deriv, nvar) for i in range(N)]
+        y = [adf.array(X[:,3*i + 1], deriv, nvar) for i in range(N)]
+        z = [adf.array(X[:,3*i + 2], deriv, nvar) for i in range(N)]
+        # Now calculate the Eckart rotation matrix
+        # using the quaternion method
+        #
+        # Calculate sum and difference of Cartesians
+        xp = [self.X0[3*i + 0] + x[i] for i in range(N)]
+        yp = [self.X0[3*i + 1] + y[i] for i in range(N)]
+        zp = [self.X0[3*i + 2] + z[i] for i in range(N)]
+        
+        xm = [self.X0[3*i + 0] - x[i] for i in range(N)]
+        ym = [self.X0[3*i + 1] - y[i] for i in range(N)]
+        zm = [self.X0[3*i + 2] - z[i] for i in range(N)]
+        
+        #
+        # Evaluate C matrix elements
+        # (Eq 24 of reference)
+        #
+        C11 = sum([self.mass[i] * (xm[i]*xm[i] + ym[i]*ym[i] + zm[i]*zm[i]) for i in range(N)])
+        C22 = sum([self.mass[i] * (xm[i]*xm[i] + yp[i]*yp[i] + zp[i]*zp[i]) for i in range(N)])
+        C33 = sum([self.mass[i] * (xp[i]*xp[i] + ym[i]*ym[i] + zp[i]*zp[i]) for i in range(N)])
+        C44 = sum([self.mass[i] * (xp[i]*xp[i] + yp[i]*yp[i] + zm[i]*zm[i]) for i in range(N)])
+        
+        C12 = sum([self.mass[i] * (yp[i]*zm[i] - ym[i]*zp[i]) for i in range(N)])
+        C13 = sum([self.mass[i] * (xm[i]*zp[i] - xp[i]*zm[i]) for i in range(N)])
+        C14 = sum([self.mass[i] * (xp[i]*ym[i] - xm[i]*yp[i]) for i in range(N)])
+        C23 = sum([self.mass[i] * (xm[i]*ym[i] - xp[i]*yp[i]) for i in range(N)])
+        C24 = sum([self.mass[i] * (xm[i]*zm[i] - xp[i]*zp[i]) for i in range(N)])
+        C34 = sum([self.mass[i] * (ym[i]*zm[i] - yp[i]*zp[i]) for i in range(N)])
+        
+        # Create the derivative array for the C matrix manually 
+        dC = np.empty_like(C11.d, shape = (nd,) + base_shape + (4,4)) 
+        
+        np.copyto(dC[...,0,0], C11.d)
+        np.copyto(dC[...,1,1], C22.d)
+        np.copyto(dC[...,2,2], C33.d)
+        np.copyto(dC[...,3,3], C44.d)
+        
+        np.copyto(dC[...,0,1], C12.d)
+        np.copyto(dC[...,1,0], C12.d)
+        
+        np.copyto(dC[...,0,2], C13.d)
+        np.copyto(dC[...,2,0], C13.d)
+        
+        np.copyto(dC[...,0,3], C14.d)
+        np.copyto(dC[...,3,0], C14.d)
+        
+        np.copyto(dC[...,1,2], C23.d)
+        np.copyto(dC[...,2,1], C23.d)
+        
+        np.copyto(dC[...,1,3], C24.d)
+        np.copyto(dC[...,3,1], C24.d)
+        
+        np.copyto(dC[...,2,3], C34.d)
+        np.copyto(dC[...,3,2], C34.d)
+        
+        C = adf.array(dC, deriv, nvar)
+        
+        #
+        # Now diagonalize C and get the derivatives
+        # of the eigenvector with the lowest eigenvalue
+        #
+        Lam,V = adf.linalg.eigh_block(C, [0]) 
+        
+        # Extract quaternion components 
+        q0 = adf.array(V.d[...,0,0], deriv, nvar, nck = C.nck, idx = C.idx)
+        q1 = adf.array(V.d[...,1,0], deriv, nvar, nck = C.nck, idx = C.idx)
+        q2 = adf.array(V.d[...,2,0], deriv, nvar, nck = C.nck, idx = C.idx)
+        q3 = adf.array(V.d[...,3,0], deriv, nvar, nck = C.nck, idx = C.idx)
+        
+        # Calculate rotation matrix 
+        
+        q00 = q0*q0
+        q11 = q1*q1
+        q22 = q2*q2
+        q33 = q3*q3
+        
+        q01 = q0*q1
+        q02 = q0*q2
+        q03 = q0*q3
+        q12 = q1*q2
+        q13 = q1*q3
+        q23 = q2*q3
+        
+        
+        R11 = q00 + q11 - q22 - q33 
+        R22 = q00 - q11 + q22 - q33 
+        R33 = q00 - q11 - q22 + q33 
+        
+        R12 = 2*(q12 + q03)
+        R13 = 2*(q13 - q02)
+        R21 = 2*(q12 - q03)
+        R23 = 2*(q23 + q01)
+        R31 = 2*(q13 + q02)
+        R32 = 2*(q23 - q01)
+        
+        for i in range(N):
+            
+            # Calculate new Cartesian coordinates
+            # for each atom
+            x_new = (R11 * x[i] + R12 * y[i] + R13 * z[i])
+            y_new = (R21 * x[i] + R22 * y[i] + R23 * z[i])
+            z_new = (R31 * x[i] + R32 * y[i] + R33 * z[i])
+            
+            # Overwrite the Cartesians for this atom
+            np.copyto(X[:,3*i + 0], x_new.d)
+            np.copyto(X[:,3*i + 1], y_new.d)
+            np.copyto(X[:,3*i + 2], z_new.d)
+        
+        # Return Eckart frame coordinates
+        
+        return X 
+        
+    def diagram(self):
+        
+        diag = ""
+        diag += "     │↓              ↑│        \n"
+        diag += "     │            ╔═══╧════╗   \n"
+        diag += "     │            ║ Eckart ║   \n"
+        diag += "     │            ╚═══╤═╤══╝   \n"
+        diag += "     │                │ │↑     \n"
+        diag += "     │                │ ╰X0    \n"
+        
+        Cdiag = self.cs.diagram() # The untransformed CS
+        
+        return diag + Cdiag 
+    
+    def __repr__(self):
+        
+        return f"EckartCoordSys({self.cs!r},{self.X0!r},{self.mass!r})"
