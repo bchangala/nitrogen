@@ -13,7 +13,7 @@ import nitrogen.angmom
 
 
 __all__ = ['PermutedAxisCoordSys', 'RotatedCoordSys', 'MovingFrameCoordSys',
-           'calcRASangle','calcRASseries']
+           'calcRASangle','calcRASseries','SingleAxisR3DFun']
 
 
 class PermutedAxisCoordSys(CoordSys):
@@ -629,7 +629,8 @@ def calcRASseries(cs, mass, Qref, Qstar_idx, degree, axis):
         The rotation axis to the reference PAS system
     pow : (degree+1,) ndarray
         The power series approximation of the rotation angle :math:`\\theta`
-        (in radians) as a function of :math:`Q^*`. 
+        (in radians) as a function of the displacement of :math:`Q^*` from 
+        the reference value.
         
     
     Notes
@@ -716,4 +717,99 @@ def calcRASseries(cs, mass, Qref, Qstar_idx, degree, axis):
         # series of theta.
     
     return RPAS, theta_pow 
+
+class SingleAxisR3DFun(nitrogen.dfun.DFun):
+    """
+    A diffentiable 3 x 3 rotation matrix for 
+    rotation about a single axis with a 
+    rotation angle power series w.r.t a single 
+    variable.
+    """
     
+    def __init__(self, theta_pow, Q0, axis, ni, i):
+        """
+        Create a DFun object for the 3 x 3 rotation matrix
+        about a given axis.
+    
+        Parameters
+        ----------
+        theta_pow : array_like
+            The power series coefficients of the rotation angle :math:`\\theta`
+            with respect to displacements of :math:`Q` from :math:`Q_0`.
+        Q0 : scalar
+            The reference value of :math:`Q`.
+        axis : integer
+            The axis index (0, 1, 2).
+        ni : integer
+            The total number of DFun variables.
+        i : integer
+            The variable index of :math:`Q` in the DFun.
+    
+    
+        """
+        
+        super().__init__(self._singAxisR3, nf = 9, nx = ni)
+        
+        self.axis = axis 
+        self.theta_pow = theta_pow.copy() 
+        self.i = i 
+        self.Q0 = Q0 
+        
+    def _singAxisR3(self, X, deriv = 0, out = None, var = None):
+        
+    
+        nd,nvar = nitrogen.dfun.ndnvar(deriv, var, self.nx)
+       
+        if out is None:
+            base_shape = X.shape[1:]
+            out = np.ndarray( (nd, self.nf) + base_shape, dtype = X.dtype)
+            
+        out.fill(0.0) # Initialize to zero
+        
+        x = nitrogen.dfun.X2adf(X, deriv, var)
+        Qi = x[self.i] # The coordinate that theta depends on 
+        dQ = Qi - self.Q0 # The displacmenet of this coordinate from its reference value 
+        
+        theta_ad = adf.const_like(0.0, dQ)
+        # theta_ad <--- 0.0 
+        dQ_pow = adf.const_like(1.0, dQ) 
+        # dQ_pow <-- 1.0 
+        
+        for i in range(len(self.theta_pow)):
+            theta_ad = theta_ad + self.theta_pow[i] * dQ_pow 
+            dQ_pow = dQ_pow * dQ 
+        
+        c = adf.cos(theta_ad) # cos(theta)
+        s = adf.sin(theta_ad) # sin(theta) 
+        
+        if self.axis == 0:
+            
+            out[0:1,0].fill(1.0)        # R(0,0) <-- 1 
+            np.copyto(out[:,4], c.d)    # R(1,1) <-- cos
+            np.copyto(out[:,8], c.d)    # R(2,2) <-- cos
+            np.copyto(out[:,5],-s.d)    # R(1,2) <-- -sin
+            np.copyto(out[:,7],+s.d)    # R(2,1) <-- +sin 
+            
+        elif self.axis == 1:
+            
+            out[0:1,4].fill(1.0)        # R(1,1) <-- 1 
+            np.copyto(out[:,0], c.d)    # R(0,0) <-- cos
+            np.copyto(out[:,8], c.d)    # R(2,2) <-- cos
+            np.copyto(out[:,6],-s.d)    # R(2,0) <-- -sin
+            np.copyto(out[:,2],+s.d)    # R(0,2) <-- +sin 
+            
+        elif self.axis == 2:
+            
+            out[0:1,8].fill(1.0)        # R(2,2) <-- 1 
+            np.copyto(out[:,0], c.d)    # R(0,0) <-- cos
+            np.copyto(out[:,4], c.d)    # R(1,1) <-- cos
+            np.copyto(out[:,1],-s.d)    # R(0,1) <-- -sin
+            np.copyto(out[:,3],+s.d)    # R(1,0) <-- +sin 
+            
+        else:
+            raise ValueError("Unexpected self.axis")
+        
+        
+        return out 
+            
+            
