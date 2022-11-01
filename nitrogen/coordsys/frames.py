@@ -9,9 +9,11 @@ from .coordsys import CoordSys, CoordTrans
 import numpy as np 
 import nitrogen.autodiff.forward as adf 
 import nitrogen.dfun 
+import nitrogen.angmom 
 
 
-__all__ = ['PermutedAxisCoordSys', 'RotatedCoordSys', 'MovingFrameCoordSys']
+__all__ = ['PermutedAxisCoordSys', 'RotatedCoordSys', 'MovingFrameCoordSys',
+           'calcRASangle']
 
 
 class PermutedAxisCoordSys(CoordSys):
@@ -380,4 +382,224 @@ class MovingFrameCoordSys(CoordSys):
     def __repr__(self):
         
         return f"RotatedCoordSys({self.cs!r},{self.R!r})"
+    
+
+def _R3axis(theta, axis):
+    
+    # Rotation matrix about a single 
+    # axis: 0,1,2 = x,y,z
+    # theta in rad
+    
+    c = np.cos(theta)
+    s = np.sin(theta)
+    if axis == 0:
+        R = np.array([
+            [1., 0., 0.],
+            [0., c, -s],
+            [0., +s, c]])
+    elif axis == 1:
+        R = np.array([
+            [c, 0., +s],
+            [0., 1., 0.],
+            [-s,  0., c]])
+    elif axis == 2:
+        R = np.array([
+            [c, -s, 0.],
+            [+s, c, 0.],
+            [0., 0., 1.]])
+    else:
+        raise ValueError("invalid axis")
+    return R 
+
+    
+def calcRASangle(cs, mass, Qref, Qstar_idx, Qstar_final_value, axis,
+                 int_points = 100):
+    """
+    Calculate the reduced axis system (RAS)
+    for an aperiodic coordinate :math:`Q^*` with a
+    fixed rotation axis.
+
+    Parameters
+    ----------
+    cs : CoordSys
+        The coordinate system
+    mass : array_like
+        The atomic masses 
+    Qref : array_like
+        The reference geometry.
+    Qstar_idx : integer
+        The coordinate index of :math:`Q^*`
+    Qstar_final_value : scalar
+        The integration end-point of :math:`Q^*`.
+    axis : {'a','b','c'}
+        The rotation axis of the reference geometry. This 
+        must be an inertial axis.
+    int_points : integer, optional
+        The number of integration steps. The default is 100. 
+
+    Returns
+    -------
+    RPAS : (3,3) ndarray
+        The rotation axis to the reference PAS system
+    Qstar_grid : ndarray
+        The :math:`Q^*` integration grid.
+    theta : ndarray
+        The integrated value of the rotation angle :math:`\\theta`.
+        
+    
+    Notes
+    -----
+    The RAS is defined in [Picket1972]_. This function assumes the 
+    special case of a fixed direction of rotation along the large
+    amplitude motion (LAM) coordinate :math:`Q^*`, e.g. an axis
+    of common symmetry or the direction normal to a plane of symmetry.
+    
+    The reference coordinate system is evaluated at the supplied 
+    coordinates :math:`Q_\\mathrm{ref}` and moved to its inertial
+    principal axis system (PAS). The rotation matrix which rotates the 
+    coordinates fromthe original frame to the reference PAS frame is 
+    returned as :math:`\\mathbf{R}_\\mathrm{PAS}`.
+    
+    The RAS coincides with the reference PAS at the reference geometry.
+    As :math:`Q^*` is displaced from its reference value, the RAS frame 
+    is rotated relative to the reference PAS by an angle :math:`\\theta(Q^*)` 
+    about the principal axis specified by `axis`. The coordinates in the 
+    final RAS are thus
+    
+    ..  math::
+        
+        \\vec{x}_\\mathrm{RAS} = \\mathbf{R}(\\theta(Q^*)) \\mathbf{R}_\\mathrm{PAS} \\vec{x},
+    
+    where :math:`\\vec{x}` refers to the original coordinate system `cs`.
+    :math:`\\mathbf{R}_\\mathrm{PAS}` orders the principal axes as :math:`(a,b,c)`. If 
+    `axis` is ``'a'``, then 
+    
+    ..  math::
+        
+        \\mathbf{R}(\\theta) = \\left( \\begin{array}{ccc} 1 & 0 & 0 \\\\
+                                      0 & \\cos\\theta & -\\sin\\theta \\\\ 
+                                      0 & \\sin\\theta & \\cos\\theta \\end{array} \\right)
+            
+    and cyclic permutations for ``'b'`` and ``'c'``. Special care should be taken
+    for degenerate inertial axes. 
+    
+    See Also
+    --------
+    calcRASseries : Calculate the RAS angle power series. 
+    
+    References
+    ----------
+    .. [Picket1972] H. M. Pickett, "Vibration-Rotation Interactions and the Choice of 
+       Rotating Axes for Polyatomic Molecules," J. Chem. Phys., 56, 1715 (1972).
+       https://doi.org/10.1063/1.1677430
+     
+    
+    """
+    
+    #################
+    # Parse rotation axis
+    #
+    if axis == 'a':
+        rot_axis = 0
+    elif axis == 'b':
+        rot_axis = 1 
+    elif axis == 'c':
+        rot_axis = 2 
+    else:
+        raise ValueError("Unexpected axis (a, b, or c)")
+    
+    ##############
+    # Evaluate the initial coordinate system
+    # at the reference geometry 
+    #
+    X0 = cs.Q2X(Qref)[0] # (N*3,) Cartesian coordinates
+    #
+    # Calculate the principal axis system of the 
+    # reference configuration
+    #
+    _,RPAS,XCOM  = nitrogen.angmom.X2PAS(X0, mass)
+
+    N = len(X0)//3  # The atom count
+    
+    # Create a uniform integration grid
+    q_initial = Qref[Qstar_idx]
+    q_final = Qstar_final_value 
+    q_grid = np.linspace(q_initial, q_final, int_points) # The integration grid
+    dq = q_grid[1] - q_grid[0] # The step size 
+    q_grid_half = q_grid + dq/2 # The half-step grid 
+    
+    
+    # Calculate the coordinates and derivatives in the 
+    # reference PAS frame 
+    
+    mass = np.array(mass) # The masses 
+    
+    Qgrid = np.tile(Qref, (int_points,1)).T
+    Qgrid[Qstar_idx,:] = q_grid
+    Xref = cs.Q2X(Qgrid, deriv = 1, var = [Qstar_idx]) # (nd=2, N*3, int_points)
+    Xref = np.reshape(Xref, (2, N, 3, int_points))     # (2, N, 3, int_points)
+    Xcom = np.sum(Xref * mass.reshape((1,N,1,1)), axis = 1) / sum(mass)
+    Xref = Xref - Xcom.reshape((2,1,3,int_points)) # Subtract COM
+    Xref = np.einsum('ij,kljn->klin', RPAS, Xref) # Rotate to reference PAS
+    
+    # Do again for the half-step grid
+    Qgrid_half = Qgrid = np.tile(Qref, (int_points,1)).T
+    Qgrid_half[Qstar_idx,:] = q_grid_half
+    Xref_half = cs.Q2X(Qgrid_half, deriv = 1, var = [Qstar_idx]) # (nd=2, N*3, int_points)
+    Xref_half = np.reshape(Xref_half, (2, N, 3, int_points))     # (2, N, 3, int_points)
+    Xcom_half = np.sum(Xref_half * mass.reshape((1,N,1,1)), axis = 1) / sum(mass)
+    Xref_half = Xref_half - Xcom_half.reshape((2,1,3,int_points)) # Subtract COM
+    Xref_half = np.einsum('ij,kljn->klin', RPAS, Xref_half) # Rotate to reference PAS
+    
+    
+    def dtheta(Xq, theta, mass, axis):
+        #
+        # Xq : (nd,N,3), value + first derivative of coordinates in reference frame
+        # theta : rotation angle, rad
+        # mass : masses 
+        
+        R = _R3axis(theta, axis) 
+        
+        I = (axis + 1) % 3 # The axis after `axis` in cyclic right-hand order
+        J = (axis + 2) % 3 # The second axis after `axis` in cyclic right-hand order
+        
+        
+        Xt = np.tensordot(R, Xq, [[1],[2]]) # Result: (3,nd,N)
+        
+        b = Xt[I,0,:]
+        c = Xt[J,0,:]
+        db = Xt[I,1,:] # db/dq
+        dc = Xt[J,1,:] # dc/dq
+        
+        
+        dthetadq = sum(mass * (c * db - b * dc)) / sum( mass * (b**2 + c**2))
+        
+        return dthetadq
+        
+    # Calculate RK4 integral 
+    theta_grid = np.zeros((int_points,))
+
+    #
+    # The initial value of theta is 0 radians.
+    #
+    for i in range(int_points - 1):
+        #
+        # There are 4 terms in the standard
+        # RK4 expression
+        #
+        k1 = dtheta(Xref[...,i], theta_grid[i], mass, rot_axis) 
+        k2 = dtheta(Xref_half[...,i], theta_grid[i] + dq*k1/2, mass, rot_axis) 
+        k3 = dtheta(Xref_half[...,i], theta_grid[i] + dq*k2/2, mass, rot_axis) 
+        k4 = dtheta(Xref[...,i+1], theta_grid[i] + dq*k3, mass, rot_axis) 
+        
+        # Add their weighted sum
+        theta_grid[i+1] = theta_grid[i] + (dq/6) * (k1 + 2*k2 + 2*k3 + k4) 
+    
+    
+    return RPAS, q_grid, theta_grid 
+    
+    
+def calcRASseries():
+    
+    raise NotImplementedError()
     
