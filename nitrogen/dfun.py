@@ -1657,6 +1657,123 @@ class PowerExpansion(DFun):
         
         return out
 
+class ZeroDFun(DFun):
+    """
+    
+    A zero-valued DFun object
+    
+    """
+    
+    def __init__(self, nx, nf=1):
+        """
+        Create a ZeroDFun object
+
+        Parameters
+        ----------
+        nx : integer
+            The number of input variables.
+        nf : integer, optional
+            The number of output zero-functions. The default is 1.
+
+        """
+        
+        if nx < 1 :
+            raise ValueError('nx must be at least 1')
+        if nf < 1 : 
+            raise ValueError('nf must be at least 1')
+        
+        # The maxderiv is None (infinite)
+        # The zlevel is 0 (identically zero-valued)
+        
+        super().__init__(self._fzerofun, nf = nf, nx = nx, maxderiv = None,
+                         zlevel = 0)
+        
+        
+        
+    def _fzerofun(self, X, deriv = 0, out = None, var = None):
+        
+        #
+        # Return a zero-filled derivative array 
+        #
+        
+        if var is None:
+            nvar = self.nx
+        else:
+            nvar = len(var)
+        
+        if out is None:
+            nd = nderiv(deriv, nvar)
+            base_shape = X.shape[1:]
+            out = np.ndarray( (nd, self.nf) + base_shape, dtype = X.dtype)
+            
+        out.fill(0)
+        
+        return out 
+    
+class ConstantDFun(DFun):
+    """
+    
+    A constant-valued DFun object
+    
+    """
+    
+    def __init__(self, nx, val):
+        """
+        Create a ConstantDFun object
+
+        Parameters
+        ----------
+        nx : integer
+            The number of input variables.
+        val : (nf,) array_like
+            The constant function value(s). The length determines `nf`.
+            If scalar, `nf` = 1 is assumed.
+
+        """
+        
+        if nx < 1 :
+            raise ValueError('nx must be at least 1')
+            
+        if np.isscalar(val):
+            val = [val]
+        val = np.array(val).copy() 
+        
+        nf = len(val)
+        
+        
+        # The maxderiv is None (infinite)
+        # The zlevel is 1 (constant)
+        
+        super().__init__(self._fconstantfun, nf = nf, nx = nx, maxderiv = None,
+                         zlevel = 1)
+        
+        self.val = val 
+        
+        
+    def _fconstantfun(self, X, deriv = 0, out = None, var = None):
+        
+        #
+        # Return a zero-filled derivative array 
+        #
+        
+        if var is None:
+            nvar = self.nx
+        else:
+            nvar = len(var)
+        
+        if out is None:
+            nd = nderiv(deriv, nvar)
+            base_shape = X.shape[1:]
+            out = np.ndarray( (nd, self.nf) + base_shape, dtype = X.dtype)
+            
+        out.fill(0)
+        for i in range(self.nf):
+            out[0:1,i].fill(self.val[i]) # Note range for first axis to guarantee fill works.
+        
+        return out 
+        
+        
+
 def _min_maxderiv(maxA,maxB):
     return _composite_maxderiv(maxA,maxB)
 def _max_zlevel(zlevelA,zlevelB):
