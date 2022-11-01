@@ -13,7 +13,7 @@ import nitrogen.angmom
 
 
 __all__ = ['PermutedAxisCoordSys', 'RotatedCoordSys', 'MovingFrameCoordSys',
-           'calcRASangle']
+           'calcRASangle','calcRASseries']
 
 
 class PermutedAxisCoordSys(CoordSys):
@@ -417,7 +417,7 @@ def calcRASangle(cs, mass, Qref, Qstar_idx, Qstar_final_value, axis,
     """
     Calculate the reduced axis system (RAS)
     for an aperiodic coordinate :math:`Q^*` with a
-    fixed rotation axis.
+    fixed rotation axis via numerical integration.
 
     Parameters
     ----------
@@ -444,7 +444,8 @@ def calcRASangle(cs, mass, Qref, Qstar_idx, Qstar_final_value, axis,
     Qstar_grid : ndarray
         The :math:`Q^*` integration grid.
     theta : ndarray
-        The integrated value of the rotation angle :math:`\\theta`.
+        The integrated value of the rotation angle :math:`\\theta` 
+        (in radians) on the :math:`Q^*` grid.
         
     
     Notes
@@ -599,7 +600,120 @@ def calcRASangle(cs, mass, Qref, Qstar_idx, Qstar_final_value, axis,
     return RPAS, q_grid, theta_grid 
     
     
-def calcRASseries():
+def calcRASseries(cs, mass, Qref, Qstar_idx, degree, axis):
     
-    raise NotImplementedError()
+    """
+    Calculate the reduced axis system (RAS)
+    for an aperiodic coordinate :math:`Q^*` with a
+    fixed rotation axis via a partial power series.
+
+    Parameters
+    ----------
+    cs : CoordSys
+        The coordinate system
+    mass : array_like
+        The atomic masses 
+    Qref : array_like
+        The reference geometry.
+    Qstar_idx : integer
+        The coordinate index of :math:`Q^*`
+    degree : integer
+        The maximum degree of the :math:`\\theta(Q^*)` power series
+    axis : {'a','b','c'}
+        The rotation axis of the reference geometry. This 
+        must be an inertial axis.
+
+    Returns
+    -------
+    RPAS : (3,3) ndarray
+        The rotation axis to the reference PAS system
+    pow : (degree+1,) ndarray
+        The power series approximation of the rotation angle :math:`\\theta`
+        (in radians) as a function of :math:`Q^*`. 
+        
+    
+    Notes
+    -----
+    The RAS is defined in [Picket1972]_. See the Notes to :func:`calcRASangle()`
+    for more details.
+    
+    See Also
+    --------
+    calcRASangle : Calculate the RAS angle via numerical integration. 
+    
+    References
+    ----------
+    .. [Picket1972] H. M. Pickett, "Vibration-Rotation Interactions and the Choice of 
+       Rotating Axes for Polyatomic Molecules," J. Chem. Phys., 56, 1715 (1972).
+       https://doi.org/10.1063/1.1677430
+     
+    
+    """
+    
+    ###########################
+    # Calculate the RAS angle via a power series solution
+    #
+    
+    #################
+    # Parse rotation axis
+    #
+    if axis == 'a':
+        rot_axis = 0
+    elif axis == 'b':
+        rot_axis = 1 
+    elif axis == 'c':
+        rot_axis = 2 
+    else:
+        raise ValueError("Unexpected axis (a, b, or c)")
+        
+    pow_order = degree # Maximum power in theta(q) power series 
+    nd = pow_order + 1 # The number of derivatives (including zeroth)
+    N = len(mass)      # The number of atoms, N 
+    
+    # Calculate the coordinates and their derivatives w.r.t. Q*
+    dX = cs.Q2X(Qref, deriv = pow_order, var = [Qstar_idx]) # (nd, N*3)
+    _,RPAS,_ = nitrogen.angmom.X2PAS(dX[0], mass) # Calculate PAS frame
+    dX = np.reshape(dX, (nd, N, 3)) # (nd,N,3)
+    
+    
+    # Subtract center-of-mass 
+    Xcom = np.sum( dX * np.array(mass).reshape(1,N,1), axis = 1) / sum(mass) 
+    dX = dX - Xcom.reshape((nd,1,3))
+    dX0 = np.einsum('ij,klj->kli',RPAS,dX) # (nd,N,3)
+    # dX contains the coordinate derivatives in the reference frame
+    #
+    
+    # Create adarray objects for exact derivative calculation
+    
+    I = (rot_axis + 1) % 3 # The axis after `axis` in cyclic right-hand order
+    J = (rot_axis + 2) % 3 # The second axis after `axis` in cyclic right-hand order
+    
+    # We will calculate the adarray for (dtheta/dQ*), which therefore
+    # only needs derivatives up to pow_order - 1 to provide derivatives
+    # for theta(Q*) up to pow_order.
+    #
+    # 
+    b = [adf.array(dX0[:-1,i,I], pow_order-1, 1) for i in range(N)]
+    c = [adf.array(dX0[:-1,i,J], pow_order-1, 1) for i in range(N)]
+    db = [ adf.array(adf.reduceOrder(dX0[:,i,I], 0, pow_order, 1, adf.idxtab(pow_order,1)), pow_order-1, 1) for i in range(N)]
+    dc = [ adf.array(adf.reduceOrder(dX0[:,i,J], 0, pow_order, 1, adf.idxtab(pow_order,1)), pow_order-1, 1) for i in range(N)]
+    
+    num,den = 0,0
+    for i in range(N):
+        num = num + mass[i] * (c[i] * db[i] - b[i] * dc[i])
+        den = den + mass[i] * (b[i] * b[i] + c[i] * c[i])
+    dtheta = num / den 
+    # dtheta is the derivative array of dtheta/dQ* with respect to Q*
+    # Convert to coefficients a power series in Q*
+    # The constant term is theta(Q*=0) = 0
+    #
+    theta_pow = np.zeros(pow_order + 1)
+    for i in range(pow_order):
+        
+        theta_pow[i+1] = dtheta.d[i] / (i+1)
+        # The factor of 1/(i+1) is necessary to 
+        # convert from a power series of dtheta/dQ* to a power
+        # series of theta.
+    
+    return RPAS, theta_pow 
     
