@@ -413,7 +413,7 @@ def _R3axis(theta, axis):
 
     
 def calcRASangle(cs, mass, Qref, Qstar_idx, Qstar_final_value, axis,
-                 int_points = 100):
+                 int_points = 100, Rref = None):
     """
     Calculate the reduced axis system (RAS)
     for an aperiodic coordinate :math:`Q^*` with a
@@ -431,16 +431,25 @@ def calcRASangle(cs, mass, Qref, Qstar_idx, Qstar_final_value, axis,
         The coordinate index of :math:`Q^*`
     Qstar_final_value : scalar
         The integration end-point of :math:`Q^*`.
-    axis : {'a','b','c'}
-        The rotation axis of the reference geometry. This 
-        must be an inertial axis.
+    axis : integer
+        The RAS rotation axis after rotation to the 
+        intermediate reference frame via `Rref`. This 
+        must be 0, 1, or 2 (for the first, second, or
+        third axis).
     int_points : integer, optional
         The number of integration steps. The default is 100. 
+    Rref : (3,3) array_like, optional
+        The fixed rotation matrix from the original coordinate 
+        system frame to an intermediate frame. If None (default),
+        then the inertial principal axis system will be used. 
+        In this case, `axis` = 0, 1, or 2 specifies the :math:`a`,
+        :math:`b`, or :math:`c` principal axis, respectively.
 
     Returns
     -------
-    RPAS : (3,3) ndarray
-        The rotation axis to the reference PAS system
+    Rref : (3,3) ndarray
+        The rotation axis to the intermediate reference system.
+        If `Rref` is None, then this is the PAS of the reference geometry.
     Qstar_grid : ndarray
         The :math:`Q^*` integration grid.
     theta : ndarray
@@ -456,24 +465,26 @@ def calcRASangle(cs, mass, Qref, Qstar_idx, Qstar_final_value, axis,
     of common symmetry or the direction normal to a plane of symmetry.
     
     The reference coordinate system is evaluated at the supplied 
-    coordinates :math:`Q_\\mathrm{ref}` and moved to its inertial
-    principal axis system (PAS). The rotation matrix which rotates the 
-    coordinates fromthe original frame to the reference PAS frame is 
-    returned as :math:`\\mathbf{R}_\\mathrm{PAS}`.
+    coordinates :math:`Q_\\mathrm{ref}` and, by default, moved to its inertial
+    principal axis system (PAS). A different choice of reference can 
+    be passed via `Rref`. The rotation matrix which rotates the 
+    coordinates from the original frame to the intermediate frame is 
+    returned as :math:`\\mathbf{R}_\\mathrm{ref}`.
     
-    The RAS coincides with the reference PAS at the reference geometry.
+    The RAS usually coincides with the reference PAS at the reference geometry.
     As :math:`Q^*` is displaced from its reference value, the RAS frame 
-    is rotated relative to the reference PAS by an angle :math:`\\theta(Q^*)` 
-    about the principal axis specified by `axis`. The coordinates in the 
+    is rotated relative to the reference frame by an angle :math:`\\theta(Q^*)` 
+    about the axis specified by `axis`. The coordinates in the 
     final RAS are thus
     
     ..  math::
         
-        \\vec{x}_\\mathrm{RAS} = \\mathbf{R}(\\theta(Q^*)) \\mathbf{R}_\\mathrm{PAS} \\vec{x},
+        \\vec{x}_\\mathrm{RAS} = \\mathbf{R}(\\theta(Q^*)) \\mathbf{R}_\\mathrm{ref} \\vec{x},
     
     where :math:`\\vec{x}` refers to the original coordinate system `cs`.
-    :math:`\\mathbf{R}_\\mathrm{PAS}` orders the principal axes as :math:`(a,b,c)`. If 
-    `axis` is ``'a'``, then 
+    :math:`\\mathbf{R}_\\mathrm{ref}` orders the principal axes as :math:`(a,b,c)`
+    by default. If 
+    `axis` is ``0``, then 
     
     ..  math::
         
@@ -481,7 +492,7 @@ def calcRASangle(cs, mass, Qref, Qstar_idx, Qstar_final_value, axis,
                                       0 & \\cos\\theta & -\\sin\\theta \\\\ 
                                       0 & \\sin\\theta & \\cos\\theta \\end{array} \\right)
             
-    and cyclic permutations for ``'b'`` and ``'c'``. Special care should be taken
+    and cyclic permutations for ``1`` and ``2``. Special care should be taken
     for degenerate inertial axes. 
     
     See Also
@@ -500,14 +511,9 @@ def calcRASangle(cs, mass, Qref, Qstar_idx, Qstar_final_value, axis,
     #################
     # Parse rotation axis
     #
-    if axis == 'a':
-        rot_axis = 0
-    elif axis == 'b':
-        rot_axis = 1 
-    elif axis == 'c':
-        rot_axis = 2 
-    else:
-        raise ValueError("Unexpected axis (a, b, or c)")
+    rot_axis = axis 
+    if rot_axis not in [0,1,2]:
+        raise ValueError("Unexpected axis (0, 1, or 2)")
     
     ##############
     # Evaluate the initial coordinate system
@@ -515,10 +521,17 @@ def calcRASangle(cs, mass, Qref, Qstar_idx, Qstar_final_value, axis,
     #
     X0 = cs.Q2X(Qref)[0] # (N*3,) Cartesian coordinates
     #
-    # Calculate the principal axis system of the 
-    # reference configuration
     #
-    _,RPAS,XCOM  = nitrogen.angmom.X2PAS(X0, mass)
+    if Rref is None:
+        # Calculate the principal axis system of the 
+        # reference configuration
+        #
+        _,RPAS,_  = nitrogen.angmom.X2PAS(X0, mass)
+        Rref = RPAS 
+    else:
+        Rref = np.array(Rref)
+        if Rref.shape != (3,3):
+            raise ValueError("Rref must be a 3 x 3 matrix")
 
     N = len(X0)//3  # The atom count
     
@@ -531,8 +544,7 @@ def calcRASangle(cs, mass, Qref, Qstar_idx, Qstar_final_value, axis,
     
     
     # Calculate the coordinates and derivatives in the 
-    # reference PAS frame 
-    
+    # reference frame
     mass = np.array(mass) # The masses 
     
     Qgrid = np.tile(Qref, (int_points,1)).T
@@ -541,7 +553,7 @@ def calcRASangle(cs, mass, Qref, Qstar_idx, Qstar_final_value, axis,
     Xref = np.reshape(Xref, (2, N, 3, int_points))     # (2, N, 3, int_points)
     Xcom = np.sum(Xref * mass.reshape((1,N,1,1)), axis = 1) / sum(mass)
     Xref = Xref - Xcom.reshape((2,1,3,int_points)) # Subtract COM
-    Xref = np.einsum('ij,kljn->klin', RPAS, Xref) # Rotate to reference PAS
+    Xref = np.einsum('ij,kljn->klin', Rref, Xref) # Rotate to reference frame
     
     # Do again for the half-step grid
     Qgrid_half = Qgrid = np.tile(Qref, (int_points,1)).T
@@ -550,7 +562,7 @@ def calcRASangle(cs, mass, Qref, Qstar_idx, Qstar_final_value, axis,
     Xref_half = np.reshape(Xref_half, (2, N, 3, int_points))     # (2, N, 3, int_points)
     Xcom_half = np.sum(Xref_half * mass.reshape((1,N,1,1)), axis = 1) / sum(mass)
     Xref_half = Xref_half - Xcom_half.reshape((2,1,3,int_points)) # Subtract COM
-    Xref_half = np.einsum('ij,kljn->klin', RPAS, Xref_half) # Rotate to reference PAS
+    Xref_half = np.einsum('ij,kljn->klin', Rref, Xref_half) # Rotate to reference frame
     
     
     def dtheta(Xq, theta, mass, axis):
@@ -597,10 +609,10 @@ def calcRASangle(cs, mass, Qref, Qstar_idx, Qstar_final_value, axis,
         theta_grid[i+1] = theta_grid[i] + (dq/6) * (k1 + 2*k2 + 2*k3 + k4) 
     
     
-    return RPAS, q_grid, theta_grid 
+    return Rref, q_grid, theta_grid 
     
     
-def calcRASseries(cs, mass, Qref, Qstar_idx, degree, axis):
+def calcRASseries(cs, mass, Qref, Qstar_idx, degree, axis, Rref = None):
     
     """
     Calculate the reduced axis system (RAS)
@@ -619,14 +631,20 @@ def calcRASseries(cs, mass, Qref, Qstar_idx, degree, axis):
         The coordinate index of :math:`Q^*`
     degree : integer
         The maximum degree of the :math:`\\theta(Q^*)` power series
-    axis : {'a','b','c'}
-        The rotation axis of the reference geometry. This 
-        must be an inertial axis.
-
+    axis : integer
+        The rotation axis of the reference geometry. This must 
+        be 0,1,2
+    Rref : (3,3) array_like, optional
+        The fixed rotation matrix from the original coordinate 
+        system frame to an intermediate frame. If None (default),
+        then the inertial principal axis system will be used. 
+        In this case, `axis` = 0, 1, or 2 specifies the :math:`a`,
+        :math:`b`, or :math:`c` principal axis, respectively.
+        
     Returns
     -------
-    RPAS : (3,3) ndarray
-        The rotation axis to the reference PAS system
+    Rref : (3,3) ndarray
+        The rotation axis to the intermediate reference system
     pow : (degree+1,) ndarray
         The power series approximation of the rotation angle :math:`\\theta`
         (in radians) as a function of the displacement of :math:`Q^*` from 
@@ -658,14 +676,9 @@ def calcRASseries(cs, mass, Qref, Qstar_idx, degree, axis):
     #################
     # Parse rotation axis
     #
-    if axis == 'a':
-        rot_axis = 0
-    elif axis == 'b':
-        rot_axis = 1 
-    elif axis == 'c':
-        rot_axis = 2 
-    else:
-        raise ValueError("Unexpected axis (a, b, or c)")
+    rot_axis = axis 
+    if rot_axis not in [0,1,2]:
+        raise ValueError("Unexpected axis (0, 1, or 2)")
         
     pow_order = degree # Maximum power in theta(q) power series 
     nd = pow_order + 1 # The number of derivatives (including zeroth)
@@ -673,14 +686,23 @@ def calcRASseries(cs, mass, Qref, Qstar_idx, degree, axis):
     
     # Calculate the coordinates and their derivatives w.r.t. Q*
     dX = cs.Q2X(Qref, deriv = pow_order, var = [Qstar_idx]) # (nd, N*3)
-    _,RPAS,_ = nitrogen.angmom.X2PAS(dX[0], mass) # Calculate PAS frame
+    
+    if Rref is None:
+        _,RPAS,_ = nitrogen.angmom.X2PAS(dX[0], mass) # Calculate PAS frame
+        Rref = RPAS 
+    else:
+        Rref = np.array(Rref)
+        if Rref.shape != (3,3):
+            raise ValueError("Rref must be a 3 x 3 matrix")
+            
     dX = np.reshape(dX, (nd, N, 3)) # (nd,N,3)
     
     
     # Subtract center-of-mass 
     Xcom = np.sum( dX * np.array(mass).reshape(1,N,1), axis = 1) / sum(mass) 
     dX = dX - Xcom.reshape((nd,1,3))
-    dX0 = np.einsum('ij,klj->kli',RPAS,dX) # (nd,N,3)
+    # Rotate to reference frame
+    dX0 = np.einsum('ij,klj->kli',Rref,dX) # (nd,N,3)
     # dX contains the coordinate derivatives in the reference frame
     #
     
@@ -716,7 +738,7 @@ def calcRASseries(cs, mass, Qref, Qstar_idx, degree, axis):
         # convert from a power series of dtheta/dQ* to a power
         # series of theta.
     
-    return RPAS, theta_pow 
+    return Rref, theta_pow 
 
 class SingleAxisR3DFun(nitrogen.dfun.DFun):
     """
@@ -877,6 +899,9 @@ class EckartCoordSys(CoordSys):
         # Shift X0 to center of mass 
         N = cs.natoms 
         X0 = np.array(X0)
+        if X0.shape != (N*3,):
+            raise ValueError("X0 must have shape (3*N,) ")
+        
         mass = np.array(mass)
         Xcom = np.sum(X0.reshape((N,3)) * mass.reshape((N,1)), axis = 0) / sum(mass)
         
@@ -924,8 +949,7 @@ class EckartCoordSys(CoordSys):
         N = self.natoms # The number of atoms 
         
         # Subtract the center-of-mass 
-        xcom = np.zeros((nd, 3) + base_shape, dtype = X.dtype) 
-        xcom = np.sum(X.reshape((nd,N,3) + base_shape) * self.mass.reshape((1,N,1) + base_shape), axis = 1) / sum(self.mass)
+        xcom = np.sum(X.reshape((nd,N,3) + base_shape) * self.mass.reshape((1,N,1) + tuple([1]*len(base_shape))), axis = 1) / sum(self.mass)
         # xcom has shape (nd,3,...)
         for i in range(N):
             for j in range(3):
