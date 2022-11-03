@@ -653,20 +653,13 @@ def calcRASseries(cs, mass, Qref, Qstar_idx, degree, axis, Rref = None):
     
     Notes
     -----
-    The RAS is defined in [Picket1972]_. See the Notes to :func:`calcRASangle()`
+    See the Notes to :func:`calcRASangle()`
     for more details.
     
     See Also
     --------
     calcRASangle : Calculate the RAS angle via numerical integration. 
-    
-    References
-    ----------
-    .. [Picket1972] H. M. Pickett, "Vibration-Rotation Interactions and the Choice of 
-       Rotating Axes for Polyatomic Molecules," J. Chem. Phys., 56, 1715 (1972).
-       https://doi.org/10.1063/1.1677430
-     
-    
+      
     """
     
     ###########################
