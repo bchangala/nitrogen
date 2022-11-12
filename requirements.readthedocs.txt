@@ -12,3 +12,4 @@ setuptools>=49
 wheel
 Cython>=0.29.21
 #py3nj # no fortran compiler on RTD
+sphinx==4.2.0
