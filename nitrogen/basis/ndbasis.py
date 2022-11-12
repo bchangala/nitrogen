@@ -684,7 +684,7 @@ class RealSphericalHBasis(NDBasis):
     See Also
     --------
     nitrogen.special.RealSphericalH : DFun sub-class real spherical harmonics.
-    nitrogen.special.LegendreCosLM : DFun sub-class for associated Legendre polynomials.
+    nitrogen.special.LegendreLMCos : DFun sub-class for associated Legendre polynomials.
     nitrogen.special.SinCosDFun : DFun sub-class for sine-cosine basis.
 
     

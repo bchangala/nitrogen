@@ -1,0 +1,2 @@
+.. automodule:: nitrogen
+   :members:

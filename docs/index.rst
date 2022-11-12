@@ -17,7 +17,7 @@ Contents
    :maxdepth: 2
    
    tutorials/index
-   api
+   api/index
 
 Indices and tables
 ==================

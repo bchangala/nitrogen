@@ -1,0 +1,2 @@
+.. automodule:: nitrogen.pes 
+   :members:
