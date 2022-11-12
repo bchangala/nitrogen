@@ -2,7 +2,7 @@ API reference
 =============
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
    
    nitrogen_head
    constants
