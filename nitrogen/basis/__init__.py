@@ -6,7 +6,7 @@ Basis set functions including discrete-variable
 representations (DVRs) and finite-basis representations
 (FBRs). The main objects are the :class:`GriddedBasis` class
 and its sub-classes :class:`GenericDVR` and :class:`NDBasis`.
-See :doc:`tutorials/dvr` for a tutorial.
+See :doc:`/tutorials/dvr` for a tutorial.
 
 ================================   ===================================
 General gridded bases

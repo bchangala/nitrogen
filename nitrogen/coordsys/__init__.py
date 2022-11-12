@@ -4,7 +4,7 @@ nitrogen.coordsys
 
 This module implements the :class:`CoordSys` base class,
 which is extended for all NITROGEN coordinate systems.
-See :doc:`tutorials/coordsys` for a tutorial.
+See :doc:`/tutorials/coordsys` for a tutorial.
 
 
 =============================  =================================================
