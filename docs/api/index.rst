@@ -2,21 +2,21 @@ API reference
 =============
 
 .. toctree::
-   :maxdepth: 0
+   :maxdepth: 1
    
    nitrogen_head
-   constants
-   dfun
-   special
-   coordsys
-   basis
-   tensor
-   ham
-   pes
-   angmom
-   linalg
-   math
-   scf
-   vpt
-   autodiff
+..   constants
+..   dfun
+..   special
+..   coordsys
+..   basis
+..   tensor
+..   ham
+..   pes
+..   angmom
+..   linalg
+..   math
+..   scf
+..  vpt
+..   autodiff
    
