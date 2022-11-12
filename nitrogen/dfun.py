@@ -4,7 +4,7 @@ nitrogen.dfun
 
 This module implements the class DFun, which 
 is used to interface general differentiable, multi-variate
-functions. See :doc:`tutorials/dfun` for an in-depth tutorial.
+functions. See :doc:`/tutorials/dfun` for an in-depth tutorial.
 
 
 ===========================   ===================================
