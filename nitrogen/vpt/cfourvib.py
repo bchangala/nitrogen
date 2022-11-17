@@ -1,5 +1,6 @@
 """
-cfourvib.py
+nitrogen.vpt.cfourvib
+---------------------
 
 CFOUR vibrational file processing and
 interface routines.
@@ -63,7 +64,12 @@ def read_QUADRATURE(filename, use_bohr = False):
     
     pos = 1 
     for i in range(Nvib):
-        freq_i = float(lines[pos].strip()) 
+        freq_str = lines[pos].strip()
+        if freq_str[-1] == 'i':
+            # imaginary frequency 
+            freq_i = float(freq_str[-1]) * 1j 
+        else:
+            freq_i = float(lines[pos].strip()) 
         pos += 2 
         for j in range(Natoms):
             disp_row = [float(x) for x in lines[pos].split() ]
