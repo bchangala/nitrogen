@@ -67,7 +67,7 @@ def read_QUADRATURE(filename, use_bohr = False):
         freq_str = lines[pos].strip()
         if freq_str[-1] == 'i':
             # imaginary frequency 
-            freq_i = float(freq_str[-1]) * 1j 
+            freq_i = float(freq_str[:-1]) * 1j 
         else:
             freq_i = float(lines[pos].strip()) 
         pos += 2 
