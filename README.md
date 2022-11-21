@@ -12,5 +12,7 @@ NITROGEN ver. 2.x is a complete re-write in Python.
 The original C code (ver. 1.x) is available [here](https://www.colorado.edu/nitrogen).
 
 Permanent DOIs are available for citing stable releases
-.. image:: https://zenodo.org/badge/295796633.svg
-   :target: https://zenodo.org/badge/latestdoi/295796633
+
+
+[![DOI](https://zenodo.org/badge/295796633.svg)](https://zenodo.org/badge/latestdoi/295796633)
+
