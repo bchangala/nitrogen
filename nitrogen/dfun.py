@@ -1541,6 +1541,10 @@ class PowerExpansion(DFun):
         The defining derivative array about the expansion point
     x0 : (nx,) ndarray
         The expansion point. 
+        
+    See Also
+    --------
+    PowerExpansionTerms : Separate terms of a power series 
     
     """
     
@@ -1654,6 +1658,118 @@ class PowerExpansion(DFun):
                 iX = adf.idxpos(idxX, self.nckD)
                 
                 out[iZ,:] += c * self.d[iX,:] * Dpow
+        
+        return out
+
+class PowerExpansionTerms(DFun):
+    
+    """
+    Separate terms of a power series expansion about a given point. 
+    
+    Attributes
+    ----------
+    order : int
+        The maximum total degree
+    x0 : (nx,) ndarray
+        The expansion point. 
+        
+    See Also
+    --------
+    PowerExpansion : A summed power series
+    
+    """
+    
+    def __init__(self, order, x0):
+        """
+        Calculate each term of a power series expansion 
+        
+        ..  math::
+            
+            f_i(\\mathbf{x}) = (\\mathbf{x}-\\mathbf{x}_0)^{\\alpha_i}
+                                                        
+                
+        Parameters
+        ----------
+        order : int
+            The maximum total degree
+        x0 : array_like
+            The expansion point.
+            
+        """
+        
+        
+        
+        x0 = np.array(x0)     # The expansion point
+        nx = len(x0)          # The number of variables
+        nd = nderiv(order, nx)  # The number of terms up to degree `deg`
+        nf = nd               # There is a separate output for each term
+        
+        super().__init__(self._fexpansionterms, nf = nf, nx = nx, maxderiv = None,
+                         zlevel = order)
+        
+        self.x0 = x0 
+        self.order = self.zlevel # = order
+        self.idxD = adf.idxtab(self.order, self.nx) # The index table
+        self.nckD = adf.ncktab(self.order + self.nx + 1)  # The binomial table
+        
+        return 
+    
+    def _fexpansionterms(self, X, deriv = 0, out = None, var = None):
+
+        # Calculate the displacement from the 
+        # expansion origin
+        disp = np.empty_like(X)
+        for i in range(self.nx):
+            disp[i] = X[i] - self.x0[i] 
+        
+        # Now calculate the powers of the displacement
+        # [power, variable, ...]
+        disp_pow = np.ones((self.order+1,) + X.shape, dtype = X.dtype)
+        for k in range(self.order):
+            disp_pow[k+1] = disp_pow[k] * disp 
+
+        out, var = self._parse_out_var(X, deriv, out, var)
+        out.fill(0)
+        
+        nvar = len(var)
+        idx = adf.idxtab(deriv, nvar) # Index table for output derivative array
+        nd = nderiv(deriv, nvar)      # The number of output derivatives
+        
+        for iD in range(self.idxD.shape[0]):
+            
+            idxD = self.idxD[iD] # The index of the powers of d
+            
+            # Calculate the displacement monomial
+            Dpow = np.ones(disp_pow.shape[2:], dtype = disp_pow.dtype)
+            for i in range(self.nx):
+                Dpow *= disp_pow[idxD[i], i]
+                
+            for iZ in range(nd):
+                idxZ = idx[iZ,:] # The result index in the requested
+                                 # `var` order
+                
+                idx_orig = np.arange(self.nx) * 0
+                for vid in range(nvar):
+                    idx_orig[var[vid]] = idxZ[vid]
+                # idx_orig is the result index in the complete variable order
+                
+                idxX = idxD + idx_orig # The index of the expansion coefficient
+                                       # that contributes to result
+                kX = np.sum(idxX)
+                if kX > self.order:
+                    break # Skip remaining 
+                
+                # Calculate the multi-index
+                # binomial coefficient
+                c = 1.0 
+                for i in range(self.nx):
+                    c *= self.nckD[idxX[i], min(idx_orig[i], idxD[i])]
+                    
+                iX = adf.idxpos(idxX, self.nckD)
+                
+                # Accumulate the requested derivative (iZ) of the 
+                # expansion term (iX) 
+                out[iZ,iX,:] += c * Dpow
         
         return out
 
