@@ -1679,7 +1679,7 @@ class PowerExpansionTerms(DFun):
     
     """
     
-    def __init__(self, order, x0):
+    def __init__(self, order, x0 = None):
         """
         Calculate each term of a power series expansion 
         
@@ -1696,8 +1696,6 @@ class PowerExpansionTerms(DFun):
             The expansion point.
             
         """
-        
-        
         
         x0 = np.array(x0)     # The expansion point
         nx = len(x0)          # The number of variables
@@ -1769,7 +1767,7 @@ class PowerExpansionTerms(DFun):
                 
                 # Accumulate the requested derivative (iZ) of the 
                 # expansion term (iX) 
-                out[iZ,iX,:] += c * Dpow
+                out[iZ,iX] += c * Dpow
         
         return out
 
