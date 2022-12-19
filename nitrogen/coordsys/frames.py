@@ -1081,3 +1081,20 @@ class EckartCoordSys(CoordSys):
     def __repr__(self):
         
         return f"EckartCoordSys({self.cs!r},{self.X0!r},{self.mass!r})"
+    
+    
+class MovingEckartCoordSys(CoordSys):
+    """
+    A moving reference frame Eckart coordinate system
+    
+    """
+    
+    def __init__(self):
+        """
+        """
+        raise NotImplementedError()
+        
+        
+        
+        
+        
