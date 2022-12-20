@@ -475,7 +475,8 @@ class StructuredBasis(NDBasis):
             # where nb is the nsub of the left-ward factor.
             #
             # Let x reference y for the next iteration
-            x = y 
+            # x = y 
+            raise NotImplementedError()
             
             
             

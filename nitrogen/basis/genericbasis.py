@@ -319,6 +319,5 @@ def _create_nd_slice(nd, axis, start, stop, step = None):
     
     return tuple(pre + idx + post)
         
-        
-        
+    
         

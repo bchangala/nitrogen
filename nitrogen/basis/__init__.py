@@ -561,3 +561,97 @@ def calcRhoLogD(bases, Q):
     
     return rhotilde
         
+def basisQuad(bases,fun,X,Y):
+    """
+    Evaluate integrals of a general scalar function
+    between expansions of a direct-product 
+    basis set of GriddedBases
+
+    Parameters
+    ----------
+    bases : list of GriddedBasis and scalar
+        The direct-product basis set factors.
+    fun : function
+        The function to evaluate.
+    X,Y : (nb,...) ndarray
+        The functions for which to evaluate matrix element
+        integrals, where `nb` is the size of the basis
+        set defined by `bases`.
+
+    Returns
+    -------
+    F : ndarray
+        The matrix element integrals. The shape of `F` is
+        ``fshape`` + ``X.shape[1:]`` + ``Y.shape[1:]``,
+        where ``fshape`` is the return shape of `fun`, i.e.,
+        ``()`` for a scalar function, ``(n,)`` for an ``n``-valued
+        function.
+
+    Notes
+    -----
+    
+    The complex conjugate of the `X` functions are used
+    in the quadrature sum. 
+    
+    """
+    
+    #
+    # Calculate the size of the basis set, nb
+    fbr_shape, nb = genericbasis.basisShape(bases)
+    
+    # Check the shapes of X and Y
+    if X.shape[0] != nb or Y.shape[0] != nb:
+        raise ValueError(f"The first axis of X and Y must equal the basis size (nb = {nb:d}).")
+
+    # Construct the coordinate grid over which 
+    # we need to evaluate the function
+    Q = bases2grid(bases)
+    quad_shape = Q.shape[1:] # The shape of the quadrature grid.
+    naxes = len(quad_shape) # The number of quadrature axes 
+    
+    # Evaluate the function
+    # We assume the Q axes are right-most
+    # and anything before that is the value-shape
+    # of f.
+    #
+    fq = fun(Q) # fshape + quad_shape
+    fshape = fq.shape[0:-naxes]
+
+    Xshape = X.shape[1:]
+    Yshape = Y.shape[1:]
+    # Fshape = fshape + Xshape + Yshape # The shape of the result array
+        
+    # Move the basis index axis to the end
+    X = np.moveaxis(X, 0, -1)
+    Y = np.moveaxis(Y, 0, -1)
+    
+    # Reshape the vectors to pre-shape + FBR direct-product shape
+    x = np.reshape(X, Xshape + fbr_shape) 
+    y = np.reshape(Y, Yshape + fbr_shape)
+    
+    # Convert x,y from the mixed DVR-FBR
+    # representation to the quadrature
+    # representation
+    # The list of bases will be prepended with a 
+    # None element for each index of Xshape and Yshape
+    #
+    xq = _to_quad([None]*len(Xshape) + bases, x) # Xshape + quad_shape
+    yq = _to_quad([None]*len(Yshape) + bases, y) # Yshape + quad_shape 
+    
+    # Collapse all the quadrature axes to a single axis
+    xq = xq.reshape(Xshape + (-1,))
+    yq = yq.reshape(Yshape + (-1,))
+    fq = fq.reshape(fshape + (-1,))
+    
+    #
+    # Compute the quadrature sum
+    # (Note: using the complex conjugate of X)
+    #
+    sublist_fq = list(range(1,len(fshape)+1)) + [0]
+    sublist_xq = list(range(len(fshape)+1,len(fshape)+len(Xshape)+1)) + [0]
+    sublist_yq = list(range(len(fshape)+len(Xshape)+1,len(fshape)+len(Xshape)+len(Yshape)+1)) + [0]
+    
+    F = np.einsum(fq, sublist_fq, xq.conj(), sublist_xq, yq, sublist_yq)
+    
+    return F 
+    
