@@ -100,7 +100,7 @@ keywords to control the number of quadrature points. Generally, the default
 values are appropriate for most cases, but these can be changed if necessary.
 
 Let's move on to a two-dimensional example, the real spherical harmonics, which 
-are defined by the `~nitrogen.special.RealSphericalH` special function class.
+are defined by the :class:`~nitrogen.special.RealSphericalH` special function class.
 
 ..  doctest:: example-ndbasis-2 
 
