@@ -173,6 +173,17 @@ def dircos_tensor(N1,k1,m1,N2,k2,m2):
     The basis functions are standard symmetric top rotational basis functions
     with the usual phase conventions. :math:`k` is the body-frame :math:`z` 
     component with respect to "anomalous" body-frame operators. 
+    
+    The direction cosine tensor :math:`\\lambda_{Q,q}^{(1,1)}` is a double
+    tensor with respect to the lab-frame angular momentum (:math:`J_{X},J_Y,J_Z`)
+    and the body-frame angular momentum (:math:`-J_x,-J_y,-J_z`). 
+    Its components are
+    
+    ..  math::
+        \\lambda_{Q,q}^{(1,1)} = (-1)^q \\left[D_{Q,-q}^{(1)}(\\phi,\\theta,\\chi)\\right]^*
+    
+    
+        
 
     """
     
@@ -194,7 +205,67 @@ def dircos_tensor(N1,k1,m1,N2,k2,m2):
     
     return lamQq 
             
+def dircos_tensor_cart(N1,k1,m1,N2,k2,m2):
+    """
+    Calculate a matrix element of the 
+    direction cosine Cartesian tensor
+    
+    ..  math::
+        
+        \\langle N_1, k_1, m_1 \\vert \\lambda_{Ij} \\vert N_2, k_2, m_2 \\rangle
+        
 
+    Parameters
+    ----------
+    N1, k1, m2, N2, k2, m2 : integer
+        Angular momentum quantum numbers
+
+    Returns
+    -------
+    (3,3) ndarray
+        The direction cosine tensor matrix element in terms
+        of Cartesian components.
+    
+    See Also
+    --------
+    dircos_tensor : Direction cosine spherical tensor matrix elements 
+    
+    Notes
+    -----
+    
+    The indices are with respect to lab frame (:math:`I = X,Y,Z`) and 
+    body-fixed frame (:math:`j = x,y,z`) axes.
+    
+    """
+    
+    # Calculate the spherical tensor representation
+    lamQq = dircos_tensor(N1, k1, m1, N2, k2, m2)
+    
+    
+    ir2 = 1/np.sqrt(2.0)
+    #
+    # Usc transforms Cartesian vector components (x,y,z)
+    # to spherical vector components (q = -1, 0, +1)
+    #
+    Usc = np.array([
+        [+ir2, -1j*ir2, 0.0],
+        [0, 0, 1],
+        [-ir2, -1j*ir2, 0.0]])
+    
+    # Ucs transforms spherical to Cartesian
+    # It is the conjugate transpose of Usc
+    Ucs = np.conjugate(Usc.T)
+    
+    # Use Ucs to transform both spherical indices of 
+    # lamQq to Cartesian indices
+    # (Note: we use the Ucs.T for the right index, *not* 
+    #  Ucs^dagger. This is not a similarity transformation)
+    #
+    
+    lamIj = Ucs @ lamQq @ (Ucs.T) 
+    
+    return lamIj
+    
 def Jbf_cs(J):
     """
     Calculate Condon-Shortley body-fixed J operators
