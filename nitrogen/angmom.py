@@ -245,12 +245,13 @@ def dircos_tensor_cart(N1,k1,m1,N2,k2,m2):
     ir2 = 1/np.sqrt(2.0)
     #
     # Usc transforms Cartesian vector components (x,y,z)
-    # to spherical vector components (q = -1, 0, +1)
+    # to spherical vector components (q = 0, +1, -1)
     #
     Usc = np.array([
-        [+ir2, -1j*ir2, 0.0],
         [0, 0, 1],
-        [-ir2, -1j*ir2, 0.0]])
+        [-ir2, -1j*ir2, 0.0],
+        [+ir2, -1j*ir2, 0.0]
+        ])
     
     # Ucs transforms spherical to Cartesian
     # It is the conjugate transpose of Usc
