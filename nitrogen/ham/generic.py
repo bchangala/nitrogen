@@ -984,7 +984,15 @@ class NonLinear(LinearOperator):
         where :math:`\\Psi^{(J,k)}` is the vibrational factor associated with 
         the signed-:math:`k` symmetric top basis function :math:`| J,k \\rangle`.
         
-        Note that the scaled RME satisfies :math:`|V_{J' J}|^2 = |V_{JJ'}|^2`.
+        Note that the scaled RME satisfies :math:`|V_{J' J}|^2 = |V_{JJ'}|^2` and 
+        in general
+        
+        ..  math::
+            
+            |V|_{J J'}^2 = \sum_{Amm'} | \\langle Jm | V_A | J' m' \\rangle | ^2
+            
+        When :math:`V` is the electric dipole operator :math:`\\mu`, then 
+        :math:`|V|^2` equals the line strength, :math:`S`.
         
         """
         
