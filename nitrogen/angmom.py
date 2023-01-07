@@ -189,16 +189,16 @@ def dircos_tensor(N1,k1,m1,N2,k2,m2):
     ..  math::
         
         \\langle N_1, k_1, m_1 \\vert \\lambda_{Qq} \\vert N_2, k_2, m_2 \\rangle = 
-             (-1)^{k_1 + k_2} \\sqrt{\\frac{2N_2+1}{2N_1+1}}
+             (-1)^{k_1 + k_2 + N_1 + N_2 - 1} \\sqrt{\\frac{2N_2+1}{2N_1+1}}
              
              \\times 
-             \\left(\\begin{array}{ccc} N_2 & 1 & N_1 \\\\ m_2 & Q & m_1 \\end{array} \\right)
-             \\left(\\begin{array}{ccc} N_2 & 1 & N_1 \\\\ k_2 & -q & k_1 \\end{array} \\right)
+             \\langle N_2 m_2, 1 Q |  N_1 m_1 \\rangle
+             \\langle N_2, -k_2, 1 q | N_1, -k_1 \\rangle
         
 
     """
     
-    red = (-1) ** (k1 + k2) * np.sqrt( (2*N2 + 1) / (2*N1 + 1))
+    red = (-1) ** (k1 + k2 + N1 + N2 - 1) * np.sqrt( (2*N2 + 1) / (2*N1 + 1))
     
     lamQq = np.zeros((3,3))
     
@@ -210,7 +210,7 @@ def dircos_tensor(N1,k1,m1,N2,k2,m2):
         for q in [-1, 0, 1]:
             
             cg2 = clebsch_gordan(2*N2, 2*1, 2*N1,
-                                 2*k2,-2*q, 2*k1)
+                                -2*k2, 2*q,-2*k1)
             
             lamQq[Q,q] = red * cg1 * cg2 
     
@@ -235,7 +235,7 @@ def dircos_tensor_cart(N1,k1,m1,N2,k2,m2):
     -------
     (3,3) ndarray
         The direction cosine tensor matrix element in terms
-        of Cartesian components.
+        of Cartesian components. 
     
     See Also
     --------
