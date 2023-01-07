@@ -25,6 +25,7 @@ from . import vpt
 __version__ = '2.2.dev0'
 
 import numpy as np 
+import matplotlib.pyplot as plt 
 
 #################################################################
 # Define some top-level constants
@@ -88,7 +89,7 @@ def X2xyz(X, elements, filename = "out.xyz", comment = None):
     # Done
     return 
 
-def podvr(prim_dvr, npo, i, qref, cs, pes_fun, masses):
+def podvr(prim_dvr, npo, i, qref, cs, pes_fun, masses, disp = 0):
     """
     Construct a potential-optimized contracted DVR based on the
     contrained body-fixed Hamiltonian.
@@ -109,6 +110,8 @@ def podvr(prim_dvr, npo, i, qref, cs, pes_fun, masses):
         The potential energy function
     masses : list of float
         The masses for the coordinate system.
+    disp : integer, optional
+        The print level. Default is 0.
 
     Returns
     -------
@@ -122,6 +125,20 @@ def podvr(prim_dvr, npo, i, qref, cs, pes_fun, masses):
     dvrs[i] = prim_dvr 
     h1 = ham.hdpdvr_bfJ(dvrs, cs, pes_fun, masses, Jlist = 0)
     w,u = np.linalg.eigh(linalg.full(h1))
+    
+    if disp >= 1:
+        print(f"The PODVR energies for coordinate {i:d} are")
+        print(w[:npo])
+        
+    if disp >= 2:
+        # plot wavefunctions
+        scale = (w[1]-w[0]) / max(abs(u[:,0])) * 0.8 
+        
+        plt.figure() 
+        for j in range(npo):
+            plt.plot(prim_dvr.grid, scale * u[:,j] + w[j])
+        plt.xlabel('q')
+        plt.ylabel('Energy')
 
     return dvrs[i].contract(u[:,:npo])
 

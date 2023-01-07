@@ -250,10 +250,26 @@ class Contracted(GenericDVR):
         
         q = np.reshape(q, (-1,))  # The new DVR grid 
         
+        #    W (n,m) = U(n,m) x u(m,m)
         W = U @ u # w takes a vector from the new DVR to the old DVR 
         
         d = W.conj().T @ prim_dvr.D @ W
         d2 = W.conj().T @ prim_dvr.D2 @ W
+        
+        
+        # Fix sign consistency
+        m = len(q) # the size of the contracted basis
+        for i in range(m-1):
+            
+            if d[i,i+1] < 0:
+                # Flip sign of i+1 
+                d[:,i+1] *= -1
+                d[i+1,:] *= -1
+                
+                d2[:,i+1] *= -1
+                d2[i+1,:] *= -1
+                
+                W[:,i+1] *= -1 
         
         super().__init__(q, d, d2) 
         

@@ -992,7 +992,7 @@ class NonLinear(LinearOperator):
             |V|_{J J'}^2 = \sum_{Amm'} | \\langle Jm | V_A | J' m' \\rangle | ^2
             
         When :math:`V` is the electric dipole operator :math:`\\mu`, then 
-        :math:`|V|^2` equals the line strength, :math:`S`.
+        :math:`|V|_{JJ'}^2` equals the line strength, :math:`S_{JJ'}`.
         
         """
         
