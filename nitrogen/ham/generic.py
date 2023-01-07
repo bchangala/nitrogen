@@ -933,7 +933,202 @@ class NonLinear(LinearOperator):
         
         return np.reshape(y, (-1,))
     
-    
+    @staticmethod
+    def vectorRME(bases,fun,X,Y):
+        """
+        Evaluate reduced matrix elements of a lab-frame vector operator.
+
+        Parameters
+        ----------
+        bases : list of GriddedBasis and scalar
+            The direct-product basis set factors.
+        fun : function
+            A function that returns the :math:`xyz` body-frame
+            components of the vector :math:`V` in terms of the
+            coordinates of `bases`.
+        X,Y : list of ndarray
+            Each element is an array of vectors in 
+            the `bases` basis set of a given value of :math:`J` 
+            following conventions of the :class:`NonLinear` 
+            Hamiltonian.
+
+        Returns
+        -------
+        VXY : ndarray
+            The scaled reduced matrix elements :math:`\\langle X || V || Y \\rangle`.
+            See Notes for precise definition.
+
+        Notes
+        -----
+        
+        We define the standard (lab-frame) reduced matrix element by
+        
+        ..  math::
+            
+            \\langle Jm\\cdots | V_Q | J' m'\\cdots \\rangle = 
+                \\langle J' m', 1 Q | J m \\rangle
+                \\langle J \\cdots || V || J' \\cdots \\rangle
+        
+        This function returns the scaled value
+        :math:`V_{JJ'} = \\sqrt{2J+1} \\langle J \\cdots || V || J' \\cdots \\rangle`.
+        
+        The RME itself is calculated as 
+        
+        ..  math::
+            
+            \\langle J \\cdots || V || J' \\cdots \\rangle = 
+                \\sqrt{2J' + 1} \\sum_{q k k'} (-1)^{J + k' + q}
+                \\left(\\begin{array}{ccc} J & J' & 1 \\\\ k  & -k' & q \\end{array} \\right) 
+                \\langle \\Psi^{(J,k)} | V_{-q} | \\Psi^{(J',k')} \\rangle,
+                
+        where :math:`\\Psi^{(J,k)}` is the vibrational factor associated with 
+        the signed-:math:`k` symmetric top basis function :math:`| J,k \\rangle`.
+        
+        Note that the scaled RME satisfies :math:`|V_{J' J}|^2 = |V_{JJ'}|^2`.
+        
+        """
+        
+        # Get the basis FBR shape and total
+        # number of vibrational basis functions, nb
+        fbr_shape, nb = nitrogen.basis.basisShape(bases)
+        
+        #
+        # Now parse the sizes and implied J-values of 
+        # each block of vectors in X and Y
+        #
+        nX, JX = [],[]
+        for x in X:
+            nX.append( x.shape[1] )
+            JX.append( ((x.shape[0] // nb) - 1)//2 )
+        nY, JY = [],[]
+        for y in Y:
+            nY.append( y.shape[1] )
+            JY.append( ((y.shape[0] // nb) - 1)//2 ) 
+            
+        # Construct the coordinate grid over which 
+        # we need to evaluate the vector-valued function
+        Q = nitrogen.basis.bases2grid(bases)
+        
+        # Evaluate the vector-valued function.
+        #
+        Vbf = fun(Q) 
+        # Vbf has a shape of (3,) + Q.shape[1:] (the quadrature shape)
+        
+        # Vbf[0,1,2] are the body-fixed x,y,z axis components
+        #
+        # Construct the spherical components
+        # Vq, q = 0, +1, -1
+        #
+        #   0  ... z
+        #  +1  ... -(x + iy) / sqrt[2]
+        #  -1  ... +(x - iy) / sqrt[2]
+        #
+        # Note that the ordering of the spherical components
+        # allow normal array indexing
+        Vq = [  Vbf[2],
+               -(Vbf[0] + 1j*Vbf[1])/np.sqrt(2.0),
+               +(Vbf[0] - 1j*Vbf[1])/np.sqrt(2.0)]
+        
+        dX,dY = sum(nX), sum(nY) # The total size of the reduced matrix 
+        
+        # Initialize the reduced matrix
+        VXY = np.zeros((dX,dY), dtype = np.complex128)
+        
+        # 
+        # Calculate <X||MU||Y> reduced matrix element
+        # block-by-block, including extra scaling.
+        
+        for i in range(len(nX)):
+            # For each X block,
+            # Reshape block of vectors to
+            # (2J+1, fbr_shape, nX[i]) 
+            
+            Xi = np.reshape(X[i], (2*JX[i]+1,) + fbr_shape + (nX[i],) )
+            # 
+            # Now transform the entire block to quadrature grid 
+            # Use None's to leave rotational and index axes untouched
+            xi = nitrogen.basis._to_quad([None] + bases + [None], Xi)
+            
+            # The rotational index is w.r.t the NonLinear Hamiltonian's
+            # real Wang basis. Transform these to the standard
+            # CS signed-k symmetric top basis.
+            #
+            UX = nitrogen.angmom.U_wr2cs(JX[i]) # The transformation matrix
+            xi = np.tensordot(UX, xi, axes = 1) # Transfrom from Wang-Real to CS 
+            # (the rotational index is first, so no axis swapping is needed
+            #  after tensordot)
+                
+            for j in range(len(nY)):
+                
+                # Process the Y block of vectors the same way
+                #
+                Yj = np.reshape(Y[j], (2*JY[j]+1,) + fbr_shape + (nY[j],) )
+                yj = nitrogen.basis._to_quad([None] + bases + [None], Yj)
+                UY = nitrogen.angmom.U_wr2cs(JY[j])
+                yj = np.tensordot(UY, yj, axes = 1) 
+                
+                # idx_x and idx_y will be the array indices
+                # of the final VXY reduced matrix
+                #
+                # Each block starts at the position equal to the 
+                # sum of the sizes of the previous blocks
+                
+                # bi and bj will index the vectors within each block
+                
+                idx_x = sum(nX[:i])
+                for bi in range(nX[i]):
+                    
+                    idx_y = sum(nY[:j])
+                    for bj in range(nY[j]):
+                        
+                        # Perform summation over body-fixed spherical 
+                        # component q and the body-fixed projections
+                        # k (of X) and k' (of Y)
+                        #
+                        for q in [0,1,-1]: # ordering here doesn't matter
+                            for k in range(-JX[i], JX[i]+1):
+                                for kp in range(-JY[j], JY[j]+1):
+                                    
+                                    # Check selection rules 
+                                    if JX[i] < abs(JY[j]-1) or JX[i] > JY[j] + 1:
+                                        # failed triangle rule
+                                        continue 
+                                    if kp - q != k :
+                                        # failed z-component rule
+                                        continue 
+                                    
+                                    # Calculate contribution to reduced
+                                    # matrix element
+                                    #
+                                    factor = (-1)**(JX[i] + kp + q) * \
+                                            nitrogen.angmom.wigner3j(2*JX[i], 2*JY[j], 2*1,
+                                                                     2*k,    -2*kp   , 2*q)
+                                    if factor == 0.0:
+                                        continue # final check for zero
+                                    
+                                    # Compute quadrature sum of the vibrational
+                                    # integral
+                                    bra = xi[JX[i] + k , ..., bi]
+                                    ket = yj[JY[j] + kp, ..., bj]
+                                    mid = Vq[-q] 
+                                    integral = np.sum(np.conj(bra) * mid * ket) 
+                                    
+                                    # Finally, 
+                                    # include sqrt[2J+1] factor to symmetrize the 
+                                    # reduced matrix ! 
+                                    #
+                                    VXY[idx_x, idx_y] += np.sqrt(2*JX[i]+1) * np.sqrt(2*JY[j] + 1) * factor * integral 
+                        
+                        idx_y += 1 
+                    
+                    idx_x += 1 
+        
+        # VXY is complete
+        # return the reduced matrix elements
+        
+        return VXY 
+        
+        
 class AzimuthalLinear(LinearOperator):
     """
     A general rovibrational Hamiltonian for linear molecules. 
