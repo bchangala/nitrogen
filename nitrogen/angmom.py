@@ -165,14 +165,15 @@ def dircos_tensor(N1,k1,m1,N2,k2,m2):
     -------
     (3,3) ndarray
         The direction cosine tensor matrix element in terms
-        of spherical tensor components. 
+        of spherical tensor components. The components are ordered
+        ``[0, +1, -1]`` so that normal array indexing is unchanged.
         
     Notes
     -----
     
     The basis functions are standard symmetric top rotational basis functions
     with the usual phase conventions. :math:`k` is the body-frame :math:`z` 
-    component with respect to "anomalous" body-frame operators. 
+    component with respect to "anomalous" body-frame operators, :math:`J_x,J_y,J_z`.
     
     The direction cosine tensor :math:`\\lambda_{Q,q}^{(1,1)}` is a double
     tensor with respect to the lab-frame angular momentum (:math:`J_{X},J_Y,J_Z`)
@@ -180,14 +181,24 @@ def dircos_tensor(N1,k1,m1,N2,k2,m2):
     Its components are
     
     ..  math::
-        \\lambda_{Q,q}^{(1,1)} = (-1)^q \\left[D_{Q,-q}^{(1)}(\\phi,\\theta,\\chi)\\right]^*
+        \\lambda_{Q,q} = (-1)^q \\left[D_{Q,-q}^{(1)}(\\phi,\\theta,\\chi)\\right]^*
     
     
+    The matrix elements are
+    
+    ..  math::
+        
+        \\langle N_1, k_1, m_1 \\vert \\lambda_{Qq} \\vert N_2, k_2, m_2 \\rangle = 
+             (-1)^{k_1 + k_2} \\sqrt{\\frac{2N_2+1}{2N_1+1}}
+             
+             \\times 
+             \\left(\\begin{array}{ccc} N_2 & 1 & N_1 \\\\ m_2 & Q & m_1 \\end{array} \\right)
+             \\left(\\begin{array}{ccc} N_2 & 1 & N_1 \\\\ k_2 & -q & k_1 \\end{array} \\right)
         
 
     """
     
-    red = (-1) ** (k1 + k2 + N1 + N2 - 1) * np.sqrt( (2*N2 + 1) / (2*N1 + 1))
+    red = (-1) ** (k1 + k2) * np.sqrt( (2*N2 + 1) / (2*N1 + 1))
     
     lamQq = np.zeros((3,3))
     
@@ -199,7 +210,7 @@ def dircos_tensor(N1,k1,m1,N2,k2,m2):
         for q in [-1, 0, 1]:
             
             cg2 = clebsch_gordan(2*N2, 2*1, 2*N1,
-                                -2*k2, 2*q,-2*k1)
+                                 2*k2,-2*q, 2*k1)
             
             lamQq[Q,q] = red * cg1 * cg2 
     
