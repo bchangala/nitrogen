@@ -1281,13 +1281,209 @@ class AzimuthalLinear(LinearOperator):
         ``...`` (``Ellipsis``). One and only one factor must be designated
         as the polar coordinate.
         
-        Examples
-        --------
-        
-        
-        
         
         """
+        
+        # Process Azimuthal basis factors 
+        az_m, az_U, az_UH, sing_val_mask, svm_1d, NH, bases_dp, ellipsis_idx = \
+            AzimuthalLinear._process_basis(bases,  azimuth, J, signed_azimuth)
+        
+        
+        fbr_shape, NV = nitrogen.basis.basisShape(bases_dp)
+        axis_of_coord = nitrogen.basis.coordAxis(bases_dp)
+        vvar = nitrogen.basis.basisVar(bases_dp)
+        #coord_k_is_ellip_coord = [None for i in range(cs.nQ)]
+        
+        NJ = 2*J + 1 
+        NDP = NJ * NV # The size of the rot-vib direct product basis
+                      # (which contains all ellipsis basis functions, 
+                      #  not selected by which actually occur in the working basis)
+                      
+        # Check that there is at least one active coordinate        
+        if len(vvar) == 0:
+            raise ValueError("there must be an active coordinate!") 
+            
+        ################################################    
+        # Evaluate quadrature grid quantities
+        
+        Q = nitrogen.basis.bases2grid(bases_dp) 
+        
+        ########################################
+        # Evaluate potential energy function on 
+        # quadrature grid 
+        if pes is None:
+            Vq = None # no PES to be used
+        else:
+            try: # Attempt DFun interface
+                Vq = pes.f(Q, deriv = 0)[0,0]
+            except:
+                Vq = pes(Q) # Attempt raw function
+                
+            # Apply PES min and max cutoffs
+            if Vmax is not None:
+                Vq[Vq > Vmax] = Vmax 
+            if Vmin is not None:
+                Vq[Vq < Vmin] = Vmin     
+            
+            # Then apply offset 
+            if Voffset is not None:
+                Vq = Vq - Voffset 
+        #
+        #
+        ##########################################
+        # Parse hbar and masses
+        #
+        if hbar is None:
+            hbar = nitrogen.constants.hbar 
+        
+        if not cs.isatomic:
+            raise ValueError("The coordinate system must be atomic.")
+        
+        if masses is None:
+            masses = [1.0] * cs.natoms
+
+        if len(masses) != cs.natoms:
+            raise ValueError("unexpected length of masses")
+            
+        ########################################
+        #
+        # Calculate coordinate system metric functions
+        # 
+        g = cs.Q2g(Q, deriv = 1, mode = 'bodyframe', 
+                   vvar = vvar, rvar = 'xyz', masses = masses)
+        #
+        # And then calculate its inverse and determinant
+        #
+        #G,detg = nitrogen.dfun.sym2invdet(g, 1, len(vvar))
+        G = nitrogen.linalg.packed.inv_sp(g[0])
+        # Determine which elements of G are strictly zero
+        G_is_zero = [np.max(abs(G[i])) < 1e-10 for i in range(G.shape[0])]
+        
+        
+        #
+        # Calculate the log. deriv. of det(g)
+        #
+        gtilde = [nitrogen.linalg.packed.trAB_sp(G, g[i+1]) for i in range(len(vvar))]
+        gtilde = np.stack(gtilde)
+        
+        # If J = 0, then we only need to keep the vibrational block of G.
+        # In packed storage, this is the first nv*(nv+1)/2 
+        # elements (where nv = len(vvar))
+        #
+        if J == 0:
+            nv = len(vvar)
+            nG = (nv*(nv+1))//2 
+            #G = G[0][:nG] # need only value; lower triangle row-order
+            G = G[:nG].copy() 
+        else:
+            pass      # keep all elements
+        
+
+        
+        ########################################
+        #
+        # Calculate the logarithmic derivatives of
+        # the integration volume weight function 
+        # defined by the basis sets. Evaluate over the 
+        # quadrature grid Q.
+        # (only necessary for active coordinates)
+        #
+        # We can use bases_quad, because the rho element for 
+        # the Ellipsis basis must be the same for each azimuthal component
+        rhotilde = nitrogen.basis.calcRhoLogD(bases_dp, Q)
+        
+        # Calculate Gammatilde, the log deriv of the ratio
+        # of the basis weight function rho and g**1/2
+        #
+        Gammatilde = rhotilde - 0.5 * gtilde  # active only
+        
+        ####################################
+        #
+        # Construct the angular momentum operators 
+        # in the signed-k (i.e. Condon-Shortley) representation
+        #
+        # 
+        Jx,Jy,Jz = nitrogen.angmom.Jbf_cs(J)  # k ordering = -J, -J + 1, ... +J
+        iJ = (1j * Jx, 1j * Jy, 1j * Jz)
+        #
+        # Calculate the iJ, iJ anticommutator
+        iJiJ = tuple(tuple( iJ[a]@iJ[b] + iJ[b]@iJ[a] for b in range(3)) for a in range(3))
+        
+        # Define the required LinearOperator attributes
+        self.shape = (NH,NH)
+        self.dtype = np.result_type(1j)  # complex128 
+        
+        self.az_m = az_m
+        self.az_U = az_U 
+        self.az_UH = az_UH 
+        self.sing_val_mask = sing_val_mask 
+        self.fbr_shape = fbr_shape 
+        self.NDP = NDP 
+        self.NV = NV 
+        self.svm_1d = svm_1d 
+        self.J = J 
+        self.bases_dp = bases_dp
+        self.ellipsis_idx = ellipsis_idx 
+        self.iJ = iJ
+        self.iJiJ = iJiJ
+        self.Vq = Vq 
+        self.axis_of_coord = axis_of_coord 
+        self.Gammatilde = Gammatilde 
+        self.G = G 
+        self.G_is_zero = G_is_zero
+        self.hbar = hbar 
+        self.nact = len(vvar) # The number of active coordinates 
+        
+        return 
+    
+    @staticmethod 
+    def _process_basis(bases,  azimuth, J, signed_azimuth):
+        """
+        Process an AzimuthalLinear basis function set.
+
+        Parameters
+        ----------
+        bases : list
+            The basis set specification
+        azimuth : list
+            The azimuthal designations.
+        J : integer
+            The total angular momentum.
+        signed_azimuth : bool
+            If True, the Ellipsis basis functions depend on the sign of 
+            the azimuthal quantum number. If False, its sign is ignored.
+
+
+        Returns
+        -------
+        az_m : list
+            The azimuthal quantum numbers for each basis factor, including
+            the rotational factor, which is first.
+        az_U : list
+            The azimuthal-to-DVR/FBR unitary transformation matrices for 
+            each basis factor. An entry of None indicates identity.
+        az_UH : list 
+            The conjugate transpose of each element of az_U. 
+            These transform from the DVR/FBR representation to the
+            azimuthal representation 
+        sing_val_mask : ndarray
+            The direct-product-basis mask indicating which 
+            basis set functions are single-valued and included.
+        svm_1d : ndarray
+            A 1D-shaped version of `sing_val_mask`
+        NH : ndarray
+            The number of non-zero entries of `svm_1d`, i.e. 
+            the size of the working basis set.
+        bases_dp : list
+            The set of direct-product basis factors. The
+            entry for the Ellipsis basis function is the concatenation 
+            of all basis sets needed for each azimuthal quantum number.
+        ellipsis_idx : integer
+            The index of the Ellipsis factor.
+            
+        
+        """
+        
         # For each basis, get the azimuthal quantum number
         # list 
         
@@ -1322,8 +1518,13 @@ class AzimuthalLinear(LinearOperator):
         min_m = -J  # Keep track of Ellipsis quantum number range;
         max_m = J   # initialize the range to [-J, J]
         
+        # For each basis factor, ...
         for i in range(len(bases)):
             if azimuth[i] is None: # This is not declared an azimuthal coordinate
+                #
+                # Its aximuthal quantum number is always 0 
+                # and it is already in its azimuthal representation
+                #
                 if np.isscalar(bases[i]): # A scalar singleton factor
                     az_m.append(np.array([0]))
                 else: # A generic basis
@@ -1479,152 +1680,8 @@ class AzimuthalLinear(LinearOperator):
         #
         bases_dp = [bases[i] if i != ellipsis_idx else ellipsis_basis_joined for i in range(len(bases))]
         
-        fbr_shape, NV = nitrogen.basis.basisShape(bases_dp)
-        axis_of_coord = nitrogen.basis.coordAxis(bases_dp)
-        vvar = nitrogen.basis.basisVar(bases_dp)
-        #coord_k_is_ellip_coord = [None for i in range(cs.nQ)]
         
-        NJ = 2*J + 1 
-        NDP = NJ * NV # The size of the rot-vib direct product basis
-                      # (which contains all ellipsis basis functions, 
-                      #  not selected by which actually occur in the working basis)
-                      
-        # Check that there is at least one active coordinate        
-        if len(vvar) == 0:
-            raise ValueError("there must be an active coordinate!") 
-            
-        ################################################    
-        # Evaluate quadrature grid quantities
-        
-        Q = nitrogen.basis.bases2grid(bases_dp) 
-        
-        ########################################
-        # Evaluate potential energy function on 
-        # quadrature grid 
-        if pes is None:
-            Vq = None # no PES to be used
-        else:
-            try: # Attempt DFun interface
-                Vq = pes.f(Q, deriv = 0)[0,0]
-            except:
-                Vq = pes(Q) # Attempt raw function
-                
-            # Apply PES min and max cutoffs
-            if Vmax is not None:
-                Vq[Vq > Vmax] = Vmax 
-            if Vmin is not None:
-                Vq[Vq < Vmin] = Vmin     
-            
-            # Then apply offset 
-            if Voffset is not None:
-                Vq = Vq - Voffset 
-        #
-        #
-        ##########################################
-        # Parse hbar and masses
-        #
-        if hbar is None:
-            hbar = nitrogen.constants.hbar 
-        
-        if not cs.isatomic:
-            raise ValueError("The coordinate system must be atomic.")
-        
-        if masses is None:
-            masses = [1.0] * cs.natoms
-
-        if len(masses) != cs.natoms:
-            raise ValueError("unexpected length of masses")
-            
-        ########################################
-        #
-        # Calculate coordinate system metric functions
-        # 
-        g = cs.Q2g(Q, deriv = 1, mode = 'bodyframe', 
-                   vvar = vvar, rvar = 'xyz', masses = masses)
-        #
-        # And then calculate its inverse and determinant
-        #
-        #G,detg = nitrogen.dfun.sym2invdet(g, 1, len(vvar))
-        G = nitrogen.linalg.packed.inv_sp(g[0])
-        # Determine which elements of G are strictly zero
-        G_is_zero = [np.max(abs(G[i])) < 1e-10 for i in range(G.shape[0])]
-        
-        
-        #
-        # Calculate the log. deriv. of det(g)
-        #
-        gtilde = [nitrogen.linalg.packed.trAB_sp(G, g[i+1]) for i in range(len(vvar))]
-        gtilde = np.stack(gtilde)
-        
-        # If J = 0, then we only need to keep the vibrational block of G.
-        # In packed storage, this is the first nv*(nv+1)/2 
-        # elements (where nv = len(vvar))
-        #
-        if J == 0:
-            nv = len(vvar)
-            nG = (nv*(nv+1))//2 
-            #G = G[0][:nG] # need only value; lower triangle row-order
-            G = G[:nG].copy() 
-        else:
-            pass      # keep all elements
-        
-
-        
-        ########################################
-        #
-        # Calculate the logarithmic derivatives of
-        # the integration volume weight function 
-        # defined by the basis sets. Evaluate over the 
-        # quadrature grid Q.
-        # (only necessary for active coordinates)
-        #
-        # We can use bases_quad, because the rho element for 
-        # the Ellipsis basis must be the same for each azimuthal component
-        rhotilde = nitrogen.basis.calcRhoLogD(bases_dp, Q)
-        
-        # Calculate Gammatilde, the log deriv of the ratio
-        # of the basis weight function rho and g**1/2
-        #
-        Gammatilde = rhotilde - 0.5 * gtilde  # active only
-        
-        ####################################
-        #
-        # Construct the angular momentum operators 
-        # in the signed-k (i.e. Condon-Shortley) representation
-        #
-        # 
-        Jx,Jy,Jz = nitrogen.angmom.Jbf_cs(J)  # k ordering = -J, -J + 1, ... +J
-        iJ = (1j * Jx, 1j * Jy, 1j * Jz)
-        #
-        # Calculate the iJ, iJ anticommutator
-        iJiJ = tuple(tuple( iJ[a]@iJ[b] + iJ[b]@iJ[a] for b in range(3)) for a in range(3))
-        
-        # Define the required LinearOperator attributes
-        self.shape = (NH,NH)
-        self.dtype = np.result_type(1j)  # complex128 
-        
-        self.az_m = az_m
-        self.az_U = az_U 
-        self.az_UH = az_UH 
-        self.sing_val_mask = sing_val_mask 
-        self.fbr_shape = fbr_shape 
-        self.NDP = NDP 
-        self.NV = NV 
-        self.svm_1d = svm_1d 
-        self.J = J 
-        self.bases_dp = bases_dp
-        self.ellipsis_idx = ellipsis_idx 
-        self.iJ = iJ
-        self.iJiJ = iJiJ
-        self.Vq = Vq 
-        self.axis_of_coord = axis_of_coord 
-        self.Gammatilde = Gammatilde 
-        self.G = G 
-        self.G_is_zero = G_is_zero
-        self.hbar = hbar 
-        self.nact = len(vvar) # The number of active coordinates 
-        
-        return 
+        return az_m, az_U, az_UH, sing_val_mask, svm_1d, NH, bases_dp, ellipsis_idx
     
     def _matvec(self, x):
         
@@ -1914,6 +1971,221 @@ class AzimuthalLinear(LinearOperator):
         y = (np.reshape(y_dp,(-1,)))[self.svm_1d] 
         
         return y
+    
+    @staticmethod
+    def vectorRME(bases, azimuth, signed_azimuth, fun, X, Y, JX, JY):
+        """
+        Evaluate reduced matrix elements of a lab-frame vector operator.
+
+        Parameters
+        ----------
+        bases : list
+            The basis set specification.
+        azimuth : list
+            The azimuthal designations.
+        signed_azimuth : bool
+            If True, Ellipsis functions are dependent on the sign of the 
+            azimuthal quantum number.
+        fun : function
+            A function that returns the :math:`xyz` body-frame
+            components of the vector :math:`V` in terms of the
+            coordinates of `bases`.
+        X,Y : list of ndarray
+            Each element is an array of vectors in 
+            the `bases` basis set of a given value of :math:`J` 
+            following conventions of the :class:`AzimuthalLinear` 
+            Hamiltonian.
+        JX, JY : list of integer
+            The :math:`J` value for each block of `X` or `Y`.
+
+        Returns
+        -------
+        VXY : ndarray
+            The scaled reduced matrix elements :math:`\\langle X || V || Y \\rangle`.
+            See Notes to :func:`NonLinear.vectorRME` for precise definition.
+
+        See Also
+        --------
+        NonLinear.vectorRME : similar function for :class:`NonLinear` Hamiltonians
+        
+        """
+        
+        # Process Azimuthal basis sets for each value of J 
+        
+        bases_dp_list = [] 
+        NH_list = []
+        NDP_list = [] 
+        svm_1d_list = []
+        fbr_shape_list = []
+        az_U_list = [] 
+        
+        Jmax = max( max(JX), max(JY) )
+        for j in range(Jmax + 1):
+            
+            az_m, az_U, az_UH, sing_val_mask, svm_1d, NH, bases_dp, ellipsis_idx = \
+                AzimuthalLinear._process_basis(bases,  azimuth, j, signed_azimuth)
+            
+            fbr_shape, NV = nitrogen.basis.basisShape(bases_dp)
+            NDP = NV * (2*j+1)              
+            
+            bases_dp_list.append(bases_dp)      # The direct product basis set
+            NH_list.append(NH)                  # The working basis size for each J
+            NDP_list.append(NDP)                # The size of the direct product rovib azimuthal basis set
+            svm_1d_list.append(svm_1d)
+            fbr_shape_list.append(fbr_shape)
+            az_U_list.append(az_U)
+
+        # Generate the quadrature grid using the 
+        # J = 0 basis set. The quadrature grid should be 
+        # the same for every value of J anyway.
+        Q = nitrogen.basis.bases2grid(bases_dp_list[0]) 
+        
+        #
+        # Now parse the sizes of
+        # each block of vectors in X and Y
+        #
+        nX = [x.shape[1] for x in X]
+        nY = [y.shape[1] for y in Y]
+       
+        
+        # Evaluate the vector-valued function.
+        #
+        Vbf = fun(Q) 
+        # Vbf has a shape of (3,) + Q.shape[1:] (the quadrature shape)
+        
+        # Vbf[0,1,2] are the body-fixed x,y,z axis components
+        #
+        # Construct the spherical components
+        # Vq, q = 0, +1, -1
+        #
+        #   0  ... z
+        #  +1  ... -(x + iy) / sqrt[2]
+        #  -1  ... +(x - iy) / sqrt[2]
+        #
+        # Note that the ordering of the spherical components
+        # allow normal array indexing
+        Vq = [  Vbf[2],
+               -(Vbf[0] + 1j*Vbf[1])/np.sqrt(2.0),
+               +(Vbf[0] - 1j*Vbf[1])/np.sqrt(2.0)]
+        
+        dX,dY = sum(nX), sum(nY) # The total size of the reduced matrix 
+        
+        # Initialize the reduced matrix
+        VXY = np.zeros((dX,dY), dtype = np.complex128)
+        
+        # 
+        # Calculate <X||MU||Y> reduced matrix element
+        # block-by-block, including extra scaling.
+        
+        def block2quad(Z, JZ):
+            # transform a block of eigenvectors to its quadrature
+            # representation 
+            #
+            # Transformation steps:
+            # 1) Working (single-valued) representation to direct-product azimuthal
+            # 2) Azimuthal to mixed DVR/FBR
+            # 3) mixed DVR/FBR to quadrature 
+            #
+            nz = Z.shape[1] # The number of vectors in this block
+            
+            # Z has shape (NH, nz)
+            
+            # 1) Convert to direct-product azimuthal representation
+            Z_dp = np.zeros((NDP_list[JZ], nz), dtype = np.complex128)
+            Z_dp[svm_1d_list[JZ],:] = Z
+            Z_dp = np.reshape(Z_dp, (2*JZ+1,) + fbr_shape_list[JZ] + (nz,))
+            
+            # 2) Transform to mixed DVR/FBR representation 
+            #    Include a [None] element to leave last index the same
+            #
+            Z_fbr = nitrogen.basis.ops.opTensorO(Z_dp, az_U_list[JZ] + [None])
+            
+            # 3) Transform to quadrature grid
+            #    Do ellipsis index first to save space
+            Z_qe = bases_dp_list[JZ][ellipsis_idx].basis2grid(Z_fbr, axis = ellipsis_idx + 1)
+            Zq = Z_qe 
+            for i,b in enumerate(bases_dp_list[JZ]):
+                if np.isscalar(b):
+                    pass
+                elif i != ellipsis_idx:
+                    Zq = b.basis2grid(Zq, axis = i + 1) 
+                else:
+                    pass
+            
+            return Zq 
+            
+        
+        for i in range(len(nX)):
+            
+            # Transform X[i] block to quadrature grid 
+            xi = block2quad(X[i], JX[i])  # (NJ, quad_shape, nX[i])
+            
+            for j in range(len(nY)):
+                
+                # Transform Y[j] block to quadrature grid 
+                yj = block2quad(Y[j], JY[j])
+                
+                
+                # idx_x and idx_y will be the array indices
+                # of the final VXY reduced matrix
+                #
+                # Each block starts at the position equal to the 
+                # sum of the sizes of the previous blocks
+                
+                # bi and bj will index the vectors within each block
+                
+                idx_x = sum(nX[:i])
+                for bi in range(nX[i]):
+                    
+                    idx_y = sum(nY[:j])
+                    for bj in range(nY[j]):
+                        
+                        # Perform summation over body-fixed spherical 
+                        # component q and the body-fixed projections
+                        # k (of X) and k' (of Y)
+                        #
+                        for q in [0,1,-1]: # ordering here doesn't matter
+                            for k in range(-JX[i], JX[i]+1):
+                                for kp in range(-JY[j], JY[j]+1):
+                                    
+                                    # Check selection rules 
+                                    if JX[i] < abs(JY[j]-1) or JX[i] > JY[j] + 1:
+                                        # failed triangle rule
+                                        continue 
+                                    if kp - q != k :
+                                        # failed z-component rule
+                                        continue 
+                                    
+                                    # Calculate contribution to reduced
+                                    # matrix element
+                                    #
+                                    factor = (-1)**(JX[i] + kp + q) * \
+                                            nitrogen.angmom.wigner3j(2*JX[i], 2*JY[j], 2*1,
+                                                                     2*k,    -2*kp   , 2*q)
+                                    if factor == 0.0:
+                                        continue # final check for zero
+                                    
+                                    # Compute quadrature sum of the vibrational
+                                    # integral
+                                    bra = xi[JX[i] + k , ..., bi]
+                                    ket = yj[JY[j] + kp, ..., bj]
+                                    mid = Vq[-q] 
+                                    integral = np.sum(np.conj(bra) * mid * ket) 
+                                    
+                                    # Finally, 
+                                    # include sqrt[2J+1] factor to symmetrize the 
+                                    # reduced matrix ! 
+                                    #
+                                    VXY[idx_x, idx_y] += np.sqrt(2*JX[i]+1) * np.sqrt(2*JY[j] + 1) * factor * integral 
+                        
+                        idx_y += 1 
+                    
+                    idx_x += 1 
+        
+        # VXY is complete
+        # return the reduced matrix elements
+        
+        return VXY 
     
 class AzimuthalLinearRT(LinearOperator):
     """
