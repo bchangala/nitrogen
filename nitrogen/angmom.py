@@ -918,6 +918,81 @@ def caseb_multistate_S(alpha, N, k, SS1, JJ1):
     Sz = Sq[0].copy()  
     
     return Sx, Sy, Sz 
+
+def caseb_multistate_dircos(N, k, SS1, JJ1):
+    """
+    Calculate the (lab-)reduced matrix elements of the
+    direction cosine tensor in a multi-state case (b) basis set.
+
+    Parameters
+    ----------
+    N : array_like
+        The :math:`N` quantum number.
+    k : array_like
+        The signed :math:`k` quantum number.
+    SS1 : array_like
+        The value of :math:`2S+1`.
+    JJ1 : array_like
+        The value of :math:`2J+1`.
+
+    Returns
+    -------
+    lamq : ndarray
+        The body-frame spherical tensor components. 
+        ``lamq[q]`` = :math:`\\lambda_q`` where :math:`q = 0,+1,-1`.
+        
+    Notes
+    -----
+    
+    The reduced matrix element is
+    
+    ..  math::
+        
+        \\langle J' N' k' S' || \\lambda_q || J N k S \\rangle = 
+            \\delta_{SS'} (-1)^{k + S + J + 1} 
+            [(2J+1)(2N'+1)(2N+1)]^{1/2}
+            \\left(\\begin{array}{ccc} N & 1 & N' \\\\ -k & q & k' \\end{array} \\right)
+            \\left\\{\\begin{array}{ccc} N' & J' & S' \\\\ J & N & 1 \\end{array} \\right\\}
+                
+        
+    The :math:`\\alpha` index is not used here, as this is usually
+    absorbed into the factor that the direction cosine tensor
+    multiplies.
+    
+    """
+    
+    
+    n = len(N) # The number of basis functions in the list 
+    
+    lamq = np.zeros((3,n,n))
+    
+    for q in [0,1,-1]:
+        for i in range(n):
+            for j in range(n):
+                #
+                # The matrix element is diagonal in 
+                # S
+                #
+                if SS1[i] != SS1[j]:
+                    continue 
+                
+                # (-1) ** (k + J + S + 1)
+                # Note (J + S + 1) = (JJ1 + SS1)/2 
+                #
+                coeff1 = (-1)**(k[j] + (SS1[j] + JJ1[j])/2 )
+                # sqrt((2N+1) * (2N'+1) * (2J+1) )
+                coeff2 = np.sqrt( (2*N[j] + 1) * (2*N[i] + 1) * JJ1[j] ) 
+                
+                threej = wigner3j(2*N[j], 2*1, 2*N[i],
+                                 -2*k[j], 2*q,-2*k[i]) 
+                
+                sixj = wigner6j(2*N[i],   JJ1[i]-1, SS1[i]-1,
+                                JJ1[j]-1, 2*N[j],   2*1)
+                
+                lamq[q,i,j] = coeff1 * coeff2 * threej * sixj 
+ 
+    # Return the spherical components    
+    return lamq
         
 def caseb_multistate_L(Li_e, LiLj_ac_e, alpha, N, k, SS1, JJ1):
     """
