@@ -919,21 +919,30 @@ def caseb_multistate_S(alpha, N, k, SS1, JJ1):
     
     return Sx, Sy, Sz 
 
-def caseb_multistate_dircos(N, k, SS1, JJ1):
+def caseb_multistate_dircos(Np, kp, SS1p, JJ1p, 
+                            N, k, SS1, JJ1):
     """
     Calculate the (lab-)reduced matrix elements of the
     direction cosine tensor in a multi-state case (b) basis set.
 
     Parameters
     ----------
+    Np : array_like
+        The bra :math:`N` quantum number.
+    kp : array_like
+        The bra signed :math:`k` quantum number.
+    SS1p : array_like
+        The bra value of :math:`2S+1`.
+    JJ1p : array_like
+        The bra value of :math:`2J+1`.
     N : array_like
-        The :math:`N` quantum number.
+        The ket :math:`N` quantum number.
     k : array_like
-        The signed :math:`k` quantum number.
+        The ket signed :math:`k` quantum number.
     SS1 : array_like
-        The value of :math:`2S+1`.
+        The ket value of :math:`2S+1`.
     JJ1 : array_like
-        The value of :math:`2J+1`.
+        The ket value of :math:`2J+1`.
 
     Returns
     -------
@@ -961,19 +970,19 @@ def caseb_multistate_dircos(N, k, SS1, JJ1):
     
     """
     
+    np = len(Np) # The number of bra functions
+    n = len(N) # The number of ket functions
     
-    n = len(N) # The number of basis functions in the list 
-    
-    lamq = np.zeros((3,n,n))
+    lamq = np.zeros((3,np,n))
     
     for q in [0,1,-1]:
-        for i in range(n):
+        for i in range(np):
             for j in range(n):
                 #
                 # The matrix element is diagonal in 
                 # S
                 #
-                if SS1[i] != SS1[j]:
+                if SS1p[i] != SS1[j]:
                     continue 
                 
                 # (-1) ** (k + J + S + 1)
@@ -981,13 +990,13 @@ def caseb_multistate_dircos(N, k, SS1, JJ1):
                 #
                 coeff1 = (-1)**(k[j] + (SS1[j] + JJ1[j])/2 )
                 # sqrt((2N+1) * (2N'+1) * (2J+1) )
-                coeff2 = np.sqrt( (2*N[j] + 1) * (2*N[i] + 1) * JJ1[j] ) 
+                coeff2 = np.sqrt( (2*N[j] + 1) * (2*Np[i] + 1) * JJ1[j] ) 
                 
-                threej = wigner3j(2*N[j], 2*1, 2*N[i],
-                                 -2*k[j], 2*q,-2*k[i]) 
+                threej = wigner3j(2*N[j], 2*1, 2*Np[i],
+                                 -2*k[j], 2*q,-2*kp[i]) 
                 
-                sixj = wigner6j(2*N[i],   JJ1[i]-1, SS1[i]-1,
-                                JJ1[j]-1, 2*N[j],   2*1)
+                sixj = wigner6j(2*Np[i],   JJ1p[i]-1, SS1p[i]-1,
+                                JJ1[j]-1,  2*N[j],    2*1)
                 
                 lamq[q,i,j] = coeff1 * coeff2 * threej * sixj 
  
