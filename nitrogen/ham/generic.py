@@ -1285,8 +1285,13 @@ class AzimuthalLinear(LinearOperator):
         """
         
         # Process Azimuthal basis factors 
-        az_m, az_U, az_UH, sing_val_mask, svm_1d, NH, bases_dp, ellipsis_idx = \
-            AzimuthalLinear._process_basis(bases,  azimuth, J, signed_azimuth)
+        #
+        # Define the azimuthal quantum number of the rotational 
+        # basis functions, which is just -k
+        k_azimuth = -np.arange(-J,J+1) # -k for basis order k = -J,...,+J
+        
+        az_m, az_U, az_UH, sing_val_mask, svm_1d, NH, bases_dp, ellipsis_idx  = \
+            AzimuthalLinear._process_generic_azimuthal_basis(bases, azimuth, k_azimuth, signed_azimuth)
         
         
         fbr_shape, NV = nitrogen.basis.basisShape(bases_dp)
@@ -1437,18 +1442,19 @@ class AzimuthalLinear(LinearOperator):
         return 
     
     @staticmethod 
-    def _process_basis(bases,  azimuth, J, signed_azimuth):
+    def _process_generic_azimuthal_basis(bases, azimuth, sre_quantum_number, signed_azimuth):
         """
         Process an AzimuthalLinear basis function set.
 
         Parameters
         ----------
         bases : list
-            The basis set specification
+            The vibrational basis set specification
         azimuth : list
-            The azimuthal designations.
-        J : integer
-            The total angular momentum.
+            The azimuthal designations of `bases`.
+        sre_quantum_number : array_like
+            The effective azimuthal quantum number for a general (spin-electronic-)rotational
+            basis factor.
         signed_azimuth : bool
             If True, the Ellipsis basis functions depend on the sign of 
             the azimuthal quantum number. If False, its sign is ignored.
@@ -1482,6 +1488,15 @@ class AzimuthalLinear(LinearOperator):
             The index of the Ellipsis factor.
             
         
+        Notes
+        -----
+        The value of `sre_quantum_number` should be :math:`-k` for 
+        standard symmetric top rotational basis functions, where :math:`k`
+        is the projection along the body-fixed :math:`z` axis. For 
+        linear molecules with orbital angular momentum, it should be
+        the value of :math:`-k + \\Lambda` for each case (b) basis
+        function.
+        
         """
         
         # For each basis, get the azimuthal quantum number
@@ -1508,15 +1523,23 @@ class AzimuthalLinear(LinearOperator):
                    # representation to mixed DVR-FBR
                    # (entries of None indicate identity)
                    
-        # The signed-k (i.e. Condon-Shortley representation) rotational
-        # basis functions are first. We append the *negative* of
-        # this value to the az_m list
+        # 
+        # sre_quantum_number contains the azimuthal quantum number
+        # of the generic (spin-electronic-)rotational factor.
         #
-        az_m.append(-np.arange(-J,J+1))  # signed-k rotational factor
+        # E.g., for standard symmetric top rotational basis functions
+        # it equals the negative of the Jz component.
+        #
+        #
+        #
+        az_m.append(np.array(sre_quantum_number))  # generic spin-rotation factor
         az_U.append(None) #  Already in azimuthal representation 
         
-        min_m = -J  # Keep track of Ellipsis quantum number range;
-        max_m = J   # initialize the range to [-J, J]
+        # Keep track of the Ellipsis quantum number range needed
+        # Initialize these limits to the min/max of -az_m[0] (Note *negative*)
+        #
+        min_m = min(-az_m[0])
+        max_m = max(-az_m[0]) 
         
         # For each basis factor, ...
         for i in range(len(bases)):
@@ -1585,10 +1608,12 @@ class AzimuthalLinear(LinearOperator):
         # We now need to determine what azimuthal quantum number range
         # is necessary for the Ellipsis basis, which takes all the slack
         #
-        # m = k - sum(all other m's)
+        # m = -az_m[0] - sum(all other m's)
         #
-        # The largest value of m is max(k) - sum( min(other m's) )
-        # The smallest value is min(k) - sum(max(other m's)) 
+        # Remember, +az_m[0] equals k or (k-Lambda), etc.
+        #
+        # The largest value of m is max(-az_m[0]) - sum( min(other m's) )
+        # The smallest value is min(-az_m[0]) - sum(max(other m's)) 
         #
         # These have been kept track of with min_m and max_m in the above
         # loops
@@ -1652,7 +1677,7 @@ class AzimuthalLinear(LinearOperator):
                 non_ellip_total += -az_grids[i] # note negative sign
         az_e = az_grids[ellipsis_idx + 1] 
         #
-        # non_ellip_total is equal to k - Sum' m 
+        # non_ellip_total is equal to -az_m[0] - Sum' m 
         # where the Sum' is over all non-ellipsis azimuthal 
         # quantum numbers
         # 
@@ -2022,8 +2047,9 @@ class AzimuthalLinear(LinearOperator):
         Jmax = max( max(JX), max(JY) )
         for j in range(Jmax + 1):
             
-            az_m, az_U, az_UH, sing_val_mask, svm_1d, NH, bases_dp, ellipsis_idx = \
-                AzimuthalLinear._process_basis(bases,  azimuth, j, signed_azimuth)
+            k_azimuth = -np.arange(-j,j+1) # -k for basis order k = -J,...,+J
+            az_m, az_U, az_UH, sing_val_mask, svm_1d, NH, bases_dp, ellipsis_idx  = \
+                AzimuthalLinear._process_generic_azimuthal_basis(bases, azimuth, k_azimuth, signed_azimuth)
             
             fbr_shape, NV = nitrogen.basis.basisShape(bases_dp)
             NDP = NV * (2*j+1)              
@@ -2320,296 +2346,23 @@ class AzimuthalLinearRT(LinearOperator):
         
         """
         
-        ######################################################
-        # First, process the spin-rotation-electronic basis
-        # functions
-        #
-        if NE < 1:
-            raise ValueError("NE must be a positive integer")
-        
-        # Defaults:
-        # Lambda --> All Sigma states
-        # S --> All singlet states
-        if Lambda is None:
-            Lambda = (0,) * NE # The z-axis component of L
-        if SS1 is None:
-            SS1 = (1,) * NE    # The spin multiplicity of each state 
-        
-        if len(Lambda) != NE:
-            raise ValueError('Lambda must have NE entries')
-        if len(SS1) != NE:
-            raise ValueError('SS1 must have NE entries')
-        
-        # Check that the half-integer or integer
-        # character of J and S are consistent. Their multiplicities
-        # must both be even or odd, so their sum must be even
-        #
-        if JJ1 < 1:
-            raise ValueError("J multiplicity must be a positive integer")
-            
-        for ss1 in SS1:
-            if (JJ1 + ss1) % 2 == 1:
-                raise ValueError("J and S are not compatible")
-            if ss1 < 1:
-                raise ValueError("S multiplicity must be a positive integer")
-        #
-        # Now, construct the list of case (b) quantum numbers
-        # for each electronic state
-        sre_basis_list = [] 
-        # The column order is 
-        # electronic index, Lambda, N, k, 2S+1, 2J+1
-        #
-        for iE in range(NE):
-            
-            ss1 = SS1[iE] # 2S + 1 for this electronic state
-            
-            # Calculate the allowed range of the N
-            # quantum number, which is strictly integer
-            Nmin = abs(JJ1 - ss1) // 2
-            Nmax = (JJ1 + ss1) // 2 - 1 
-            
-            for Nval in range(Nmin, Nmax + 1):
-                # For each value of N, we have (2*N+1)
-                # values of k, the signed z-axis projection
-                # (using the usual "anomalous" convention)
-                
-                for k in range(-Nval, Nval+1):
-                    qns = [iE, Lambda[iE], Nval, k, ss1, JJ1]
-                    sre_basis_list.append(qns)
-                    
-        sre_basis_list = np.array(sre_basis_list)
-        # The number of spin-rot-electronic basis functions
-        Nsre = sre_basis_list.shape[0]
-        
         print("***************************************")
         print("Preparing AzimuthalLinearRT Hamiltonian")
         print("")
-        print("Spin-rotation-electronic basis")
-        print("------------------------------")
-        print(f" Total # of sre functions = {Nsre:d}")
-        print("------------------------------")
-        print(" E-idx Lambda N   k    S    J ")
-        print("------------------------------")
-        eidx_prev = -1 
-        for i in range(Nsre):
-            qn = sre_basis_list[i]
-            Sstr = f" {(qn[4]-1)//2:2d}" if qn[4] % 2 == 1 else f"{(qn[4]-1)/2:4.1f}"
-            Jstr = f" {(qn[5]-1)//2:2d}" if qn[5] % 2 == 1 else f"{(qn[5]-1)/2:4.1f}"
+        
+        # Construct the case (b) spin-rotation-electronic 
+        # basis set list.
+        Lambda, SS1, sre_basis_list  = AzimuthalLinearRT._process_sre_basis(JJ1, NE, Lambda, SS1)
+        Nsre = sre_basis_list.shape[0] # The total number of sre functions
+        #
+        # The sre azimuthal quantum number is -k + Lambda
+        #
+        sre_azimuthal = -sre_basis_list[:,3] + sre_basis_list[:,1] 
+        
+        # Now process the entire sre-vibrational basis 
+        az_m, az_U, az_UH, sing_val_mask, svm_1d, NH, bases_dp, ellipsis_idx  = \
+            AzimuthalLinear._process_generic_azimuthal_basis(bases, azimuth, sre_azimuthal, signed_azimuth)
             
-            if eidx_prev != qn[0]:
-                print(f"  {qn[0]:2d}    {qn[1]:2d}   ",end="")
-            else:
-                print("             ", end = "")
-                
-            print(f"{qn[2]:2d}  {qn[3]:2d}  {Sstr:4s} {Jstr:4s} ")
-            
-            eidx_prev = qn[0]
-            
-        print("------------------------------")
-        
-        # Process ASO tensor
-        if ASO is None:
-            ASO = np.zeros((3,3))
-        ASO = np.array(ASO)
-        if ASO.shape != (3,3):
-            raise ValueError("ASO must be a constant (3,3) array")
-        print("")
-        print("The ASO spin-orbit tensor is ")
-        print(ASO)
-        print("")
-        
-        # For each basis, get the azimuthal quantum number
-        # list 
-        
-        if len(azimuth) != len(bases):
-            raise ValueError("azimuth must be same length as bases")
-        
-        # There should be one entry of Ellipsis in the azimuth list
-        n = 0
-        for i,entry in enumerate(azimuth):
-            if entry is Ellipsis:
-                n += 1
-                ellipsis_idx = i # The basis index for the Ellipsis factor
-        if n != 1:
-            raise ValueError("azimuth must contain exactly one Ellipsis")
-        
-        # The ellipsis entry must be a callable 
-        if not callable(bases[ellipsis_idx]):
-            raise ValueError("The ... bases entry must be callable")
-        
-        az_m = []  # Entry for each basis factor
-        az_U = []  # Unitary transforms that convert from azimuthal 
-                   # representation to mixed DVR-FBR
-                   # (entries of None indicate identity)
-                   
-        # The spin-rotation-electronic factor is first
-        # Its entry should be the value of -k + Lambda
-        #
-        az_m.append( -sre_basis_list[:,3] + sre_basis_list[:,1] )
-        az_U.append(None) #  Already in azimuthal representation 
-        
-        # Keep track of required Ellipsis quantum number range
-        # Initialize to the min/max of k - Lambda = -az_m[0]
-        #
-        min_m = min(-az_m[0])
-        max_m = max(-az_m[0]) 
-        
-        for i in range(len(bases)):
-            if azimuth[i] is None: # This is not declared an azimuthal coordinate
-                if np.isscalar(bases[i]): # A scalar singleton factor
-                    az_m.append(np.array([0]))
-                else: # A generic basis
-                    az_m.append(np.array([0] * bases[i].nb))
-                az_U.append(None) 
-            elif azimuth[i] is Ellipsis:
-                # This is the callable "Ellipsis" basis
-                az_m.append(Ellipsis) # Place holder 
-                az_U.append(None)     # Azimuthal representation is implied
-            else:
-                #
-                # Attempt to compute the azimuthal representation of this basis.
-                # This is the representation that diagonalizes the derivative
-                # operator.
-                #
-                try:
-                    # Calculate the grid of the derivative of each basis function
-                    df = bases[i].basis2grid_d(np.eye(bases[i].nb), azimuth[i][0], axis = 0)
-                    D = bases[i].grid2basis(df, axis = 0)
-                except:
-                    raise RuntimeError(f"Attempt to build derivative operator for basis [{i:d}] failed.")
-                    
-                w,u = np.linalg.eigh(-1j * D) 
-                w *= azimuth[i][1] # correct for right or left-handed sense / unit scaling
-                #
-                # u transforms a vector in the azimuthal representation
-                # to the original FBR or DVR representation
-                
-                # in principle, w should be exact integers
-                # assuming a proper basis has been chosen
-                # (i.e. one that is closed under rotations of the azimuthal 
-                #  coordinate) 
-                #
-                # Let's check that the eigenvalues are indeed close to integer
-                # values 
-                w_int = np.rint(w).astype(np.int32) # round to nearest integer
-                if np.max(np.absolute(w_int - w)) > 1e-10:
-                    print("Warning: azimuthal quantum numbers are not quite integer!"
-                          " (or perhaps were rounded unexpectedly)")
-                
-                az_m.append(w_int) # Save the integer values
-                az_U.append(u) 
-                
-                min_m -= np.max(w_int)
-                max_m -= np.min(w_int)
-                
-        # Calculate the conjugate tranpose of each az_U
-        # This will transform from original DVR/FBR basis to the azimuthal representation
-        #
-        az_UH = []
-        for U in az_U:
-            if U is None:
-                az_UH.append(None)
-            else:
-                az_UH.append(U.conj().T) # conjugate transpose  
-        
-        #
-        # We now need to determine what azimuthal quantum number range
-        # is necessary for the Ellipsis basis, which takes all the slack
-        #
-        # m = k - Lambda - sum(all other m's)
-        #
-        # The largest value of m is max(k - Lambda) - sum( min(other m's) )
-        # The smallest value is min(k - Lambda) - sum(max(other m's)) 
-        #
-        # These have been kept track of with min_m and max_m in the above
-        # loops
-        ellipsis_range = np.arange(min_m, max_m + 1)
-        
-        # If the sign of the ellipsis quantum number does not matter
-        # then we can truncate the range further
-        if not signed_azimuth:
-            max_abs = max(abs(min_m), abs(max_m))
-            ellipsis_range = np.arange(0, max_abs + 1) 
-            print("The Ellipsis basis is not sign dependent.")
-        else:
-            print("The Ellipsis basis is sign dependent.")
-        
-        print("Attempting to calculate Ellipsis bases over m = ")
-        print(ellipsis_range)
-            
-        #
-        # For each m in this range, bases[ellipsis_idx](m) returns
-        # a basis specification. This must be a compatible GriddedBasis, i.e.
-        # not a scalar. (It is possible that a basis cannot be formed, in which
-        # case we will not include that azimuthal quantum number.)
-        #
-        ellipsis_bases = []
-        actual_ellipsis_range = []
-        for m in ellipsis_range:
-            try:
-                b = bases[ellipsis_idx](m) 
-                ellipsis_bases.append(b)
-                actual_ellipsis_range.append(m)
-            except:
-                print(f"Note: azimuthal basis m = {m:d} is being skipped.")
-    
-        ellipsis_range = actual_ellipsis_range 
-        if len(ellipsis_range) == 0:
-            raise ValueError("No Ellipsis bases could be formed!")
-        
-        #
-        # Concatenate the individual blocks of basis functions
-        # for the Ellipsis factor into a single generic basis set
-        # and record the corresponding azimuthal quantum number for
-        # every individual basis function
-        ellipsis_basis_joined = nitrogen.basis.ConcatenatedBasis(ellipsis_bases) 
-        size_of_ellipsis_m = [b.nb for b in ellipsis_bases]
-        # Nellip = sum(size_of_ellipsis_m)
-        az_m[ellipsis_idx + 1] = np.repeat(ellipsis_range, np.array(size_of_ellipsis_m))
-        
-        #
-        # az_m now contains the azimuthal quantum numbers for each basis factor.
-        # Non-azimuthal factors and fixed scalars have values of zero.
-        # We now need to determine which combinations of direct products
-        # have the correct quantum numbers 
-        #
-        
-        az_grids = np.meshgrid(*az_m, indexing = 'ij') 
-        
-        non_ellip_total = np.zeros_like(az_grids[0])
-        for i in range(len(az_grids)):
-            if i != (ellipsis_idx + 1):
-                non_ellip_total += -az_grids[i] # Note negative sign 
-        az_e = az_grids[ellipsis_idx + 1] 
-        #
-        # non_ellip_total is equal to k - Lambda - Sum' m 
-        # where the Sum' is over all non-ellipsis azimuthal 
-        # quantum numbers
-        # 
-        # az_e is the ellipsis factor azimuthal quantum number
-        #
-        if signed_azimuth:
-            sing_val_mask = (az_e == non_ellip_total)
-        else:
-            sing_val_mask = (az_e == abs(non_ellip_total)) 
-            
-        svm_1d = np.reshape(sing_val_mask, (-1,)) 
-        NH = np.count_nonzero(svm_1d)  # the number of single-valued functions
-        
-        # The True values of svm_1d are the direct-product functions
-        # in the azimuthal representation that have the correct 
-        # combination of quantum numbers.
-        
-        ########################################
-        # Analyze final direct-product basis shape
-        # and activity
-        #
-        # First, form the final vibrational bases list including the 
-        # concatenated Ellipsis basis. This is the direct-product
-        # basis set in the DVR/FBR representation
-        #
-        bases_dp = [bases[i] if i != ellipsis_idx else ellipsis_basis_joined for i in range(len(bases))]
-        
         fbr_shape, NV = nitrogen.basis.basisShape(bases_dp)
         axis_of_coord = nitrogen.basis.coordAxis(bases_dp)
         vvar = nitrogen.basis.basisVar(bases_dp)
@@ -2790,6 +2543,20 @@ class AzimuthalLinearRT(LinearOperator):
                                                          sre_basis_list[:,4], # 2S+1
                                                          sre_basis_list[:,5]) # 2J+1
         
+        ###########################
+        # Process ASO tensor
+        if ASO is None:
+            ASO = np.zeros((3,3))
+        ASO = np.array(ASO)
+        if ASO.shape != (3,3):
+            raise ValueError("ASO must be a constant (3,3) array")
+        print("")
+        print("The ASO spin-orbit tensor is ")
+        print(ASO)
+        print("")
+        #
+        ###########################
+        
         
         # Define the required LinearOperator attributes
         self.shape = (NH,NH)
@@ -2826,6 +2593,111 @@ class AzimuthalLinearRT(LinearOperator):
         self.nact = len(vvar) # The number of active coordinates 
         
         return 
+    
+    @staticmethod 
+    def _process_sre_basis(JJ1, NE, Lambda, SS1):
+                                                     
+        """
+        see AzimuthalLinear._process_basis for more information
+        
+        Returns
+        -------
+        Lambda : array_like
+            The value of :math:`\\Lambda` for each of the `NE` electronic states
+        SS1 : array_like
+            The value of :math:`2S+1` for each of the `NE` electronic states.
+        sre_basis_list : ndarray
+            The case (b) quantum numbers. The column order is 
+            electronic index, Lambda, N, k, 2S+1, 2J+1.
+        """
+        
+        ######################################################
+        # Generate spin-rotation-electronic basis set list
+        # and quantum numbers
+        #
+        if NE < 1:
+            raise ValueError("NE must be a positive integer")
+        
+        # Defaults:
+        # Lambda --> All Sigma states
+        # S --> All singlet states
+        if Lambda is None:
+            Lambda = (0,) * NE # The z-axis component of L
+        if SS1 is None:
+            SS1 = (1,) * NE    # The spin multiplicity of each state 
+        
+        if len(Lambda) != NE:
+            raise ValueError('Lambda must have NE entries')
+        if len(SS1) != NE:
+            raise ValueError('SS1 must have NE entries')
+        
+        # Check that the half-integer or integer
+        # character of J and S are consistent. Their multiplicities
+        # must both be even or odd, so their sum must be even
+        #
+        if JJ1 < 1:
+            raise ValueError("J multiplicity must be a positive integer")
+            
+        for ss1 in SS1:
+            if (JJ1 + ss1) % 2 == 1:
+                raise ValueError("J and S are not compatible")
+            if ss1 < 1:
+                raise ValueError("S multiplicity must be a positive integer")
+        #
+        # Now, construct the list of case (b) quantum numbers
+        # for each electronic state
+        sre_basis_list = [] 
+        # The column order is 
+        # electronic index, Lambda, N, k, 2S+1, 2J+1
+        #
+        for iE in range(NE):
+            
+            ss1 = SS1[iE] # 2S + 1 for this electronic state
+            
+            # Calculate the allowed range of the N
+            # quantum number, which is strictly integer
+            Nmin = abs(JJ1 - ss1) // 2
+            Nmax = (JJ1 + ss1) // 2 - 1 
+            
+            for Nval in range(Nmin, Nmax + 1):
+                # For each value of N, we have (2*N+1)
+                # values of k, the signed z-axis projection
+                # (using the usual "anomalous" convention)
+                
+                for k in range(-Nval, Nval+1):
+                    qns = [iE, Lambda[iE], Nval, k, ss1, JJ1]
+                    sre_basis_list.append(qns)
+                    
+        sre_basis_list = np.array(sre_basis_list)
+        # The number of spin-rot-electronic basis functions
+        Nsre = sre_basis_list.shape[0]
+        
+        
+        print("Spin-rotation-electronic basis")
+        print("------------------------------")
+        print(f" Total # of sre functions = {Nsre:d}")
+        print("------------------------------")
+        print(" E-idx Lambda N   k    S    J ")
+        print("------------------------------")
+        eidx_prev = -1 
+        for i in range(Nsre):
+            qn = sre_basis_list[i]
+            Sstr = f" {(qn[4]-1)//2:2d}" if qn[4] % 2 == 1 else f"{(qn[4]-1)/2:4.1f}"
+            Jstr = f" {(qn[5]-1)//2:2d}" if qn[5] % 2 == 1 else f"{(qn[5]-1)/2:4.1f}"
+            
+            if eidx_prev != qn[0]:
+                print(f"  {qn[0]:2d}    {qn[1]:2d}   ",end="")
+            else:
+                print("             ", end = "")
+                
+            print(f"{qn[2]:2d}  {qn[3]:2d}  {Sstr:4s} {Jstr:4s} ")
+            
+            eidx_prev = qn[0]
+            
+        print("------------------------------")
+        
+        return Lambda, SS1, sre_basis_list 
+        
     
     def _matvec(self, x):
         
@@ -3189,3 +3061,298 @@ class AzimuthalLinearRT(LinearOperator):
         y = (np.reshape(y_dp,(-1,)))[self.svm_1d] 
         
         return y
+    
+    @staticmethod
+    def vectorRME(bases, azimuth, signed_azimuth, NE, Lambda, SS1, fun, X, Y, JJ1X, JJ1Y,
+                  funorder = 'LR'):
+        """
+        Evaluate reduced matrix elements of a lab-frame vector operator.
+
+        Parameters
+        ----------
+        bases : list
+            The basis set specification.
+        azimuth : list
+            The azimuthal designations.
+        signed_azimuth : bool
+            If True, Ellipsis functions are dependent on the sign of the 
+            azimuthal quantum number.
+        NE : integer
+            The number of electronic states 
+        Lambda : array_like
+            The Lambda values for each electronic state
+        SS1 : array_like
+            The 2S+1 values for each electronic state
+        fun : function
+            A function that returns the electronic matrix elements
+            of the :math:`xyz` body-frame
+            components of the vector :math:`V` in terms of the
+            coordinates of `bases`. The return shape should be
+            (3,NE*(NE+1)/2,...)
+            Note, we assume :math:`V` is Hermitian in the
+            electronic basis. 
+        X,Y : list of ndarray
+            Each element is an array of vectors in 
+            the `bases` basis set of a given value of :math:`J` 
+            following conventions of the :class:`AzimuthalLinear` 
+            Hamiltonian.
+        JJ1X, JJ1Y : list of integer
+            The :math:`2J+1` value for each block of `X` or `Y`.
+        funorder : {'LR', 'LC'}, optional
+            :math:`V` matrix electronic state ordering. The `fun` function returns
+            the *lower* triangle of the diabatic vector-operator matrix. If 'LR'
+            (default), the values are returned in row major order. If 'LC'
+            the values are returned in column major order.
+
+        Returns
+        -------
+        VXY : ndarray
+            The scaled reduced matrix elements :math:`\\langle X || V || Y \\rangle`.
+            See Notes to :func:`NonLinear.vectorRME` for precise definition of
+            the scaling.
+
+        See Also
+        --------
+        NonLinear.vectorRME : similar function for :class:`NonLinear` Hamiltonians
+        
+        """
+        
+        # Process Azimuthal basis sets for each value of J 
+        
+        bases_dp_list = [] 
+        NH_list = []
+        NDP_list = [] 
+        svm_1d_list = []
+        fbr_shape_list = []
+        az_U_list = [] 
+        Nsre_list = [] 
+        sre_basis_list_list = []
+        
+        JJ1max = max( max(JJ1X), max(JJ1Y) )
+        
+        # 2J+1 is either 1, 3, 5, ...
+        # or 2, 4, 6, ...
+        # The starting value is 2 - (JJ1max % 2)
+        jj1_list = list(range(2-(JJ1max%2), JJ1max + 2, 2))
+        
+        for jj1 in jj1_list:
+            
+            Lambda, SS1, sre_basis_list  = AzimuthalLinearRT._process_sre_basis(jj1, NE, Lambda, SS1)
+            Nsre = sre_basis_list.shape[0] # The total number of sre functions
+            #
+            # The sre azimuthal quantum number is -k + Lambda
+            #
+            sre_azimuthal = -sre_basis_list[:,3] + sre_basis_list[:,1] 
+            
+            az_m, az_U, az_UH, sing_val_mask, svm_1d, NH, bases_dp, ellipsis_idx  = \
+                AzimuthalLinear._process_generic_azimuthal_basis(bases, azimuth, sre_azimuthal, signed_azimuth)
+            
+            fbr_shape, NV = nitrogen.basis.basisShape(bases_dp)
+            NDP = NV * Nsre           
+            
+            bases_dp_list.append(bases_dp)      # The direct product basis set
+            NH_list.append(NH)                  # The working basis size for each J
+            NDP_list.append(NDP)                # The size of the direct product sre-vib azimuthal basis set
+            svm_1d_list.append(svm_1d)
+            fbr_shape_list.append(fbr_shape)
+            az_U_list.append(az_U)
+            Nsre_list.append(Nsre)
+            sre_basis_list_list.append(sre_basis_list)
+        
+        # We need the direction cosine reduced matrix elements between
+        # each jj1 block
+        
+        dircos = [[None for iidx in range(len(jj1_list))] for jidx in range(len(jj1_list))]
+        
+        for iidx in range(len(jj1_list)):
+            for jidx in range(len(jj1_list)):
+                # 0                 1       2  3   4     5
+                # electronic index, Lambda, N, k, 2S+1, 2J+1.
+                
+                dircos[iidx][jidx] = nitrogen.angmom.caseb_multistate_dircos(
+                    sre_basis_list_list[iidx][:,2],
+                    sre_basis_list_list[iidx][:,3],
+                    sre_basis_list_list[iidx][:,4],
+                    sre_basis_list_list[iidx][:,5],
+                    sre_basis_list_list[jidx][:,2],
+                    sre_basis_list_list[jidx][:,3],
+                    sre_basis_list_list[jidx][:,4],
+                    sre_basis_list_list[jidx][:,5])
+        
+        # Generate the quadrature grid using the 
+        # first JJ1 basis set. The quadrature grid should be 
+        # the same for every value of J anyway.
+        Q = nitrogen.basis.bases2grid(bases_dp_list[0]) 
+        
+        #
+        # Now parse the sizes of
+        # each block of vectors in X and Y
+        #
+        nX = [x.shape[1] for x in X]
+        nY = [y.shape[1] for y in Y]
+       
+        
+        ###################################
+        # Evaluate vector-valued matrix elements
+        # over th equadrature grid 
+        Vtri = fun(Q) # The lower triangle, in row of column-major order Vtri[xyz,idx,...]
+        idx = 0 
+        Vaij = [[[None for j in range(NE)] for i in range(NE)] for a in range(3)]
+        if funorder == 'LR':
+            # The function provides the lower triangle
+            # in row major order
+            for i in range(NE):
+                for j in range(i+1):
+                    
+                    for a in range(3):
+                        Vaij[a][i][j] = Vtri[a,idx]
+                        if i != j:
+                            Vaij[a][j][i] = np.conj( Vaij[a][i][j] ) # Hermitian
+                    
+                    idx = idx + 1 
+                    
+        elif funorder == 'LC':
+            # Column major order
+            for j in range(NE):
+                for i in range(j,NE):
+                    
+                    Vaij[a][i][j] = Vtri[a,idx]
+                    if i != j:
+                        Vaij[a][j][i] = np.conj( Vaij[a][i][j] ) # Hermitian
+                    
+                    idx = idx + 1
+                    
+        else:
+            raise ValueError("Invalid funorder")
+            
+        
+        
+        
+        # Vaij[0,1,2] are the body-fixed x,y,z axis components
+        #
+        # Construct the spherical components
+        # Vq, q = 0, +1, -1
+        #
+        #   0  ... z
+        #  +1  ... -(x + iy) / sqrt[2]
+        #  -1  ... +(x - iy) / sqrt[2]
+        #
+        # Note that the ordering of the spherical components
+        # allow normal array indexing
+        
+        Vq = [ [[  Vaij[2][i][j]                                  for j in range(NE)] for i in range(NE)],
+               [[-(Vaij[0][i][j] + 1j*Vaij[1][i][j])/np.sqrt(2.0) for j in range(NE)] for i in range(NE)],
+               [[+(Vaij[0][i][j] - 1j*Vaij[1][i][j])/np.sqrt(2.0) for j in range(NE)] for i in range(NE)] ]
+        
+        dX,dY = sum(nX), sum(nY) # The total size of the reduced matrix 
+        
+        # Initialize the reduced matrix
+        VXY = np.zeros((dX,dY), dtype = np.complex128)
+        
+        # 
+        # Calculate <X||MU||Y> reduced matrix element
+        # block-by-block, including extra scaling.
+        
+        def block2quad(Z, jidx):
+            # transform a block of eigenvectors to its quadrature
+            # representation 
+            #
+            # Transformation steps:
+            # 1) Working (single-valued) representation to direct-product azimuthal
+            # 2) Azimuthal to mixed DVR/FBR
+            # 3) mixed DVR/FBR to quadrature 
+            #
+            nz = Z.shape[1] # The number of vectors in this block
+            
+            # Z has shape (NH, nz)
+            
+            # 1) Convert to direct-product azimuthal representation
+            Z_dp = np.zeros((NDP_list[jidx], nz), dtype = np.complex128)
+            Z_dp[svm_1d_list[jidx],:] = Z
+            Z_dp = np.reshape(Z_dp, (Nsre_list[jidx],) + fbr_shape_list[jidx] + (nz,))
+            
+            # 2) Transform to mixed DVR/FBR representation 
+            #    Include a [None] element to leave last index the same
+            #
+            Z_fbr = nitrogen.basis.ops.opTensorO(Z_dp, az_U_list[jidx] + [None])
+            
+            # 3) Transform to quadrature grid
+            #    Do ellipsis index first to save space
+            Z_qe = bases_dp_list[jidx][ellipsis_idx].basis2grid(Z_fbr, axis = ellipsis_idx + 1)
+            Zq = Z_qe 
+            for i,b in enumerate(bases_dp_list[jidx]):
+                if np.isscalar(b):
+                    pass
+                elif i != ellipsis_idx:
+                    Zq = b.basis2grid(Zq, axis = i + 1) 
+                else:
+                    pass
+            
+            return Zq 
+            
+        # iidx and jidx are the indices in the
+        # precalculated sre basis set list
+        for i in range(len(nX)):
+            
+            # Transform X[i] block to quadrature grid 
+            iidx = jj1_list.index(JJ1X[i])
+            xi = block2quad(X[i], iidx)  # (Nsre, quad_shape, nX[i])
+            
+            for j in range(len(nY)):
+                
+                # Transform Y[j] block to quadrature grid 
+                jidx = jj1_list.index(JJ1Y[j])
+                yj = block2quad(Y[j], jidx)
+                
+                
+                # idx_x and idx_y will be the array indices
+                # of the final VXY reduced matrix
+                #
+                # Each block starts at the position equal to the 
+                # sum of the sizes of the previous blocks
+                
+                # bi and bj will index the vectors within each block
+                
+                idx_x = sum(nX[:i])
+                for bi in range(nX[i]):
+                    
+                    idx_y = sum(nY[:j])
+                    for bj in range(nY[j]):
+                        
+                        # Perform summation over body-fixed spherical 
+                        # component q and the body-fixed projections
+                        # k (of X) and k' (of Y)
+                        #
+                        for q in [0,1,-1]: # ordering here doesn't matter
+                        
+                            for p in range(Nsre_list[iidx]):
+                                for pp in range(Nsre_list[jidx]):
+                                    
+                                    factor = (-1)**q * dircos[iidx][jidx][q,p,pp]
+                                    if factor == 0.0:
+                                        continue # check sre selection rule
+                                    
+                                    # Get the electronic state indices
+                                    eidx_i = sre_basis_list_list[iidx][p,0]
+                                    eidx_j = sre_basis_list_list[jidx][pp,0]
+                                    
+                                    # Compute quadrature sum of the vibrational
+                                    # integral
+                                    bra = xi[p , ..., bi] # The bra vibrational factor
+                                    ket = yj[pp, ..., bj] # The ket vibrational factor 
+                                    mid = Vq[-q][eidx_i][eidx_j] # The electronic matrix element, note -q
+                                    integral = np.sum(np.conj(bra) * mid * ket) 
+                                    
+                                    # Finally, 
+                                    # include sqrt[2J+1] factor to scale
+                                    #
+                                    VXY[idx_x, idx_y] += np.sqrt(JJ1X[i]) * factor * integral 
+                        
+                        idx_y += 1 
+                    
+                    idx_x += 1 
+        
+        # VXY is complete
+        # return the reduced matrix elements
+        
+        return VXY 
