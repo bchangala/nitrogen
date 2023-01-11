@@ -970,13 +970,13 @@ def caseb_multistate_dircos(Np, kp, SS1p, JJ1p,
     
     """
     
-    np = len(Np) # The number of bra functions
+    mp = len(Np) # The number of bra functions (using mp because np is numpy ! Sorry ! >< )
     n = len(N) # The number of ket functions
     
-    lamq = np.zeros((3,np,n))
+    lamq = np.zeros((3,mp,n))
     
     for q in [0,1,-1]:
-        for i in range(np):
+        for i in range(mp):
             for j in range(n):
                 #
                 # The matrix element is diagonal in 
@@ -993,7 +993,7 @@ def caseb_multistate_dircos(Np, kp, SS1p, JJ1p,
                 coeff2 = np.sqrt( (2*N[j] + 1) * (2*Np[i] + 1) * JJ1[j] ) 
                 
                 threej = wigner3j(2*N[j], 2*1, 2*Np[i],
-                                 -2*k[j], 2*q,-2*kp[i]) 
+                                 -2*k[j], 2*q, 2*kp[i]) 
                 
                 sixj = wigner6j(2*Np[i],   JJ1p[i]-1, SS1p[i]-1,
                                 JJ1[j]-1,  2*N[j],    2*1)
