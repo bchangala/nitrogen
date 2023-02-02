@@ -638,6 +638,41 @@ def X2PAS(X, mass):
     
     return XPAS, RPAS, COM
 
+def X2COM(X, mass):
+    """
+    Return X translated to the center-of-mass 
+    frame
+    
+    Parameters
+    ----------
+    X : ndarray
+        A (3*N,...) array containing the
+        x, y, and z Cartesian positions of N particles.
+    mass : array_like
+        The masses of the N particles.
+        
+    Returns
+    -------
+    XCOM : ndarray
+        
+    """
+    
+    N = len(mass) # The number of atoms 
+    
+    # Calculate the center of mass
+    COM = 0
+    for k in range(N):
+        COM += mass[k] * X[3*k:3*(k+1)]
+    COM /= sum(mass) 
+    
+    XCOM = np.copy(X)  # Create a copy of X 
+    
+    for k in range(N):
+        
+        XCOM[3*k:3*(k+1)] -= COM
+        
+    return XCOM 
+    
 
 def Nbf_matrix(N):
     """

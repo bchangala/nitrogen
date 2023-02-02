@@ -460,4 +460,26 @@ def mpolyval(p, x):
         
     return y 
 
-            
+def levi3():
+    """
+    Return the 3-index Levi-Civita :math:`\\epsilon_{ijk}` tensor.
+    
+    Returns
+    -------
+    eps : (3,3,3) ndarray
+        The Levi-Civita tensor 
+        
+    """
+    
+    return np.array([[[ 0,  0,  0],
+                      [ 0,  0,  1],
+                      [ 0, -1,  0]],
+
+                     [[ 0,  0, -1],
+                      [ 0,  0,  0],
+                      [ 1,  0,  0]],
+        
+                     [[ 0,  1,  0],
+                      [-1,  0,  0],
+                      [ 0,  0,  0]]])
+    
