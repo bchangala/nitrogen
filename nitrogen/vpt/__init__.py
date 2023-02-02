@@ -351,41 +351,6 @@ def calcAlpha_anharm(Be, omega, aQ, f3):
    
     return alpha 
 
-def calcAlpha(omega, Be, Ie, aQ, zeta, f3):
-    """
-    Calculate VPT2 :math:`\\alpha` parameters.
-        
-    Parameters
-    ----------
-    omega : (N,) array_like
-        The harmonic frequencies in :math:`hc \\times \\mathrm{cm}^{-1}`` units.
-    Be : (3,) array_like
-        The equilibrium rotational constants in :math:`hc \\times \\mathrm{cm}^{-1}`` units.
-    Ie : (3,) array_like
-        The equilibrium principal moments of inertia
-    aQ : (N,3,3) array_like
-        The inertia tensor derivatives w.r.t. :math:`Q`.
-    zeta : (N,N,3) array_like
-        The Coriolis :math:`zeta` constants.
-    f3 : array_like
-        The PES scaled derivative array including up to at least cubic derivatives.
-        Only :math:`f_{kkk}` and :math:`f_{kkl}` type derivatives will be used.
-
-    Returns
-    -------
-    alpha : (N,3) ndarray
-        The :math:`\\alpha` constant for each mode and principal axis.
-
-    """
-    
-    a_harm = calcAlpha_harm(Be, omega, aQ, Ie)
-    a_anh  = calcAlpha_anharm(Be, omega, aQ, f3)
-    a_cor  = calcAlpha_cor(Be, omega, zeta)
-    
-    alpha = a_harm + a_anh + a_cor 
-    
-    return alpha
-
 def calctau(Ie,aQ,omega):
     """
     Calculate the quartic centrifugal distortion :math:`\\tau` parameters.
@@ -445,6 +410,11 @@ def calc_harmCD(Be,tau):
         Various corrected rotational constants.
     CD : dict
         Various reduction cases of the centrifugal distortion parameters
+        
+    See Also
+    --------
+    analyzeCD : Higher level function for calculating and printing CD parameters
+    
     """
     
     # We follow Gordy and Cook, Section 8.3 to 
@@ -574,7 +544,7 @@ def calc_harmCD(Be,tau):
     return B0, CD 
     
     
-def analyzeCD(Xe,omega,Lvib,mass):
+def analyzeCD(Xe,omega,Lvib,mass, printing = True):
     """
     Analyze and report quartic
     centrifugal distortion
@@ -590,6 +560,8 @@ def analyzeCD(Xe,omega,Lvib,mass):
         The mass-weighted normal coordinates
     mass : (n,) array_like
         The atomic masses 
+    printing : bool, optional 
+        Print report. 
         
     Returns
     -------
@@ -625,59 +597,146 @@ def analyzeCD(Xe,omega,Lvib,mass):
         print(f"{val:15.5E}   {val*29979.2458:15.5f}   ", end = end)
     
     # Print results 
-    print("==========================================")
-    print(" Harmonic centrifugal distortion analysis ")
-    print("==========================================")
-    print("")
-    print("               cm^-1             MHz      ")
-    print("          --------------    --------------")
-    for i in range(3):
-        print("   " + abc[i] + "e   ",end = ""); printval(Be[i])
-    print("")
-    
-    
-    for i in range(3):
-        print("   " + abc[i] + "'   ",end = ""); printval(B0["Bp"][i])
-    print("")
-    for i in range(3):
-        print(" " + abc[i] + "' - " + abc[i] + "e" ,end = ""); printval(B0["Bp"][i]-Be[i])
-    print("")
-    
-    for i in range(3):
-        print("   " + abc[i] + "A   ",end = ""); printval(B0["BA"][i])
-    print("")
-    for i in range(3):
-        print(" " + abc[i] + "A - " + abc[i] + "e" ,end = ""); printval(B0["BA"][i]-Be[i])
-    print("")
-    
-    for i in range(3):
-        print("   " + abc[i] + "S   ",end = ""); printval(B0["BS"][i])
-    print("")
-    for i in range(3):
-        print(" " + abc[i] + "S - " + abc[i] + "e" ,end = ""); printval(B0["BS"][i]-Be[i])
-    print("")
-    print(f"   sigma ............ {sigma:.6f}         ")
-    print("")
-    print("  ---------------------------------------  ")
-    print("         Kivelson-Wilson parameters        ")
-    print("  ---------------------------------------  ")
-    for p in CD["KW"]:
-        print(f" {p:>7s}", end = ""); printval(CD["KW"][p])
-    print("")
-    print("  ---------------------------------------  ")
-    print("          A-reduced (Ir) parameters        ")
-    print("  ---------------------------------------  ")
-    for p in CD["AIr"]:
-        print(f" {p:>7s}", end = ""); printval(CD["AIr"][p])
-    print("")
-    print("  ---------------------------------------  ")
-    print("          S-reduced (Ir) parameters        ")
-    print("  ---------------------------------------  ")
-    for p in CD["SIr"]:
-        print(f" {p:>7s}", end = ""); printval(CD["SIr"][p])
-    print("")
-    print("==========================================")
+    if printing:
+        print("==========================================")
+        print(" Harmonic centrifugal distortion analysis ")
+        print("==========================================")
+        print("")
+        print("               cm^-1             MHz      ")
+        print("          --------------    --------------")
+        for i in range(3):
+            print("   " + abc[i] + "e   ",end = ""); printval(Be[i])
+        print("")
+        
+        
+        for i in range(3):
+            print("   " + abc[i] + "'   ",end = ""); printval(B0["Bp"][i])
+        print("")
+        for i in range(3):
+            print(" " + abc[i] + "' - " + abc[i] + "e" ,end = ""); printval(B0["Bp"][i]-Be[i])
+        print("")
+        
+        for i in range(3):
+            print("   " + abc[i] + "(A) ",end = ""); printval(B0["BA"][i])
+        print("")
+        for i in range(3):
+            print(" " + abc[i] + "(A)-" + abc[i] + "e" ,end = ""); printval(B0["BA"][i]-Be[i])
+        print("")
+        
+        for i in range(3):
+            print("   " + abc[i] + "(S) ",end = ""); printval(B0["BS"][i])
+        print("")
+        for i in range(3):
+            print(" " + abc[i] + "(S)-" + abc[i] + "e" ,end = ""); printval(B0["BS"][i]-Be[i])
+        print("")
+        print(f"   sigma ............ {sigma:.6f}         ")
+        print("")
+        print("  ---------------------------------------  ")
+        print("         Kivelson-Wilson parameters        ")
+        print("  ---------------------------------------  ")
+        for p in CD["KW"]:
+            print(f" {p:>7s}", end = ""); printval(CD["KW"][p])
+        print("")
+        print("  ---------------------------------------  ")
+        print("          A-reduced (Ir) parameters        ")
+        print("  ---------------------------------------  ")
+        for p in CD["AIr"]:
+            print(f" {p:>7s}", end = ""); printval(CD["AIr"][p])
+        print("")
+        print("  ---------------------------------------  ")
+        print("          S-reduced (Ir) parameters        ")
+        print("  ---------------------------------------  ")
+        for p in CD["SIr"]:
+            print(f" {p:>7s}", end = ""); printval(CD["SIr"][p])
+        print("")
+        print("==========================================")
     
 
     
     return B0,CD
+
+def analyzeAlpha(Xe,omega,Lvib,mass,f3, printing = True):
+    """
+    Analyze and report VPT alpha constants.
+    
+    Parameters
+    ----------
+    Xe : (3*n,) array_like
+        The Cartesian reference geometry (in the
+        principal axis system)
+    omega : (N,) array_like
+        The harmonic frequencies 
+    Lvib : (3*n,N) array_like
+        The mass-weighted normal coordinates
+    mass : (n,) array_like
+        The atomic masses 
+    f3 : ndarray
+        The derivative array with up to at least cubic terms.
+        Only :math:`f_{kkk}` and :math:`f_{kks}` types terms
+        are used.
+    printing : bool, optional
+        Print report
+        
+    Returns
+    -------
+    alpha : (N,3) ndarray
+        The :math:`\\alpha` constant for each mode and principal axis.
+        
+    """
+    
+    # Calculate Ia, Ib, Ic
+    Ie = np.diag(nitrogen.angmom.X2I(Xe, mass))
+    # Calculate Ae, Be, Ce
+    hbar = nitrogen.constants.hbar
+    Be = hbar**2 / (2*Ie) 
+    # Calculate inertia tensor derivatives
+    aQ = calc_inertia_Qderiv(mass, Xe, Lvib)
+    # Calculate Coriolis constants
+    zeta = calc_coriolis_zetas(Lvib)
+    
+    # Calculate harmonic, anharmonic 
+    # and Coriolis contributions to VPT2 
+    # alpha's
+    a_harm = calcAlpha_harm(Be, omega, aQ, Ie)
+    a_anh  = calcAlpha_anharm(Be, omega, aQ, f3)
+    a_cor  = calcAlpha_cor(Be, omega, zeta)
+    # Total alpha
+    alpha = a_harm + a_anh + a_cor 
+    
+    N = len(omega)
+    c = 29979.2458
+    #############
+    # Print summary 
+    def printabc(abc, end = "\n"):
+        print(f"{abc[0]:13.5f}  {abc[1]:13.5f}  {abc[2]:13.5f}", end = end)
+        
+    if printing:
+        print("=========================================================")
+        print("              Vibration-rotation analysis                ")
+        print("=========================================================")
+        print("")
+        print("   Contributions to alpha (MHz):                         ")
+        print("")
+        print("                  a              b              c        ")
+        print("            -------------  -------------  -------------  ")
+        for i in range(N):
+            print("")
+            print( "     Har.  ", end = ""); printabc(a_harm[i]*c)
+            print(f" {i:2d}  Cor.  ", end = ""); printabc(a_cor[i]*c)
+            print( "     Anh.  ", end = ""); printabc(a_anh[i]*c)
+        
+        print("")
+        print("   Total alpha (MHz):                            ")
+        print("")
+        for i in range(N):
+            print(f"   {i:2d}      ", end = ""); printabc(alpha[i]*c)
+        print("")
+        print("")
+        
+        B0_minus_Be = np.sum(-0.5 * alpha, axis = 0)
+        
+        print("  B0 - Be  ", end = ""); printabc(B0_minus_Be*c)
+        print("")
+        print("=========================================================")
+    
+    return alpha 
