@@ -41,16 +41,24 @@ def fitSimplePIP(X,F,P,yfun,degree,Xscale):
         The expansion coefficients
     res : ndarray
         The scaled residuals.
+    Ffun : DFun
+        The fitted function, F(X).
     
     Notes
     -----
     Derivatives up to arbitrary order can be fitted.
+    
+    See Also
+    --------
+    InternuclearExp : internuclear function for exponentially scaled distance
+    InternuclearR : internuclear function for linear distance 
 
     """
     
     
     #####################################
-    # A simple PIP fitter for small permutation groups
+    # A simple PIP fitting routine
+    # for small molecular permutation groups
     #
     natoms = X.shape[0] // 3 # the number of atoms 
     ny = (natoms*(natoms-1)) // 2 # The number of internuclear y coordinates
@@ -58,7 +66,8 @@ def fitSimplePIP(X,F,P,yfun,degree,Xscale):
     #
     # The `y` variables are the n*(n-1)//2 functions
     # of the internuclear distances. This can be any
-    # 'radial' function, e.g. r12, exp(-r12/a), etc.
+    # 'radial' function, e.g. r12, exp(-r12/a), etc.,
+    # which is passed by the caller.
     #
     
     # Calculate the y-index permutations from the 
@@ -157,7 +166,7 @@ def fitSimplePIP(X,F,P,yfun,degree,Xscale):
     
     # Calculate the value/derivatives of each monomial term of the 
     # surface expansion w.r.t. X coordinates
-    Z_of_y = nitrogen.dfun.PowerExpansionTerms(degree, np.zeros((natoms,)))
+    Z_of_y = nitrogen.dfun.PowerExpansionTerms(degree, np.zeros((ny,)))
     Z_of_X = yfun ** Z_of_y 
 
     ymonomials = Z_of_X.f(X, deriv = data_deg)  # shape (data_nd, nt, npoints)
@@ -218,8 +227,14 @@ def fitSimplePIP(X,F,P,yfun,degree,Xscale):
         start = stop
     print("--------------------------------------")
     print("")
-
-    return pfull, res 
+    
+    #
+    # Create the DFun object for F(X) function
+    #
+    surface_fun = yfun ** nitrogen.dfun.PowerExpansion(pfull.reshape((-1,1)),
+                                                       np.zeros((ny,)))
+    
+    return pfull, res, surface_fun
     
 
 def atom2yidx(n):
