@@ -21,6 +21,8 @@ from .cfour import *
 from . import opt 
 from .opt import * 
 
+from . import fit 
+
 __all__ = ['loadpes', 'curvVib']
 __all__ += cfour.__all__
 __all__ += opt.__all__

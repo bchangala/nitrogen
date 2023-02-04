@@ -2291,3 +2291,40 @@ def sym2invdet(S, deriv, nvar, logdet = False):
     #
     return iS, det.d.copy()
 
+def infer_deriv(nd,nvar):
+    """
+    Infer the derivative order given the
+    number of derivatives and variables
+    
+    Parameters
+    ----------
+    nd : integer
+        The number of derivatives
+    nvar : integer
+        The number of variables 
+    
+    Returns
+    -------
+    deriv : interger
+        The derivative order
+    """
+    
+    deriv = 0 
+    
+    while True:
+        count = nderiv(deriv, nvar)
+        
+        if count == nd:
+            # This is the correct number of derivatives
+            break 
+        elif count > nd:
+            # We somehow missed the number of derivatives
+            # The passed value of `nd` must not be a valid
+            # derivative count for nvar 
+            raise ValueError(f"nd = {nd:d} and nvar = {nvar:d} are not a valid derivative-variable count pair.")
+        
+        # count is less than passed nd, 
+        # increment deriv and try again
+        deriv = deriv + 1 
+    
+    return deriv 
