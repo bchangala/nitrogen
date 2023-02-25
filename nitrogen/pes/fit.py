@@ -442,3 +442,79 @@ class InternuclearR(nitrogen.dfun.DFun):
                 y.append(rij)
                 
         return nitrogen.dfun.adf2array(y, out)
+    
+def Sn(n,indices):
+    """
+    Return the permutations of identical
+    particles.
+    
+    Parameters
+    ----------
+    n : integer 
+        The total number of particles
+    indices : array_like
+        A list of identical indices (`0` through `n`-1).
+    
+    Returns
+    -------
+    P : list
+        A list of permutations
+    """
+    
+    # First, a simple recursive generator
+    # of all permutations of a list 
+    def perm(start, end=[]):
+        if(len(start) == 0):
+            return [end]
+        else:
+            perms = []
+            for i in range(len(start)):
+                perms = perms + perm(start[:i] + start[i+1:], end + start[i:i+1])
+            return perms 
+    
+    S = perm(indices) 
+    
+    P = [] 
+    for s in S:
+        p = [i for i in range(n)]
+        for i in range(len(indices)):
+            p[indices[i]] = s[i]
+        P.append(p)
+       
+    return P 
+    
+def productP(P1,P2):
+    """
+    Return the direct product of all
+    permutations in P1 and P2.
+    
+    Parameters
+    ----------
+    P1,P2 : list
+        A list of permutations
+    
+    Returns
+    -------
+    P : list
+        The direct products
+    
+    """
+    
+    n1 = len(P1)
+    n2 = len(P2)
+    
+    P = [] 
+    
+    for i in range(n1):
+        p1 = P1[i] 
+        
+        for j in range(n2):
+            p2 = P2[j] 
+            
+            p = [p2[idx] for idx in p1]
+            
+            P.append(p)
+    
+    return P 
+    
+    
