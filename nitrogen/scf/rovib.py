@@ -458,6 +458,14 @@ def rovib_MP2(Hvib, Crot, Crv, mp2_max, target = None, excitation_fun = None, pr
                     tau[b,a,c,d] += val 
                     tau[b,a,d,c] += val 
     
+    # 
+    # The final sigma tensor is symmetric
+    #
+    # The final tau tensor is symmetric w.r.t permutation of the first
+    # pair of indices, the second pair of indices, or the first with the
+    # second pair of indices.
+    #
+    
     return Evib, sigma, tau 
     #
     ##################################
