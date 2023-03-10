@@ -1101,4 +1101,49 @@ def caseb_multistate_L(Li_e, LiLj_ac_e, alpha, N, k, SS1, JJ1):
                         LiLj_ac[a,b,i,j] = LiLj_ac_e[a,b, alpha[i], alpha[j]]
                         
     return Li, LiLj_ac 
+
+
+def sigtau2Btau(sigma, tau):
+    """
+    Transform a general quartic rotational operator
+    to the quadratic-diagonalized form.
+
+    Parameters
+    ----------
+    sigma : (3,3) ndarray
+        The quadratic coefficients. 
+    tau : (3,3,3,3) ndarray
+        The quartic coefficients.
+
+    Returns
+    -------
+    B : (3,) ndarray
+        The diagonal quadratic coefficients in descending order 
+        (i.e., A, B, C)
+    taup : (3,3,3,3) ndarray
+        The modified quartic coefficients
+
+    """
     
+    #
+    #
+    # We assume `sigma` is symmetric 
+    #
+    
+    # Diagonalize it
+    B,U = np.linalg.eigh(0.5 * sigma)
+    # Reorder in descending rotational constant, 
+    # i.e. ABC order 
+    B = np.flip(B)
+    U = np.flip(U, axis = 1) 
+    
+    R = U.T  # The index transformation array 
+    
+    taup = tau 
+    # Sequentially transform each index of `tau`.
+    # By always doing the last axis with tensordot, the final result will
+    # have the correct axis order
+    for i in range(4):
+        taup = np.tensordot(R, taup, axes = ([1], [-1]))
+    
+    return B, taup 

@@ -7,7 +7,8 @@ import nitrogen
 import nitrogen.tensor as tensor 
 import numpy as np 
 
-__all__ = ['NonLinearTO'] 
+__all__ = ['NonLinearTO', 
+           'rovib_MP2'] 
 
 
 
@@ -218,3 +219,223 @@ class NonLinearTO(tensor.TensorOperator):
     
     def asConfigurationOperator(self, config_funs, labels = None):
         return self.H.asConfigurationOperator(config_funs, labels = labels) 
+    
+    def getRotConfigOp(self, config_funs, labels = None):
+        
+        CrotCO = [[self.Crot[a][b].asConfigurationOperator(config_funs, labels = labels) for a in range(3)] for b in range(3)]
+        CrvCO = [self.Crv[a].asConfigurationOperator(config_funs, labels = labels) for a in range(3)]
+        
+        return CrotCO, CrvCO 
+    
+    
+def rovib_MP2(Hvib, Crot, Crv, mp2_max, target = None, excitation_fun = None, printlevel = 1):
+    """
+    Single-state second-order rotational effective Hamiltonian.
+
+    Parameters
+    ----------
+    Hvib : ConfigurationOperator
+        The configuration representation pure vibrational Hamiltonian.
+    Crot : nested list of ConfigurationOperator
+        The coefficients of :math:`[iJ_a/\\hbar, iJ_b/\\hbar]_+`.
+    Crv : list of ConfigurationOperator
+        The coefficients of :math:`[iJ_a/\\hbar]`.
+    mp2_max : scalar
+        The maximum excitation of the perturbative block.
+    target : array_like, optional
+        The target configuration. The default is [0, 0, ...] 
+    excitation_fun : function, optional
+        The configuration excitation function. If None, then the sum
+        of configuration indices is used. See :func:`~nitrogen.scf.config_table`.
+    printlevel : int, optional
+        Printed output level. The default is 1. 
+
+    Returns
+    -------
+    Evib : float
+        The MP2 vibrational energy 
+    sigma : ndarray
+        The quadratic coefficients
+    tau : ndarray
+        The quartic coefficients
+    
+    Notes
+    -----
+    `Crot` is assumed to be a symmetric tensor, ``Crot[a][b] = Crot[b][a]``.
+    The matrix elements of `Crv` are assumed to be real and anti-symmetric
+    within the vibrational basis. 
+    
+    The rotational arrays are defined by 
+    
+    ..  math::
+        
+        H_\\text{rot} = \\frac{1}{2} \\sigma_{\\alpha \\beta} J_\\alpha J_\\beta + 
+            \\frac{1}{4} \\tau_{\\alpha \\beta \\gamma \\delta} J_\\alpha J_\\beta J_\\gamma J_\\delta
+    
+    """
+    
+    #################################
+    # First, calculate the configurations that define
+    # perturbative space
+    index_range = Hvib.shape
+    n = len(index_range)    
+    cfg = nitrogen.scf.config_table(mp2_max, n, fun = excitation_fun, index_range = index_range) 
+    #
+    # Now locate the position of the target configuration
+    #
+    if target is None:
+        target = [0 for i in range(n)]
+    target = np.array(target) 
+    if len(target) != cfg.shape[1]:
+        raise ValueError("Target array has unexpected length.")
+    istarget = (cfg == target).all(axis=1)
+    # 
+    cfg_mp2 = cfg[~istarget] 
+    cfg_target = cfg[istarget] 
+    #
+    
+    # Calculate zeroth-order energies
+    E0 = Hvib.block(cfg_target, ket_configs = 'diagonal')[0]
+    Ei = Hvib.block(cfg_mp2, ket_configs = 'diagonal')
+    
+    # Calculate off-diagonal block
+    Hi0 = Hvib.block(cfg_mp2, ket_configs = cfg_target)[:,0] 
+    #
+    if printlevel >= 1:
+        print("")
+        print("-----------------------")
+        print( " Simple MP2 energy")
+        print(f" Target = {cfg_target[0]}")
+        print(f" N(MP2) = {cfg_mp2.shape[0]}")
+        print("-----------------------")
+        print(f" E0 + E1 = {E0:10.4f}") # Zeroth + first-order energy
+    #
+    c1 = Hi0 / (E0 - Ei) # First-order amplitudes
+    e2 = np.abs(Hi0)**2 / (E0 - Ei) # Second-order energy corrections
+    E2 = np.sum(e2)  # The total second-order 
+    # 
+    #
+    if printlevel >= 1:
+        print(f" E2      = {E2:10.4f}")
+        print("-----------------------")
+        print(f" Total E = {E0+E2 : 10.4f}") 
+    
+    if printlevel >= 1: # Print contribution report 
+        idx = np.argsort(-np.abs(c1))
+        print("")
+        print("-------------------------------------")
+        print(" MP2 report  (c1 ; e2 )           ")
+        print("-------------------------------------")
+        for i in idx[:10]:
+            with np.printoptions(formatter={'int':'{:2d}'.format}):
+                print(f"{cfg_mp2[i]} ... {c1[i]:10.2E}  ;  {e2[i]:10.2E} ")
+        print("-------------------------------------")
+    
+    Evib = E0 + E2 
+    
+    # Now calculate the effective rotational Hamiltonian
+    #
+    sigma = np.zeros((3,3))
+    tau = np.zeros((3,3,3,3))
+    
+    # The first-order contribution comes from Trot only 
+    C1 = np.zeros((3,3))
+    for a in range(3):
+        for b in range(a+1):
+            C1[a,b] = Crot[a][b].block(cfg_target, ket_configs = 'diagonal')[0] 
+            C1[b,a] = C1[a,b] # Crot is symmetric
+            
+    # Now add these contributions to `sigma`
+    for a in range(3):
+        for b in range(3): # Note full loop range
+            # 
+            # Cab [iJa, iJb]_+ = -Cab*(JaJb + JbJa)
+            #
+            sigma[a,b] -= 2 * C1[a,b]
+            sigma[b,a] -= 2 * C1[a,b]
+
+    # sigma is currently symmetric and contains just the first-order 
+    # contributions. Its eigenvalues (times 1/2) are the first-order rotational constants 
+    B1,_ = np.linalg.eigh(0.5 * sigma) 
+    MHz = 29979.2458 
+    if printlevel >= 1: # Print first-order rotational information
+        print("")
+        print("First-order rotational tensor (cm^-1):     ")
+        for a in range(3):
+            for b in range(a+1):
+                print(f" {0.5*sigma[a,b]:12.3E} ", end = "")
+            print("")
+        print("")
+        print("The first-order rotational constants are ")
+        lab = ['C','B','A']
+        for a in range(2,-1,-1):
+            print(f" {lab[a]:s} = {B1[a]:7.3f} cm^-1 =  {MHz * B1[a]:11.3f} MHz")
+        print("")
+    
+    ###################################################
+    # Second-order rotational Hamiltonian
+    # 
+    # Calculate off-diagonal rot/rovib matrix elements
+    C2 = np.zeros((3,3,cfg_mp2.shape[0]))
+    c2 = np.zeros((3,cfg_mp2.shape[0]))
+    
+    
+    for a in range(3):
+        for b in range(a+1): # Crot is symmetric 
+            C2[a,b] = Crot[a][b].block(cfg_mp2, ket_configs = cfg_target)[:,0]
+            np.copyto(C2[b,a], C2[a,b]) # symmetric
+        
+        c2[a] = Crv[a].block(cfg_mp2, ket_configs = cfg_target)[:,0] # Note this is <v'|...|target>
+        # We assume c2 changes sign for <target|...|v'>
+    
+    #
+    # There are several types of terms from the second-order sum
+    #
+    denom = 1.0 / (E0 - Ei) # The energy denominator 
+    eps_abc = nitrogen.math.levi3() # The epsilon tensor 
+    
+    for a in range(3):
+        for b in range(3): 
+            #
+            # "Coriolis contribution"
+            #
+            #    c_vv'[a] * c_v'v [b] (iJa) (iJb)
+            #  = -c_v'v[a] * c_v'v[b] (-1 * JaJb)   note sign change in `c`
+            #  = c_v'v[a] * c_v'v[b] * JaJb
+            sigma[a,b] += 2 * sum(denom * c2[a] * c2[b]) 
+            
+            # Vibrational contribution
+            # 
+            #   (V_vv' Cab_v'v + Cab_vv' V_v'v) [iJa,iJb]_+
+            # = -2 * V_v'v * Cab_v'v * (JaJb + JbJa)
+            #
+            val = -4 * sum(denom * Hi0 * C2[a,b])
+            sigma[a,b] += val 
+            sigma[b,a] += val 
+            
+            # nominal "cubic" terms can be reduced to quadratic
+            #
+            # Note [iJa, iJb] = eps_abc iJc
+            #
+            for c in range(3):
+                val = 2 * sum(denom * c2[c] * C2[a,b]) 
+                for d in range(3):
+                    # This is expressly symmetric in sigma[a,b] <> sigma [b,a]
+                    sigma[a,d] += eps_abc[c,b,d] * val 
+                    sigma[d,a] += eps_abc[c,b,d] * val 
+                    
+                    sigma[d,b] += eps_abc[c,a,d] * val 
+                    sigma[b,d] += eps_abc[c,a,d] * val 
+            
+            # quartic terms 
+            for c in range(3):
+                for d in range(3):
+                    val = 4 * sum(denom * C2[a,b] * C2[c,d]) 
+                    tau[a,b,c,d] += val 
+                    tau[a,b,d,c] += val 
+                    tau[b,a,c,d] += val 
+                    tau[b,a,d,c] += val 
+            
+    return Evib, sigma, tau 
+    #
+    ##################################

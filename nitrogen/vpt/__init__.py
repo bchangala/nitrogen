@@ -577,6 +577,7 @@ def analyzeCD(Xe,omega,Lvib,mass, printing = True):
     Ie = np.diag(nitrogen.angmom.X2I(Xe, mass))
     hbar = nitrogen.constants.hbar
     Be = hbar**2 / (2*Ie) # The rotational constants, cm^-1
+    # Be is ordered A B C
     
     # Calculate the inertia tensor derivatives 
     aQ = calc_inertia_Qderiv(mass, Xe, Lvib)
@@ -587,20 +588,28 @@ def analyzeCD(Xe,omega,Lvib,mass, printing = True):
     
     # Calculate reduced parameters
     B0,CD = calc_harmCD(Be, tau)
-    Bp = B0["Bp"] # (the unreduced, effective orthorhombic parameters)
-    sigma = (2*Bp[0] - Bp[1] - Bp[2])/(Bp[1]-Bp[2])  # asymmetry parameter 
-    
-    abc = ['A','B','C']
-    
-    def printval(val, end = "\n"):
-        # Print in cm^-1 and MHz 
-        print(f"{val:15.5E}   {val*29979.2458:15.5f}   ", end = end)
+
     
     # Print results 
     if printing:
         print("==========================================")
         print(" Harmonic centrifugal distortion analysis ")
         print("==========================================")
+        print("")
+        printCD(Be,B0,CD)
+
+    return B0,CD
+
+def printCD(Be,B0,CD):
+    
+        def printval(val, end = "\n"):
+            # Print in cm^-1 and MHz 
+            print(f"{val:15.5E}   {val*29979.2458:15.5f}   ", end = end)
+            
+        abc = ['A','B','C']
+        Bp = B0["Bp"] # (the unreduced, effective orthorhombic parameters)
+        sigma = (2*Bp[0] - Bp[1] - Bp[2])/(Bp[1]-Bp[2])  # asymmetry parameter 
+        
         print("")
         print("               cm^-1             MHz      ")
         print("          --------------    --------------")
@@ -650,10 +659,6 @@ def analyzeCD(Xe,omega,Lvib,mass, printing = True):
             print(f" {p:>7s}", end = ""); printval(CD["SIr"][p])
         print("")
         print("==========================================")
-    
-
-    
-    return B0,CD
 
 def analyzeAlpha(Xe,omega,Lvib,mass,f3, printing = True):
     """
