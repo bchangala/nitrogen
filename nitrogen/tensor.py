@@ -239,7 +239,7 @@ class TensorOperator():
         The input tensor network will be contracted with the 
         operator based on the negative integer elements in 
         its respective `labels` attributes. Missing 
-        labels in the network will not be contracted.
+        negative labels in the network will not be contracted.
 
         """
         
@@ -269,6 +269,21 @@ class TensorOperator():
         """
         raise NotImplementedError()
         return 
+    
+        
+    def asConfigurationOperator(self, config_funs, labels = None):
+        """ return a ConfigurationOperator object wrapping this
+            TensorOperator using the supplied basis functions """
+        # 
+        # This uses a generic network evaluation of the 
+        # the tensor operator. It always works, but may
+        # be inefficient depending on the underlying structure
+        # of the tensor operator. 
+        # 
+        # TensorOperator sub-classes should consider redefining
+        # this method as appropriate.
+        #
+        return TensorToConfigurationOperator(self, config_funs, labels = labels)
 
 class ConfigurationOperator():
     """
@@ -313,6 +328,21 @@ class ConfigurationOperator():
         
     def _block(self, bra_configs, ket_configs, mode):
         raise NotImplementedError()
+        # bra_configs and ket_configs are (n,) + self.shape lists
+        # of configurations
+        # mode is {None, 'symmetric', 'diagonal'}
+        # 
+        # if mode is None, then the full <bra|...|ket> block should
+        # be calculated and returned
+        #
+        # if mode is 'symmetric', then bra and ket 
+        # configurations are the same.
+        #
+        # if mode is 'diagonal', then bra and ket
+        # configurations are the same, and only the
+        # diagonal matrix elements are to be returned
+        #
+        #
         pass # TO BE IMPLEMENTED BY SUB-CLASS 
 
 class DirectSumConfigurationOperator(ConfigurationOperator):
@@ -417,9 +447,134 @@ class SingleIndexOperator(ConfigurationOperator):
         
         return out 
                 
-                
-        
 
+class TensorToConfigurationOperator(ConfigurationOperator):
+    """
+    A generic ConfigurationOperator wrapper for 
+    TensorOperator's with a given configuration basis set.
+    
+    Attributes
+    ----------
+    
+    configs_funs : list of ndarrays
+        The configuration basis functions 
+    nC : integer
+        The number of configuration indices 
+    labels : list of list
+        The TensorOperator index labels for each configuration group
+    T : TensorOperator
+        The TensorOperator being wrapped.
+        
+    """
+    
+    def __init__(self, T, config_funs, labels = None):
+        """
+
+        Parameters
+        ----------
+        T : TensorOperator
+            The operator to be recast.
+        config_funs : list of ndarrays
+            config_funs[i][j] is the basis-function array for the jth function
+            of the ith group.
+        labels : list of list, optional
+            The index labels of each basis function factor.
+            If None (default), this is assumed to be ``[[0], [1], [2], ...]``.
+
+        """
+        
+        nT = len(T.shape) # The number of tensor indices (1-sided) of T
+        
+        ##################
+        # Default labels: [ [0], [1], [2], ... for each axis of shape]
+        if labels is None:
+            labels = [[i] for i in range(nT)]
+        ##################
+        # Check that each label is used once
+        if list(np.unique(sum(labels,[]))) != [i for i in range(nT)]:
+            raise ValueError("labels must use 0, 1, 2, ... once each")
+        ##################
+        
+        nC = len(labels) # The number of configuration indices, which 
+                         # may be smaller than the number of tensor indices
+                         # if a label-group has more than one label.
+        
+        
+        shape = [] 
+        # Check the basis function shapes 
+        for i in range(nC):
+            funs = config_funs[i] # The functions for the i**th group 
+            
+            shape.append(funs.shape[0]) # The number of basis functions for this group 
+            
+            for j,lab in enumerate(labels[i]): # For each tensor index in this group
+                if funs.shape[j+1] != T.shape[lab]:
+                    raise ValueError(f"The basis function shape of label-group {i:d} does not match T.")
+        
+        
+        dtype = T.dtype 
+        
+        super().__init__(shape, dtype)
+        
+        self.config_funs = config_funs 
+        self.nC = nC 
+        self.labels = labels 
+        self.T = T 
+        
+    def _block(self, bra_configs, ket_configs, mode):
+        
+        nb = bra_configs.shape[0] 
+        nk = ket_configs.shape[0] 
+        
+        if mode == 'diagonal':
+            
+            out = np.empty((nb,), dtype = self.dtype)
+            
+            for i in range(nb):
+                bra = bra_configs[i,:] # == ket
+                out[i] = self._calcme(bra,bra)
+                
+        else:
+            
+            out = np.empty((nb,nk), dtype = self.dtype) 
+            
+            for i in range(nb):
+                bra = bra_configs[i,:]
+                
+                for j in range(nk):
+                    
+                    if j < i and mode == 'symmetric':
+                        # If mode is symmetric, then bra and ket list
+                        # are the same. Assume upper triangle is equal
+                        # to lower triangle 
+                        out[i,j] = out[j,i]
+                        continue 
+                    
+                    ket = ket_configs[j,:]
+                    
+                    out[i,j] = self._calcme(bra, ket)
+                      
+        return out
+    
+    def _calcme(self, bra, ket):
+        """ Calculate the matrix element of the TensorOperator using 
+            the wavefunctions of the configurations `bra` and `ket`."""
+        bra_network = self._makeNetwork(bra)
+        ket_network = self._makeNetwork(ket)
+        braket_network = interleaveNetworks(bra_network, ket_network)
+        return self.T.contract(braket_network)
+        
+    def _makeNetwork(self, config):
+        """ make a network for the product of configuration wavefunctions """
+        
+        # Collect the wavefunctions for each factor
+        tensors = [self.config_funs[j][config[j]] for j in range(self.nC)]
+        
+        # Label their indices appropriately for contraction with 
+        # the TensorOperator 
+        labs = [[ (-l-1) for l in self.labels[j]] for j in range(self.nC)]
+        
+        return TensorNetwork(tensors, labs) 
     
 class DirectSumOperator(TensorOperator):
     """
@@ -454,6 +609,16 @@ class DirectSumOperator(TensorOperator):
         for T in self.terms:
             result += T._contract(network) 
         return result
+    
+    def asConfigurationOperator(self, config_funs, labels = None):
+        
+        # 
+        # Wrap each TO term as an individual CO 
+        # and return the direct sum of these CO's
+        #
+        terms = [T.asConfigurationOperator(config_funs, labels = labels) for T in self.terms]
+        return DirectSumConfigurationOperator(*terms)
+       
 
 class DirectProductOperator(TensorOperator):
     
@@ -631,6 +796,358 @@ class DirectProductOperator(TensorOperator):
         result_tensor = con(ten, lab)
         result_array = result_tensor.array()
         return result_array
+
+class QuadratureOperator(TensorOperator):
+    """
+    A full rank quadrature operator
+    
+    """
+    
+    def __init__(self, F, left, right):
+        """
+        Parameters
+        ----------
+        F : ndarray
+            The values of a quadrature grid.
+        left : list of ndarray
+            The FBR-to-quadrature transformation
+            operators of the left indices
+        right : list of ndarray
+            The FBR-to-quadrature transformation
+            operators of the right indices
+        
+        Notes
+        -----
+        Entries of None in `left` or `right` are
+        interpreted as identity.
+        
+        
+        """
+        
+        quad_shape = F.shape 
+        dtype = F.dtype
+        
+        shape = []
+    
+        for i in range(len(quad_shape)):
+            
+           
+            if left[i] is None: # identity
+                leftShape = (quad_shape[i], quad_shape[i])
+                leftType = dtype
+            else: # an explicit transformation
+                leftShape = left[i].shape 
+                leftType = left[i].dtype 
+            
+            if right[i] is None: # identity
+                rightShape = (quad_shape[i], quad_shape[i])
+                rightType = dtype
+            else: # an explicit transformation
+                rightShape = right[i].shape 
+                rightType = right[i].dtype 
+                
+            if leftShape != rightShape:
+                raise ValueError("left and right ops must have same shape")
+            if leftShape[0] != quad_shape[i]:
+                raise ValueError("Quadrature shape and transformation shapes do not match")
+            
+            shape.append(leftShape[1]) # Append the FBR size
+            dtype = np.result_type(dtype, leftType, rightType)
+        
+        #######################
+        # Pre-compute the quadrature transformation network
+        #
+        #
+        #
+        #    -1   -3   -5   ....
+        #     |    |    |
+        #     Q    Q    Q    ("Left")
+        #     |    |    |  
+        #   +-----------------  ...
+        #   |  F                ...
+        #   +-----------------  ...
+        #     |    |    |
+        #     Q    Q    Q    ("Right")
+        #     |    |    | 
+        #    -2   -4   -6   ...
+        #
+        #
+        #
+        
+        
+        Ftensor = diagonal(F) # The diagonal tensor for the quadrature grid
+        Flabel = [] 
+        
+        Qtensors = []
+        Qlabels = []
+        
+        dummy_lab = 1 # Start dummy labels with 1 
+        
+        for i in range(len(quad_shape)):
+            
+            # Idx -i-1 (i.e. -1, -3, -5, ...)
+            #
+            # If there is no left operator, then 
+            # Identity is assumed. Label this index of
+            # Ftensor with the external label
+            ext_index = -2*i - 1
+            if left[i] is None:
+                Flabel.append(ext_index) # -1, -3, -5, ...
+            else:
+                # There is a quadrature transformation
+                # Connect its first index to the F tensor
+                # and make its second index the external
+                Qtensors.append(left[i])
+                Qlabels.append([dummy_lab, ext_index])
+                Flabel.append(dummy_lab) 
+                dummy_lab += 1
+            
+            # Now process the right-side in the same way 
+            # (external indices are -2, -4, -6, ...)
+            ext_index = -2*i - 2
+            if right[i] is None:
+                Flabel.append(ext_index) # -2, -4, -6, ...
+            else:
+                Qtensors.append(right[i])
+                Qlabels.append([dummy_lab, ext_index])
+                Flabel.append(dummy_lab) 
+                dummy_lab += 1
+        
+        #
+        # Store the complete internal network 
+        #
+        int_tensors = [Ftensor] + Qtensors 
+        int_labels  = [Flabel] + Qlabels
+        
+        # For contract, the supplied `network`
+        # will be contracted with the negative labels
+        # of the internal network.
+        #
+        # It is necessary to offset all the positive
+        # internal labels to start higher than 
+        # the internal labels in `network`.
+        
+        self.F = F 
+        self.shape = tuple(shape)
+        self.dtype = dtype 
+        self.left = left 
+        self.right = right
+        
+        self.int_tensors = int_tensors 
+        self.int_labels = int_labels 
+        
+        
+        return 
+    
+    def _contract(self, network):
+        
+        #
+        # Construct the total network,
+        # merging the passed `network`
+        # and pre-computed internal
+        # quadrature transformation network
+        #
+
+        # The negative indices of `network`
+        # correspond to external indices of the TensorOperator
+        # with [-1, -3, -5, ...] on the left-hand side and
+        # [-2, -4, -6, ...] on the right-hand side
+        #
+        
+        # 1) Relabel all matched external indices 
+        #    of `network` and the internal network
+        #
+        # 2) Offset the internal labels of the
+        #    internal network to start *after*
+        #    all other internal indices. This
+        #    will usually be the most efficient
+        #    contraction.
+        #
+        
+        braket_labels = network.labels
+        
+        # Collect all negative labels in `network`
+        neg_labels = [i for g in braket_labels for i in g if i < 0] 
+        
+        dummy_idx = max(sum(braket_labels,[0])) + 1 # keep track of next available dummy label
+        
+        # The offset that must be added to pre-existing internal labels
+        offset = dummy_idx - 1 + len(neg_labels) 
+        
+        int_labels = self.int_labels 
+        int_tensors = self.int_tensors
+        
+        # Offset internal labels to be higher than all of those
+        # in `network` and the additional dummies from external
+        # pairs
+        int_labels = offsetPostiveLabels(int_labels, offset) 
+        
+        
+        # Now go ahead and replace external pairs 
+        for extlab in neg_labels:
+            
+            # For each negative (external) label in the input `network`,
+            # replace its occurences with a new dummy
+            #
+            int_labels = replaceLabel(int_labels, extlab, dummy_idx)
+            braket_labels = replaceLabel(braket_labels, extlab, dummy_idx)
+            dummy_idx += 1 
+        
+        # Concatenate the total network
+        ten = int_tensors + network.tensors
+        lab = int_labels + braket_labels
+        
+        #
+        # Contract the network and return the
+        # explicit array
+        #
+        result_tensor = con(ten, lab)
+        result_array = result_tensor.array()
+        return result_array
+    
+    def asConfigurationOperator(self, config_funs, labels = None):
+        return QuadratureConfigurationOperator(self.F, self.left, self.right, 
+                                               config_funs, labels = labels)
+        
+class QuadratureConfigurationOperator(ConfigurationOperator):
+    
+    """
+    Configuration operator map of a QuadruatureOperator tensor operator
+    """
+    
+    def __init__(self, F, left, right, config_funs, labels = None):
+        
+        if labels is None:
+            labels = [[i] for i in range(len(config_funs))]
+        
+        # 
+        # Pre-compute the leg transformations of the configuration
+        # wavefunctions on the left- and right-hand sides
+        # 
+        # `left` and `right` contain the transformation matrices
+        # in order of the tensor operator indices (the axis order
+        # of `F`).
+        
+        #grp, pos = label2grppos(labels) 
+        # 
+        #nidx = len(left) # The number of tensor indices
+        
+        # 
+        def transform_config(cfuns, trans):
+            
+            # Create a new copy that we can
+            # can transform
+            new_funs = [f.copy() for f in cfuns]
+            
+            num_groups = len(new_funs)
+            for i in range(num_groups):
+                # Transform all indices in this group
+                for j,idx in enumerate(labels[i]): # For every index in this label
+                    # j is the ordering within this group
+                    # `idx` is the tensor index label, i.e. the position within F, left, and right
+                    
+                    if trans[idx] is None: # no transformation to perform
+                        pass
+                    else:
+                        new_f = np.tensordot(trans[idx], new_funs[i], axes = ([1], [j+1]))
+                        new_f = np.moveaxis(new_f, 0, j+1)
+                        new_funs[i] = new_f
+            return new_funs
+        
+        
+        left_funs = transform_config(config_funs, left)
+        right_funs = transform_config(config_funs, right)
+        
+        # Calculate the configuration shape
+        shape = [f.shape[0] for f in config_funs]
+        shape = tuple(shape)
+        
+        # Figure out the index labels for using tensordot for
+        # sequential summation
+        legs = [i for i in range(F.ndim)] 
+        # Contraction is performed from the first group in `labels` to the end
+        running_labels = [] 
+        for i in range(len(shape)):
+            # The original index labels we want to contract over 
+            # are given by labels[i] 
+            orig_lab = labels[i] 
+            new_lab = [legs.index(o) for o in orig_lab]
+            running_labels.append(new_lab) 
+            # remove the used tensor indices from legs
+            for o in orig_lab:
+                legs.remove(o)
+        
+        
+        super().__init__(shape, dtype = F.dtype)
+        
+        self.F = F 
+        self.left_funs = left_funs 
+        self.right_funs = right_funs
+        self.labels = labels 
+        self.running_labels = running_labels 
+    
+    def _block(self, bra_configs, ket_configs, mode):
+        # bra_configs and ket_configs are (n,) + self.shape lists
+        # of configurations
+        # mode is {None, 'symmetric', 'diagonal'}
+        # 
+        # if mode is None, then the full <bra|...|ket> block should
+        # be calculated and returned
+        #
+        # if mode is 'symmetric', then bra and ket 
+        # configurations are the same.
+        #
+        # if mode is 'diagonal', then bra and ket
+        # configurations are the same, and only the
+        # diagonal matrix elements are to be returned
+        #
+        #
+        
+        m = bra_configs.shape[0] 
+        n = ket_configs.shape[0] 
+        
+        if mode == 'diagonal':
+            
+            out = np.zeros((m,), dtype = self.dtype)
+            
+            for i in range(m):
+                out[i] = self._calcme(bra_configs[i], ket_configs[i])
+        
+        else:
+            
+            out = np.zeros((m,n), dtype = self.dtype)
+            
+            for i in range(m):
+                for j in range(n):
+                    
+                    if j > i and mode == 'symmetric':
+                        out[j,i] = out[i,j] 
+                        continue 
+                    
+                    out[i,j] = self._calcme(bra_configs[i], ket_configs[j])
+        
+        return out 
+    
+    def _calcme(self, bra, ket):
+        
+        # Start with the full quadrature grid
+        # and perform sequential summation over the product
+        # bra-ket wavefunction and the corresponding
+        # indices
+        #
+        temp = self.F 
+        # 
+        # We have already figured out what the running axis labels 
+        # of F are as sequential contraction is performed. These are 
+        # stored in the attribute `running_labels`
+        #
+        for i in range(len(self.shape)):
+            fun = self.left_funs[i][bra[i]] * self.right_funs[i][ket[i]]
+            temp = np.tensordot(fun, temp, axes = ( np.arange(fun.ndim) , self.running_labels[i] ) )
+            
+        return temp 
+                
+                
 
 def con(tensors, labels, sequence = None, forder = None, check = True):
     """ An ncon style contraction function. See [NCON]_.
@@ -1279,7 +1796,56 @@ def label2grppos(labels):
     
     return grp,pos 
     
+def replaceLabel(labels, oldLabel, newLabel):
+    """
+    Replace an index label in a nested list
+    of lists.
     
+    Parameters
+    ----------
+    labels: list of list
+        A nested list of labels
+    oldLabel: integer
+        The old label
+    newLabel: integer
+        The new label
+        
+    Returns
+    -------
+    list
+        The new nested list
+    
+    """
+    
+    # Replace all oldLabel instances with newLabel
+    new = [[newLabel if k == oldLabel else k for k in group] for group in labels]
+    
+    return new
+
+def offsetPostiveLabels(labels, offset) :
+    """
+    Add an offset to all positive labels
+
+    Parameters
+    ----------
+    labels : list of list
+        A nested list of labels
+    offset : integer
+        The positive offset
+
+    Returns
+    -------
+    list
+        The new nested list
+
+    """
+    
+    # Add `offset` to all positive labels. 
+    # Leave negative labels the same
+    new = [[k + offset if k >= 0 else k for k in group] for group in labels]
+
+    return new 
+
 def interleaveNetworks(net1, net2):
     """
     Merge two TensorNetworks by interleaving

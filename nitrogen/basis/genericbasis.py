@@ -73,6 +73,15 @@ class GriddedBasis:
             raise ValueError("var is out of range")
         return self._dH_grid(x, var,axis)
     
+    def getQuadOp(self):
+        """ calculate the explicit basis-to-quadrature grid
+        transformation matrix"""
+        return self.basis2grid(np.eye(self.nb), axis = 0)
+    def getDQuadOp(self, var):
+        """ calculate the explicit basis-to-quadrature derivative grid
+        transformation matrix"""
+        return self.basis2grid_d(np.eye(self.nb), var, axis = 0)
+    
     def _basis2grid(self, x, axis = 0):
         raise NotImplementedError()
     def _grid2basis(self,x, axis = 0):

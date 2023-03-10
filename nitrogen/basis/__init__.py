@@ -655,3 +655,79 @@ def basisQuad(bases,fun,X,Y):
     
     return F 
     
+
+def collectBasisQuadrature(bases, keepIdentity = False):
+    """
+    Collect basis-to-quadrature transformation
+    matrices for active basis sets
+    
+    Parameters
+    ----------
+    bases : list of GriddedBasis or scalars
+        The basis sets
+    keepIdentity : bool
+        If False, identity transformations will automatically
+        be replaced with None. If True, the explicit identity will
+        be kept.
+    
+    Returns
+    -------
+    arrays : list
+        The transformation arrays for each active basis set.
+        If `keepIdentity` is ``False``, then identities are 
+        indicated with ``None``.
+    
+    """
+    
+    arrays = [] 
+    for bas in bases:
+        if not np.isscalar(bas): # For non-scalar bases elements
+            qop = bas.getQuadOp()
+            
+            # Check for identity
+            if not keepIdentity:
+                if qop.shape[0] == qop.shape[1] and np.allclose(qop, np.eye(qop.shape[0])):
+                    # If the transformation is just identity...
+                    qop = None 
+                    
+            arrays.append(qop)
+            
+    return arrays
+    
+def collectBasisDerivativeQuadrature(bases):
+    """
+    Collect derivative basis-to-quadrature transformation
+    matrices for active coordinates.
+    
+    Parameters
+    ----------
+    bases : list of GriddedBasis or scalars
+        The basis sets
+    
+    Returns
+    -------
+    arrays : list
+        The transformation arrays for the basis sets of
+        each each active coordinate.
+    factorOfCoord : list
+        The index of the active basis sets that each active
+        coordinate belongs to.
+    
+    """
+    
+    arrays = [] 
+    factorOfCoord = []
+    
+    factor = 0 
+    for bas in bases:
+        if not np.isscalar(bas): # For non-scalar bases elements
+        
+            # For each coordinate in this basis set 
+            for i in range(bas.nd):
+                dqop = bas.getDQuadOp(i)
+                arrays.append(dqop)
+                factorOfCoord.append(factor)
+                
+            factor += 1 # Increment only for active factors 
+                
+    return arrays, factorOfCoord
