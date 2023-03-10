@@ -351,6 +351,8 @@ def rovib_MP2(Hvib, Crot, Crv, mp2_max, target = None, excitation_fun = None, pr
             # 
             # Cab [iJa, iJb]_+ = -Cab*(JaJb + JbJa)
             #
+            # (The factor of 2 here is from the factor of
+            #  1/2 in the definition of sigma)
             sigma[a,b] -= 2 * C1[a,b]
             sigma[b,a] -= 2 * C1[a,b]
 
@@ -390,6 +392,16 @@ def rovib_MP2(Hvib, Crot, Crv, mp2_max, target = None, excitation_fun = None, pr
     
     #
     # There are several types of terms from the second-order sum
+    # 
+    # We organize these by the total (raw) power of J
+    #
+    # The 0th degree terms is just the VMP2 vibrational energy 
+    # contribution. This was calculated above.
+    #
+    # The 1st degree terms come from the rot-vib first-order corrections.
+    # These are zero by the rot-vib operator being real and anti-symmetric
+    #
+    # We continue with 2nd, 3rd, and 4th degree terms
     #
     denom = 1.0 / (E0 - Ei) # The energy denominator 
     eps_abc = nitrogen.math.levi3() # The epsilon tensor 
@@ -398,6 +410,7 @@ def rovib_MP2(Hvib, Crot, Crv, mp2_max, target = None, excitation_fun = None, pr
         for b in range(3): 
             #
             # "Coriolis contribution"
+            # The 1 + 1 2nd degree term
             #
             #    c_vv'[a] * c_v'v [b] (iJa) (iJb)
             #  = -c_v'v[a] * c_v'v[b] (-1 * JaJb)   note sign change in `c`
@@ -405,7 +418,8 @@ def rovib_MP2(Hvib, Crot, Crv, mp2_max, target = None, excitation_fun = None, pr
             sigma[a,b] += 2 * sum(denom * c2[a] * c2[b]) 
             
             # Vibrational contribution
-            # 
+            # (the 2 + 0 and 0 + 2 2nd degree terms)
+            #
             #   (V_vv' Cab_v'v + Cab_vv' V_v'v) [iJa,iJb]_+
             # = -2 * V_v'v * Cab_v'v * (JaJb + JbJa)
             #
@@ -413,9 +427,11 @@ def rovib_MP2(Hvib, Crot, Crv, mp2_max, target = None, excitation_fun = None, pr
             sigma[a,b] += val 
             sigma[b,a] += val 
             
-            # nominal "cubic" terms can be reduced to quadratic
             #
-            # Note [iJa, iJb] = eps_abc iJc
+            # The nominal cubic terms can actually be reduced
+            # to quadratic terms (the cubic parts exactly cancel
+            # by antisymmetry of the rot-vib vibrational operator)
+            #
             #
             for c in range(3):
                 val = 2 * sum(denom * c2[c] * C2[a,b]) 
@@ -427,7 +443,13 @@ def rovib_MP2(Hvib, Crot, Crv, mp2_max, target = None, excitation_fun = None, pr
                     sigma[d,b] += eps_abc[c,a,d] * val 
                     sigma[b,d] += eps_abc[c,a,d] * val 
             
-            # quartic terms 
+            #
+            # Finally, the 4th degree terms. These are the centrifugal
+            # quartic distortion
+            #
+            # (The factor of 4 below comes from the factor of 1/4 in the 
+            #  definition of tau)
+            #
             for c in range(3):
                 for d in range(3):
                     val = 4 * sum(denom * C2[a,b] * C2[c,d]) 
@@ -435,7 +457,7 @@ def rovib_MP2(Hvib, Crot, Crv, mp2_max, target = None, excitation_fun = None, pr
                     tau[a,b,d,c] += val 
                     tau[b,a,c,d] += val 
                     tau[b,a,d,c] += val 
-            
+    
     return Evib, sigma, tau 
     #
     ##################################
