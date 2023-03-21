@@ -1657,7 +1657,14 @@ class PowerExpansion(DFun):
                     
                 iX = adf.idxpos(idxX, self.nckD)
                 
-                out[iZ,:] += c * self.d[iX,:] * Dpow
+                #
+                # Dpow ... base_shape = (...)
+                # d[iX,:] ... (nf,)
+                # out[iZ,:] ... (nf,) + base_shape
+                #
+                # Use NumPy tensordot to compute outer product
+                #
+                out[iZ,:] += np.tensordot(c * self.d[iX,:], Dpow, 0)
         
         return out
 
