@@ -17,6 +17,8 @@ as differentiable DFun objects.
 :class:`~nitrogen.special.Real2DHO`              Real 2-D isotropic harmonic oscillator wavefunctions.
 :class:`~nitrogen.special.Sin`                   Sine.
 :class:`~nitrogen.special.Monomial`              A monomial :math:`x^p y^q z^r \cdots`.
+:class:`~nitrogen.special.ChebyshevT`            Chebyshev polynomials of the first kind, :math:`T_n(x)`.
+:class:`~nitrogen.special.ChebyshevU`            Chebyshev polynomials of the second kind, :math:`U_n(x)`.
 ==============================================   ====================================================
 
 """
@@ -1120,3 +1122,174 @@ class Real2DHO(dfun.DFun):
         dfun.adf2array(chi, out)
         # and return
         return out 
+
+class ChebyshevT(dfun.DFun):  
+    """
+    Chebyshev polynomials of the first kind, :math:`T_n(x)`.
+    
+    Attributes
+    ----------
+    nmax : int
+        The maximum degree.
+
+    """
+    
+    def __init__(self, nmax):
+        """
+        Create Chebyshev polynomial basis.
+
+        Parameters
+        ----------
+        nmax : int
+            The maximum degree.
+        """
+        
+        if nmax < 0:
+            return ValueError("nmax must be >= 0")
+         
+        super().__init__(self._Tx, nf = nmax + 1, nx = 1,
+                         maxderiv = None, zlevel = None)
+        #
+        # The zlevel is actually finite, but 
+        # I will ignore that here.
+        #
+        self.nmax = nmax 
+        
+        return 
+        
+    def _Tx(self, X, deriv = 0, out = None, var = None):
+        """
+        basis evaluation function 
+        
+        Use recursion relations for Chebyshev 
+        polynomials of the first kind
+    
+        """    
+        nd,nvar = dfun.ndnvar(deriv, var, self.nx)
+        if out is None:
+            base_shape = X.shape[1:]
+            out = np.ndarray( (nd, self.nf) + base_shape, dtype = X.dtype)
+        
+        # Create adf object for theta
+        x = dfun.X2adf(X,deriv,var)[0]
+        
+        # Calculate T polynomials
+        T = _chebyshev_TU_gen(x, self.nmax, kind = 'first')
+            
+        # Convert adf objects to a single
+        # derivative array
+        dfun.adf2array(T, out)
+        
+        return out 
+    
+class ChebyshevU(dfun.DFun):  
+    """
+    Chebyshev polynomials of the second kind, :math:`U_n(x)`.
+    
+    Attributes
+    ----------
+    nmax : int
+        The maximum degree.
+
+    """
+    
+    def __init__(self, nmax):
+        """
+        Create Chebyshev polynomial basis.
+
+        Parameters
+        ----------
+        nmax : int
+            The maximum degree.
+        """
+        
+        if nmax < 0:
+            return ValueError("nmax must be >= 0")
+         
+        super().__init__(self._Ux, nf = nmax + 1, nx = 1,
+                         maxderiv = None, zlevel = None)
+        #
+        # The zlevel is actually finite, but 
+        # I will ignore that here.
+        #
+        self.nmax = nmax 
+        
+        return 
+        
+    def _Ux(self, X, deriv = 0, out = None, var = None):
+        """
+        basis evaluation function 
+        
+        Use recursion relations for Chebyshev 
+        polynomials of the first kind
+    
+        """    
+        nd,nvar = dfun.ndnvar(deriv, var, self.nx)
+        if out is None:
+            base_shape = X.shape[1:]
+            out = np.ndarray( (nd, self.nf) + base_shape, dtype = X.dtype)
+        
+        # Create adf object for theta
+        x = dfun.X2adf(X,deriv,var)[0]
+        
+        # Calculate T polynomials
+        U = _chebyshev_TU_gen(x, self.nmax, kind = 'second')
+            
+        # Convert adf objects to a single
+        # derivative array
+        dfun.adf2array(U, out)
+        
+        return out 
+    
+def _chebyshev_TU_gen(x,nmax, kind = 'first'):
+    """ Calculate Chebyshev polynomials
+    of the first or second kind 
+    up to degree `nmax` with generic algebra.
+     
+    
+    Parameters
+    ----------
+    x : ndarray, adarray, or other algebraic object
+        The argument of the Laguerre polynomials
+    nmax : int
+        The maximum degree.
+    kind : {'first','second'}, optional
+        The polynomial type. The default is
+        ''first'' (:math:`T_n(x)`).
+        
+    Returns
+    -------
+    T : list
+        The Chebyshev polynomials as the 
+        same type of `x`.
+    
+    """
+    
+    if kind != 'first' and kind != 'second':
+        raise ValueError('`kind` must be `first` or `second`')
+        
+    T = []
+    
+    if nmax >= 0:
+        T0 = 1.0 + 0.0 * x # T_0(x) = U_0(x) = 1
+        T.append(T0)
+    
+    if nmax >= 1:
+        if kind == 'first':
+            T1 = 1.0 * x # T_1(x) = x
+        elif kind == 'second':
+            T1 = 2.0 * x # U_1(x) = x
+        T.append(T1)
+        
+    for n in range(2,nmax+1):
+        #
+        # Use recurrence relation
+        #
+        # Tn = 2*x*T{n-1} - T{n-2}
+        # 
+        # same for Un 
+        #
+        Tn = 2 * x * T[n-1] - T[n-2]
+        T.append(Tn)
+  
+    return T
