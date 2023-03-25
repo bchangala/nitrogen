@@ -85,7 +85,9 @@ def curvVib(Q0, pes, cs, masses, mode = 'bodyframe', fidx = 0):
         The harmonic frequencies (times :math:`\hbar`).
         Negative frequencies are returned for imaginary frequencies.
     nctrans : LinearTrans
-        The normal coordinate transformation.
+        The normal coordinate transformation. The columns of `nctrans.T`
+        are the (right) eigenvectors of the GF matrix, scaled to the
+        dimensionless normal coordinates.
         
     Notes
     -----
