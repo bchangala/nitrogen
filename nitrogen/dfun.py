@@ -588,6 +588,7 @@ class DFun:
                                              out = out[:, i, j, k])
                         
                         if i != j: # copy result because Hessian is symmetric
+                            # H_ji <-- H_ij 
                             np.copyto(out[:,j, i, k], out[:, i, j, k])
             
         return out
