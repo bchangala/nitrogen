@@ -2824,6 +2824,126 @@ def reduceOrder(F, i, k, ni, idx, out = None):
     
     return G
 
+def reduceOrderTwice(F, i, j, k, ni, idx, out = None):
+    """
+    Reduce the derivative array for F with respect to 
+    variables i and j. The returned derivative array is
+    that for the function :math:`\\partial_i \\partial_j F`.
+    (Note that this function is an unscaled derivative.)
+
+    Parameters
+    ----------
+    F : ndarray
+        The derivative array up to degree `k`
+        in `ni` variables.
+    i,j : int
+        The variable index (0, ..., `ni` - 1) to
+        reduce. `i` may equal `j`.
+    k : int
+        The initial derivative order of F.
+    ni : int
+        The number of independent variables.
+    idx : ndarray
+        The return value of idxtab with suitable parameters.
+    out : ndarray, optional
+        Output buffer. If None, this will be
+        created. The default is None.
+
+    Returns
+    -------
+    out : ndarray
+        The derivative array with shape (`nd_reduced`, ...)
+        corresponding to the new function :math:`\\partial_i \\partial_j F`
+
+    """
+
+    nd,_ = idx.shape # The number of derivatives
+    
+    if k <= 1:
+        raise ValueError("Cannot reduce a derivative array with k = 0 or 1") 
+        
+    if i < 0 or i >= ni : 
+        raise ValueError(f"Cannot reduce w.r.t variable index i = {i:d} with only ni = {ni:d} variables")
+    if j < 0 or j >= ni : 
+        raise ValueError(f"Cannot reduce w.r.t variable index j = {j:d} with only ni = {ni:d} variables")
+        
+    # k is > 1 and ni is > 0 
+    #
+    # Calculate the number of derivatives for
+    # order k - 2 in ni variables. We already know
+    # that nd is the number of deriv for order k
+    # in ni variables, so we can use the simple result:
+    nd_reduced = (nd * k * (k+1) ) // ( (k + ni) * (k + ni - 1) )
+    # This should be an integer result always!
+    
+    if out is None:
+        out = np.ndarray( (nd_reduced,) + F.shape[1:], dtype = F.dtype)
+    G = out # reference only
+    
+    # The index table `idx` for F is already provided,
+    # so we will loop through this instead of building
+    # a new index table for the reduced derivative array
+    # The derivatives we are interested in appear
+    # in the same order in the F (unreduced) and G (reduced)
+    # derivative arrays.
+    # This is to say that if one has two multi-indices of F
+    # a = [a0 a1 a2 ... ai ...] and b = [b0 b1 b2 ... bi ...]
+    # a appears before b
+    # then the corresponding reduced indices
+    # a' = [a0 a1 a2 ... ai-1 ... aj-1 ... ] and b' = [b0 b1 b2 ... bi-1 ... bj-1 ...]
+    # appear in the same order: a' before b'
+    # (regardless of whether i == j)
+    #
+    iG = 0 # running position in the reduced derivative array 
+    for iF in range(nd):
+        
+        idxF = idx[iF,:]  # The multi-index of the original function's derivatives
+        
+        
+        # Check whether the reduced deriative 
+        # exists. If i == j, then the derivative order
+        # for variable i must be >= 2. If i != j, 
+        # then both must be >= 1
+        #
+        if i == j and idxF[i] < 2 :
+            continue 
+        if i !=j and (idxF[i] < 1 or idxF[j] < 1):
+            continue 
+        
+        # The reduced derivative exists.
+        #
+        # Because we store the derivatives with a factor
+        # equal to the inverse of the multi-index factorial,
+        # we need to correct this in the reduced array
+        #
+        # The correct conversion factor is idxF! / idxG! 
+        #
+        # If i != j, then this ratio is just idxF[i] * idxF[j].
+        #
+        # If i == j, then this ratio is idxF[i] * (idxF[i] - 1)
+        #
+        # Now we do this:
+        # G[iG] = F[iF] * ratio
+        #
+        if i == j:
+            ratio = idxF[i] * (idxF[i] - 1) 
+        else:
+            ratio = idxF[i] * idxF[j] 
+            
+        # Depending on the shape of G, we will split this up
+        if len(G.shape) == 1:
+            G[iG] = F[iF] * ratio # Scalar multiplication
+        else:
+            np.multiply(F[iF], ratio, out = G[iG]) # use np.multiply to save on temp memory
+        
+        iG += 1
+        
+    # Check that nothing went wrong in the book keeping
+    assert iG == nd_reduced, "Derivative array reduction was not successful!"
+    
+    
+    return G
+
 def n2N(n):
     """
     Calculate the square matrix rank N
