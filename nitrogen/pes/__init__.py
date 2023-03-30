@@ -21,7 +21,10 @@ from .cfour import *
 from . import opt 
 from .opt import * 
 
+# Submodules
 from . import fit 
+from . import rxnpath 
+
 
 __all__ = ['loadpes', 'curvVib']
 __all__ += cfour.__all__

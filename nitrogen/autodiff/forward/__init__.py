@@ -2873,7 +2873,7 @@ def reduceOrderTwice(F, i, j, k, ni, idx, out = None):
     # order k - 2 in ni variables. We already know
     # that nd is the number of deriv for order k
     # in ni variables, so we can use the simple result:
-    nd_reduced = (nd * k * (k+1) ) // ( (k + ni) * (k + ni - 1) )
+    nd_reduced = (nd * k * (k-1) ) // ( (k + ni) * (k + ni - 1) )
     # This should be an integer result always!
     
     if out is None:
