@@ -483,3 +483,86 @@ def levi3():
                       [-1,  0,  0],
                       [ 0,  0,  0]]])
     
+
+def constrainedPolynomial(x, df, x0 = None):
+    """
+    Calculate a single-variable
+    polynomial that exactly satisfies
+    the value and derivatives at one or more points
+    
+    Parameters
+    ----------
+    x : (n,) array_like
+        The matching positions
+    df : (deriv+1, n) array_like
+        The scaled derivative arrays of :math:`f(x)` at the matching positions
+    x0 : scalar, optional
+        The expansion point of the polynomial. If None, 
+        `x0` is zero.
+    
+    Returns
+    -------
+    c : (nc,) ndarray
+        The power series coefficients for the matching polynomial, 
+        ``c[0] + c[1]*(x-x0) + c[2]*(x-x0)**2 + ...``, where 
+        `nc` = `n`\ *(\ `deriv` +1).
+        
+    Notes
+    -----
+    The `df` derivative array contains the **scaled** derivatives,
+    ``df[n]`` = :math:`f^{(n)} = \partial_x^n f / n!`.
+    
+    """
+    
+    x = np.array(x)
+    df = np.array(df)
+    
+    if x0 is None:
+        x0 = 0.0 
+        
+    n = len(x) # The number of points 
+    deriv = df.shape[0] - 1 # The derivative order 
+    
+    # The number of parameters is equal to the
+    # total number of boundary conditions, 
+    # which equals n * (deriv + 1)
+    #
+    nc = n * (deriv + 1) 
+    
+    # We now set up the linear equation relating the 
+    # polynomial expansion coefficients to the 
+    # derivatives at each matching position
+    
+    C = np.zeros((nc,nc)) 
+    b = np.zeros((nc,))
+    
+    nck = adf.ncktab(nc)
+    
+    
+    for i in range(n): 
+        # At matching point x[i]
+        for k in range(deriv+1): 
+            # The k**th scaled derivative at x[i]
+            
+            idx = i*(deriv+1) + k # The constraint index
+            
+            b[i*(deriv+1) + k] = df[k,i]  # The constraint value 
+            
+            for m in range(nc):
+                # The (x-x0)**m term 
+                #
+                # The k**th scaled deriative of (x-x0)**m 
+                # is (m choose k) * (x-x0)**(m-k) for k <= m 
+                
+                if k > m:
+                    # The derivative is zero
+                    C[idx, m] = 0.0 
+                else:
+                    C[idx, m] = nck[m,k] * (x[i] - x0)**(m-k)
+                    
+                    
+    # C is now complete.
+    # Solve the linear equation C @ c = b 
+    c = np.linalg.solve(C, b) 
+    
+    return c 
