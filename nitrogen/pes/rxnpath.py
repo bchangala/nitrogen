@@ -411,7 +411,26 @@ def qderiv_stationary(q0, deriv, V, cs, masses = None, mode = 'bodyframe',
     qn = np.stack(qn, axis = 0) # Stack into a derivative array 
     
     return qn 
+
+
+def singleLeibniz(a1,a2):
+    """
+    A simple single-variable Leibniz product rule
     
+    a1,a2 : (deriv+1,...) ndarray
+        Single variable deriative arrays
+    
+    """
+    result = np.zeros_like(a1)
+    deriv = a1.shape[0] - 1
+    for i in range(deriv+1):
+        for j in range(deriv + 1):
+            k = i + j # total order 
+            if k > deriv:
+                continue 
+            result[k] += a1[i] * a2[j] 
+    return result 
+   
 def pathderivchain(A,X):
     """
     Calculate the derivative of a quantity with respect to the
@@ -433,27 +452,7 @@ def pathderivchain(A,X):
         
     """
        
-    ########################################
-    #
-    def singleLeibniz(a1,a2):
-        """
-        A simple single-variable Leibniz product rule
-        
-        a1,a2 : (deriv+1,...) ndarray
-            Single variable deriative arrays
-        
-        """
-        result = np.zeros_like(a1)
-        deriv = a1.shape[0] - 1
-        for i in range(deriv+1):
-            for j in range(deriv + 1):
-                k = i + j # total order 
-                if k > deriv:
-                    continue 
-                result[k] += a1[i] * a2[j] 
-        return result 
-    #
-    #########################################
+
     
     #########################################
     # Perform a many-to-single chain rule
@@ -512,4 +511,115 @@ def pathderivchain(A,X):
         result += temp * A[idxA]
     
     return result 
-   
+
+def invertderiv(f, x0 = 0.0):
+    """
+    Calculate the derivatives of the inverse function
+    given the derivatives of a function.
+    
+    Parameters
+    ----------
+    f : (deriv+1,...) ndarray
+        The derivative array of the original function, :math:`f(x)`.
+    x0 : (...) ndarray or scalar, optional
+        The expansion value of :math:`x`.  The default is zero.
+    
+    Returns
+    -------
+    F : (deriv+1,...) ndarray
+        The deriative array of the inverse function, :math:`F(y)`.
+    
+    
+    """
+    
+    # We will take advantage of the Taylor series/chain rule
+    # operation to implicitly perform the inverse recursion 
+    # process
+    
+    deriv = f.shape[0] - 1 # The derivative order 
+    base_shape = f.shape[1:] 
+    
+    F = np.zeros_like(f) 
+    
+    F[0] = x0  # The value of the inverse function is just the expansion point 
+    
+    # Construct the derivative array
+    # of the displacement of `f`
+    df = f.copy() 
+    df[0] = 0.0  # Value is 0.0 at expansion
+    
+    # And calculate its powers 
+    dfpow = np.zeros((deriv + 1, deriv + 1) + base_shape)
+    
+    # dfpow[:,p] is the derivative array for the
+    # p**th power of the displacement of f
+    #
+    if deriv >= 0:
+        dfpow[0:1, 0] = 1.0 # The zeroth power is just 1.0 constant
+    if deriv >= 1:
+        # The first power is the displacement of f
+        np.copyto(dfpow[:, 1], df) # First power = coordinate displacement
+    for p in range(2,deriv+1):
+        # higher powers
+        df_p = singleLeibniz(dfpow[:,p-1], dfpow[:,1]) 
+        np.copyto(dfpow[:, p], df_p)
+        
+    #
+    # Now the derivatives of F must satisfy
+    #
+    # F(0) * [df]**0 + 
+    # F(1) * [df]**1 + 
+    # F(2) * [df]**2 + ...  =  F
+    #
+    # The derivative array of F w.r.t itself is just (F0, 1, 0, 0, 0, ...)
+    #
+    # i.e. F(0) = x0
+    #      F(1) * df(1) = 1 --> F(1) = 1 / df(1)
+    F[1] = 1.0 / df[1] # note f[1] = df[1] 
+    
+    for n in range(2, deriv+1):
+        
+        temp = sum([F[m] * dfpow[n,m] for m in range(1,n)]) # m = 1 ... n-1
+        F[n] = -temp / dfpow[n,n]
+    
+    return F 
+
+def proxyderiv(qn, star_index):
+    """
+    Convert path derivatives to those with respect to 
+    one of the coordinates
+    
+    Parameters
+    ----------
+    qn : (deriv+1,n) 
+        The derivative array of the coordinates with respect to 
+        a path parameter
+    star_index : integer
+        The index of the proxy coordinate
+    
+    Returns
+    -------
+    qn_star : (deriv+1,n)
+        The derivatives of the coordinates with respect to the
+        proxy coordinate
+    
+    """
+    
+    # Extract the derivatives of q* w.r.t the path paramter `s`
+    qn = np.array(qn)
+    
+    qstar_wrt_s = qn[:,star_index]
+    
+    # Now invert the derivatives to get `s` w.r.t q*
+    s_wrt_qstar = invertderiv(qstar_wrt_s, x0 = 0.0)
+    
+    # Now use the chain rule to compute other coordinates w.r.t. q* 
+    qn_star = np.zeros_like(qn)
+    for i in range(qn.shape[1]): # for each coordinate
+        qn_star[:,i] = pathderivchain(qn[:,i], s_wrt_qstar.reshape((-1,1))) 
+    
+    # Note that the derivative array for q* w.r.t q* itself should
+    # always come out to be [q*, 1, 0, 0, 0, ...]
+    #
+    
+    return qn_star 
