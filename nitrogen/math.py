@@ -566,3 +566,121 @@ def constrainedPolynomial(x, df, x0 = None):
     c = np.linalg.solve(C, b) 
     
     return c 
+
+def constrainedFourier(x, df, period = None):
+    """
+    Calculate a single-variable
+    Fourier series that exactly satisfies
+    the value and derivatives at one or more points
+    
+    Parameters
+    ----------
+    x : (n,) array_like
+        The matching positions
+    df : (deriv+1, n) array_like
+        The scaled derivative arrays of :math:`f(x)` at the matching positions
+    period : float, optional
+        The period of the coordinate `x`. If None, :math:`2\\pi` is assumed.
+    
+    Returns
+    -------
+    c : (nc,) ndarray
+        The Fourier series coefficients. 
+        
+    Notes
+    -----
+    The `df` derivative array contains the **scaled** derivatives,
+    ``df[n]`` = :math:`f^{(n)} = \partial_x^n f / n!`.
+    
+    The expansions coefficients are defined as 
+    
+    ..  math::
+        
+        f(x) = c_0 + c_1 \\sin \\sigma x + c_2 \\cos \\sigma  x +
+        c_3 \\sin 2 \\sigma  x + c_4 \\cos 2 \\sigma  x + \\cdots
+        
+    where :math:`\\sigma = 2\\pi/`\ `period`.
+    
+    """
+    
+    x = np.array(x)
+    df = np.array(df)
+    
+    if period is None:
+        scale = 1.0 
+    else:
+        scale = (2*np.pi) / period 
+        
+        
+    n = len(x) # The number of points 
+    deriv = df.shape[0] - 1 # The derivative order 
+    
+    # We assume a fully linearly independent
+    # set of constraints
+    #
+    # The number of parameters is equal to the
+    # total number of boundary conditions, 
+    # which equals n * (deriv + 1)
+    #
+    nc = n * (deriv + 1) 
+    
+    # We now set up the linear equation relating the 
+    # polynomial expansion coefficients to the 
+    # derivatives at each matching position
+    
+    C = np.zeros((nc,nc)) 
+    b = np.zeros((nc,))
+    
+    
+    for i in range(n): 
+        # At matching point x[i]
+        
+        for k in range(deriv+1): 
+            # The k**th scaled derivative at x[i]
+            
+            idx = i*(deriv+1) + k # The constraint index
+            
+            b[i*(deriv+1) + k] = df[k,i]  # The constraint value 
+            
+            for m in range(nc):
+                # The c_m expansion term:
+                # 
+                # if m is even, then cos(w * scale * x) with w = m // 2
+                #    m is odd,  then sin(w * scale * x) with w = (m+1) // 2
+                #
+                # Calculate the k**th scaled derivative of the term
+                # at x[i]
+                #
+                if m == 0: 
+                    # constant term
+                    C[idx, m] = (1.0 if k == 0 else 0.0) 
+                    
+                elif (m % 2) == 0:
+                    # cosine
+                    ws = (m // 2) * scale
+                    if k % 4 == 0:
+                        C[idx, m] = (ws)**k * np.cos(ws * x[i]) / np.math.factorial(k)
+                    elif k % 4 == 1:
+                        C[idx, m] = (ws)**k * (-np.sin(ws * x[i])) / np.math.factorial(k)
+                    elif k % 4 == 2:
+                        C[idx, m] = (ws)**k * (-np.cos(ws * x[i])) / np.math.factorial(k)
+                    else: #k % 4 == 3
+                        C[idx, m] = (ws)**k * np.sin(ws * x[i]) / np.math.factorial(k)
+                    
+                else:
+                    # sine 
+                    ws = ( (m+1) // 2 ) * scale
+                    if k % 4 == 0:
+                        C[idx, m] = (ws)**k * np.sin(ws * x[i]) / np.math.factorial(k)
+                    elif k % 4 == 1:
+                        C[idx, m] = (ws)**k * np.cos(ws * x[i]) / np.math.factorial(k)
+                    elif k % 4 == 2:
+                        C[idx, m] = (ws)**k * (-np.sin(ws * x[i])) / np.math.factorial(k)
+                    else: #k % 4 == 3
+                        C[idx, m] = (ws)**k * (-np.cos(ws * x[i])) / np.math.factorial(k)
+            
+    # C is now complete.
+    # Solve the linear equation C @ c = b 
+    c = np.linalg.solve(C, b) 
+    
+    return c 

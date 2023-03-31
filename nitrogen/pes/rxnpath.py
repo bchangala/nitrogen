@@ -16,8 +16,8 @@ def qderiv_nonstationary(q0, deriv, V, cs, masses = None, mode = 'bodyframe',
 
     Parameters
     ----------
-    q0 : array_like
-        The evaluation point.
+    q0 : (nq,...) array_like
+        The evaluation points
     deriv : integer
         The maximum derivative order to calculate.
     V : DFun
@@ -35,21 +35,21 @@ def qderiv_nonstationary(q0, deriv, V, cs, masses = None, mode = 'bodyframe',
 
     Returns
     -------
-    q : (deriv + 1, nq)
-        The derivative of the reaction path with respect to the
+    q : (deriv + 1, nq, ...)
+        The derivatives of the reaction path with respect to the
         arc length parameter.
 
     """
     
     q0 = np.array(q0)
-    nvar = len(q0) # The number of coordinates
-    
+    nvar = q0.shape[0] # The number of coordinates
+    base_shape = q0.shape[1:] 
     
     # If deriv == 0, then only the value is
-    # requested. Just return the evaluation point
+    # requested. Just return the evaluation points
     #
     if deriv == 0:
-        q = np.array(q0).copy().reshape((1,nvar))
+        q = np.array(q0).copy().reshape((1,nvar) + base_shape)
         return q 
     
     if direction == 'descend':
@@ -66,7 +66,6 @@ def qderiv_nonstationary(q0, deriv, V, cs, masses = None, mode = 'bodyframe',
     # order less.
     #
     
-    # nd_V = nitrogen.dfun.nderiv(deriv, nvar)
     nd_G = nitrogen.dfun.nderiv(deriv-1, nvar)
     
     # Calculate derivatives of the metric tensor, g
@@ -76,7 +75,7 @@ def qderiv_nonstationary(q0, deriv, V, cs, masses = None, mode = 'bodyframe',
     G,_ = nitrogen.dfun.sym2invdet(g, deriv - 1, nvar)
     
     # Extract just the vibrational block
-    dG = np.zeros((nd_G, nvar, nvar))
+    dG = np.zeros((nd_G, nvar, nvar) + base_shape)
     
     if mode == 'bodyframe':
         #
@@ -96,7 +95,7 @@ def qderiv_nonstationary(q0, deriv, V, cs, masses = None, mode = 'bodyframe',
     # Calculate the derivatives of the PES
     # arranged as derivatives of the gradient
     #
-    df = V.jacderiv(q0, deriv - 1)[:,:,0] # (nd, nvar, 1, ...)
+    df = V.jacderiv(q0, deriv - 1)[:,:,0] # (nd, nvar, ...)
     
  
     # Now begin the recursive evaluation 
@@ -109,11 +108,26 @@ def qderiv_nonstationary(q0, deriv, V, cs, masses = None, mode = 'bodyframe',
     # q^(1) = dq/ds = v = +/- Gvib . f / c =  +/- F / c 
     # c = sqrt[F.f]
 
+    def matvec(M,v):
+        # 
+        # Matrix vector product with shapes
+        # (n,m,...) @ (m,...) --> (n,...)
+        #
+        # Multiply via broadcasting and then sum over the second index
+        #
+        return np.sum(M*v, axis = 1)
     
+    def dot(v,w):
+        #
+        # Vector dot product with shapes
+        # (n,...) . (n,...) --> (...)
+        #
+        return np.sum(v*w, axis = 0)
+        
     f0 = df[0] # f_vib 
     G0 = dG[0] # G_vib 
-    F0 = G0 @ f0  # The covariant gradient
-    c0 = np.sqrt(F0 @ f0)  
+    F0 = matvec(G0,f0) # The covariant gradient
+    c0 = np.sqrt(dot(F0,f0))  
     v0 = sign * F0 / c0 # Sign depends on ascent or descent 
     q1 = v0
     
@@ -438,16 +452,16 @@ def pathderivchain(A,X):
     
     Parameters
     ----------
-    A : (nd,...) ndarray
+    A : (nd,...',...) ndarray
         The derivative array of :math:`A(x)` 
         with respect to `nvar` :math:`x` coordinates.
-    X : (deriv+1,nvar) ndarray
+    X : (deriv+1,nvar,...) ndarray
         The derivative array of `nvar` `:math:`x` coordinates
         with respect to the path parameter :math:`s`.
     
     Returns
     -------
-    B : (deriv+1,...) ndarray
+    B : (deriv+1,...',...) ndarray
         The derivative array of :math:`B(s) = A(x(s))`
         
     """
@@ -460,7 +474,10 @@ def pathderivchain(A,X):
     
     deriv = X.shape[0] - 1 # The derivative order 
     nvar = X.shape[1] # The number of variables 
-    base_shape = A.shape[1:]
+    
+    Ashape = A.shape[1:] 
+    Xshape = X.shape[2:]
+    Aax = len(Ashape) - len(Xshape) # The number of additional A axes
     
     # The derivatives of A w.r.t `s` with be calculated
     # with the Taylor series chain rule 
@@ -468,12 +485,12 @@ def pathderivchain(A,X):
     # We first need the derivative arrays of the powers 
     # of each `x` coordinate w.r.t `s` 
     #
-    deltaX = X.copy() 
+    deltaX = X.copy()  
     deltaX[0] = 0.0 
     # deltaX is the derivative array w.r.t. s 
     # for the displacement of the coordinates
     
-    xpow = np.zeros((deriv + 1, nvar, deriv + 1))
+    xpow = np.zeros((deriv + 1, nvar, deriv + 1) + Xshape)
     
     # xpow[:,k,p] is the derivative array for the
     # p**th power of (delta x)_k
@@ -492,10 +509,10 @@ def pathderivchain(A,X):
     # of A w.r.t s via its truncated Taylor series 
 
     idxtab = nitrogen.autodiff.forward.idxtab(deriv, nvar) 
-    result = np.zeros( (deriv+1,) + base_shape )
+    result = np.zeros( (deriv+1,) + Ashape )
     
-    one = np.zeros((deriv+1,))
-    one[0] = 1.0 
+    one = np.zeros((deriv+1,) + Xshape)
+    one[0:1].fill(1.0) 
     # one is the `s` derivative array for 1
     
     for idxA in range(idxtab.shape[0]):
@@ -507,12 +524,18 @@ def pathderivchain(A,X):
         # temp now equals the product of powers of 
         # x-displacements 
         #
-        temp = temp.reshape((deriv+1,) + tuple([1]*len(base_shape)))
+        temp = np.expand_dims(temp, tuple(range(1,Aax+1)))
+        
+        # temp =   (deriv+1, 1,...'1,  ... )
+        # A[idx] =          (  ...' ,  ... )
+        #
+        #     B    (deriv+1,   ...' ,  ... )
         result += temp * A[idxA]
     
     return result 
 
 def invertderiv(f, x0 = 0.0):
+    
     """
     Calculate the derivatives of the inverse function
     given the derivatives of a function.
