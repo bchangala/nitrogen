@@ -157,7 +157,7 @@ def qderiv_nonstationary(q0, deriv, V, cs, masses = None, mode = 'bodyframe',
         # 
         # F = G @ f 
         #
-        Fn.append(sum([Gn[m] @ fn[n-m] for m in range(n+1)])) # m = 0...n
+        Fn.append(sum([matvec(Gn[m],fn[n-m]) for m in range(n+1)])) # m = 0...n
        
         
         # Calculate c(n)
@@ -166,7 +166,7 @@ def qderiv_nonstationary(q0, deriv, V, cs, masses = None, mode = 'bodyframe',
         #
         temp = 0 
         for m in range(0,n+1): # m = 0...n
-            temp = temp + np.dot(Fn[m],fn[n-m])
+            temp = temp + dot(Fn[m],fn[n-m])
             if m > 0 and m < n:
                 temp = temp - cn[m] * cn[n-m]  # m = 1...n-1
         cn.append(0.5 * temp / cn[0]) 
@@ -614,32 +614,32 @@ def proxyderiv(qn, star_index):
     
     Parameters
     ----------
-    qn : (deriv+1,n) 
-        The derivative array of the coordinates with respect to 
+    qn : (deriv+1,n,...) 
+        The derivative array of the `n` coordinates with respect to 
         a path parameter
     star_index : integer
         The index of the proxy coordinate
     
     Returns
     -------
-    qn_star : (deriv+1,n)
-        The derivatives of the coordinates with respect to the
+    qn_star : (deriv+1,n,...)
+        The derivatives of the `n` coordinates with respect to the
         proxy coordinate
     
     """
     
     # Extract the derivatives of q* w.r.t the path paramter `s`
-    qn = np.array(qn)
+    qn = np.array(qn) # (nd,n,...)
     
-    qstar_wrt_s = qn[:,star_index]
+    qstar_wrt_s = qn[:,star_index] # (nd,...)
     
     # Now invert the derivatives to get `s` w.r.t q*
-    s_wrt_qstar = invertderiv(qstar_wrt_s, x0 = 0.0)
+    s_wrt_qstar = invertderiv(qstar_wrt_s) # (nd,...)
     
     # Now use the chain rule to compute other coordinates w.r.t. q* 
     qn_star = np.zeros_like(qn)
     for i in range(qn.shape[1]): # for each coordinate
-        qn_star[:,i] = pathderivchain(qn[:,i], s_wrt_qstar.reshape((-1,1))) 
+        qn_star[:,i] = pathderivchain(qn[:,i], s_wrt_qstar[:,np.newaxis,...] ) 
     
     # Note that the derivative array for q* w.r.t q* itself should
     # always come out to be [q*, 1, 0, 0, 0, ...]
