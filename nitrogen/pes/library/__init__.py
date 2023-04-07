@@ -25,6 +25,7 @@ si2c               Disilicon carbide. Cartesian coordinates Si--C--Si.
 h2o2_mk2012_bo     H2O2, hydrogen peroxide, internal coordinates (see notes).
 h2o2_mk2012_ad     H2O2, hydrogen peroxide, internal coordinates (see notes).
 c2h_chptp2000      C2H radical, multistate diabatic surfaces for X + A states.
+muellerbrown       Müller-Brown model surface
 ================   ===============================================================
 
 
