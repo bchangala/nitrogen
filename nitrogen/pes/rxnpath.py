@@ -8,8 +8,7 @@ import numpy as np
 import nitrogen
 
 
-def qderiv_nonstationary(q0, deriv, V, G,
-                         direction = 'descend'):
+def qderiv_nonstationary(q0, deriv, V, G, direction = 'descend'):
     """
     Calculate the reaction path deriatives evaluated at an arbitrary
     (non-stationary) point.
@@ -164,8 +163,7 @@ def qderiv_nonstationary(q0, deriv, V, G,
     
     return qn 
 
-def qderiv_stationary(q0, deriv, V, G,
-                      direction = 'normal'):
+def qderiv_stationary(q0, deriv, V, G, direction = 'normal'):
     """
     Calculate the reaction path deriatives evaluated at a stationary
     point.
@@ -370,7 +368,149 @@ def qderiv_stationary(q0, deriv, V, G,
     
     return qn 
 
+def LQA_nonstationary(q0, V, G, arclength = 'massweighted',
+                      proxy_index = 0):
+    """
+    Compute the covariant gradient (i.e., the reaction path tangent
+    vector) within a local quadratic approximation at 
+    non-stationary points.
 
+    Parameters
+    ----------
+    q0 : (nq,...) array_like 
+        The non-stationary evaluation points.
+    V : DFun
+        The potential energy surface 
+    G : DFun
+        The inverse metric. If None, a constant unit metric is assumed.
+    arclength : {'massweighted','gradient','proxy'}, optional
+        The path parameterization convention. The default is 'massweighted'.
+    proxy_index : integer, optional
+        The proxy coordinate index.
+
+    Returns
+    -------
+    w0 : (nq,...) ndarray
+        The path tangent at `q0`.
+    W : (nq,nq,...) ndarray
+        The path tangent-gradient at `q0`. ``W[i,j]`` is equal to 
+        :math:`\\partial_j w_i \\vert_0`.
+    G0 : (nq,nq,...) ndarray
+        The inverse metric evaluated at `q`. The inner product of 
+        tangent vectors (**not** gradient vectors) with `G0` yields
+        their proper 2-norm.
+    
+    Notes
+    -----
+    
+    The path tangent is defined as 
+    
+    ..  math::
+        
+        \\mathbf{w} = -G\\mathbf{f}/h,
+                    
+    where :math:`\\mathbf{f}` is the gradient, :math:`G` is the inverse metric
+    tensor, and :math:`h` defines the path parameterization normalization.
+    
+    The LQA approximates the local path tangent as 
+    
+    ..  math::
+        
+        \\mathbf{w} \\approx \\mathbf{w}_0 + W(\\mathbf{q} - \\mathbf{q}_0)
+    
+    For `arclength` == ``'massweighted'``, the natural mass-weighted arc length
+    is used, :math:`h = (\\mathbf{f}^T G \\mathbf{f})^{1/2}`.
+    
+    For `arclength` == ``'gradient'``, :math:`h = 1`.
+    
+    For `arclength` == ``'proxy'``, :math:`h = -(G\\mathbf{f})_i`, where :math:`i` is the
+    coordinate index specified by `proxy_index`. In this case, the path is parameterized
+    by one of the coordinates themselves -- the ''proxy'' coordinate -- so :math:`w_i = 1`.
+    
+    """
+    
+    # Calculate the local quadratic approximation to the 
+    # path tangent
+    #
+    # Let w = -F/h
+    #     F = G @ f
+    #
+    # where `f` is the gradient and
+    # `h` defines the normalization convention.
+    # 
+    #
+    q0 = np.array(q0)
+    
+    # Calculate the inverse metric tensor and its first derivatives
+    #
+    dG = symfull_axis(G.f(q0, deriv = 1), 1) 
+    
+    G0 = dG[0]   # G_ij (...)
+    G1 = dG[1:]  # d_i G_jk (...)
+    
+    # Calculate the energy gradient and hessian
+    _,f,K = [a[0] for a in V.vjh(q0)]
+    # f : (nq,...) the local gradient
+    # K : (nq,nq,...) the local Hessian
+    
+    #
+    # Calculate F = G @ f and its derivatives
+    #
+    F0 = np.einsum('ij...,j...->i...', G0, f) # G0 @ f : (nq,...)
+    F1 = np.einsum('ijk...,k...->ij...',G1,f) + np.einsum('jk...,ik...->ij...',G0,K)
+    # F1 : (nq,nq,...)
+    # F1[i,j] = d_i F_j
+    
+    #
+    # Calculate the normalization parameter `h` and its derivatives
+    if arclength == 'massweighted':
+        #
+        # h = sqrt[f.T @ G @ f]
+        #   = sqrt[f.F]
+        h0 = np.sqrt(np.sum(f*F0,axis=0)) 
+        h1 = (np.einsum('j...,ij...->i...', f,F1) + 
+              np.einsum('ij...,j...->i...', K,F0)) / (2*h0) 
+        
+    elif arclength == 'gradient': 
+        # No normalization
+        #
+        h0 = 1.0 
+        h1 = 0.0 
+        
+    elif arclength == 'proxy':
+        #
+        # h = -F*
+        #
+        h0 = -F0[proxy_index] 
+        h1 = -F1[:,proxy_index]
+        
+    else: 
+        raise ValueError('Invalid arclength mode = {str(arclength):s}')
+
+    # Calculate the path tangent and its derivatives
+    #
+    # w = -F/h
+    #
+    #      h*w = -F 
+    # --> dh*w + h*dw = -dF 
+    #              dw = -(dF + dh*w) / dh
+    w0 = -F0 / h0 
+    w1 = -(F1 + np.einsum('i...,j...->ij...',h1,w0)) / h0 
+    # w1[i,j] = d_i w_j
+    
+    #
+    # The local tangent is approximated as 
+    # 
+    # w  ~  w0 + W@(q-q0)
+    # 
+    # so W equals the transpose of `w1`
+    #
+    W = np.einsum('ij...->ji...',w1) 
+    
+    return w0, W, G0
+    
+    
+    
 def singleLeibniz(a1,a2):
     """
     A simple single-variable Leibniz product rule
@@ -1014,5 +1154,317 @@ def symfull_axis(A, axis = 0):
     Afull = np.moveaxis(Afull, (0,1), (axis,axis+1)) # Move the array axes back 
     
     return Afull 
+
+
+def spline_proxy_path(V, G, q0, q1, proxy_index, nodes,
+                      match_level = 0, is_stat = (True,True),
+                      max_iter = 20, deltarms = 1e-6):
+    """
+    Compute a reaction path between two points as a 
+    spline function with respect to a proxy coordinate.
+
+    Parameters
+    ---------- 
+    V : DFun
+        The potential energy surface.
+    G : DFun
+        The inverse metric tensor.
+    q0,q1 : (nq,)
+        A path end-point.
+    proxy_index : integer
+        The proxy coordinate index.
+    nodes : integer
+        The number of interior spline nodes.
+    match_level : integer, optional
+        The exact boundary condition constraint level. 
+        If `match_level` = 0, the path end-points are constrained.
+        If `match_level` = 1, the path tangent is also constrained.
+        The default is 0.
+    is_stat : (2,) tuple of boolean, optional
+        Specifies whether each end-point is a stationary point. 
+        The default is (True,True). This only matters if `match_level`
+        is greater than 0.
+    max_iter : integer, optional
+        The maximum number of path updates.
+    deltarms : float
+        The threshold change to the estimated path rms error per step.
+        
+    Returns
+    -------
+    path_list : list of (nq,nodes) ndarray
+        The path nodes for each update.
+    spline_list : list of (nq, nodes-1, 4) ndarray
+        The cubic spline parameters for each update.
+    rms_list : list of float
+        The path rms for each update.
+
+    """
     
+    ##########################################
+    # 
+    # Two-point reaction path spline solution
+    #
+    ##########################################
+    
+    # Make sure q0 and q1 are in increasing order
+    # with respect to the proxy coordinate
+    if q0[proxy_index] > q1[proxy_index]:
+        q0,q1 = q1,q0 
+        is_stat = (is_stat[1], is_stat[0])
+    
+    ##########################################
+    #
+    # Calculate the boundary values at the 
+    # path end-points. 
+    #
+    if match_level >= 0: 
+        # The path values
+        p0,p1 = q0,q1 
+        dp0,dp1 = None, None 
+    if match_level >= 1:
+        # The path tangent is needed
+        #
+        # First point
+        if is_stat[0]: 
+            dp0 = qderiv_stationary(q0, 1, V, G)[1]
+        else:
+            dp0 = qderiv_nonstationary(q0, 1, V, G)[1]
+        dp0 = dp0 / dp0[proxy_index]
+        
+        # Second point 
+        if is_stat[1]: 
+            dp1 = qderiv_stationary(q1, 1, V, G)[1]
+        else:
+            dp1 = qderiv_nonstationary(q1, 1, V, G)[1]
+        dp1 = dp1 / dp1[proxy_index]
+    #
+    ##########################################
+    
+    ########################################## 
+    # Construct the initial spline nodes 
+    # 
+    nq = len(q0)
+    path = np.zeros((nq,nodes))
+    
+    xnodes = np.linspace(p0[proxy_index], p1[proxy_index], nodes)
+    
+    for i in range(nq):
+        if match_level == 0:
+            # Linear interpolation of the two end-points 
+            path[i] = np.linspace(p0[i], p1[i], nodes)
+        elif match_level == 1:
+            # Match derivatives at end-points. This requires
+            # a cubic polynomial
+            x = [p0[proxy_index], p1[proxy_index]] # The matching points 
+            df = np.array([ 
+                [p0[i],  p1[i]],    # Matching value of coordinate i
+                [dp0[i], dp1[i]]    # Matching derivative of coordinate i (w.r.t. proxy)
+                ])  
+            
+            p = nitrogen.math.constrainedPolynomial(x, df)            
+            path[i] = np.polyval(np.flip(p), xnodes)
+        else:
+            raise NotImplementedError("Only match_level = 0 and 1 is supported.")
+    #
+    # `path` contains the initial trial path
+    ##########################################
+    
+    ##########################################
+    #
+    # Perform the iterative solution to the spline path 
+    old_rms = np.inf 
+    old_path = path 
+    
+    path_list = [old_path] 
+    rms_list = [old_rms]
+    spline_list = [np.array(_calculate_proxy_spline(path, proxy_index, match_level, dp0, dp1)[0])]
+    
+    for i in range(max_iter+1):
+        
+        path,rms = _update_spline_proxy_path(V, G, old_path, proxy_index, 
+                                             match_level, dp0, dp1)
+        path_list.append(path)
+        rms_list.append(rms)
+        spline_list.append(
+            np.array(_calculate_proxy_spline(path, proxy_index, match_level, dp0, dp1)[0]))
+        
+        if abs(rms - old_rms) < deltarms:
+            break 
+        
+        old_rms = rms 
+        old_path = path 
+    
+    if i == max_iter:
+        print(f"Warning: max iterations {max_iter:d} reached")
+        
+    
+    return path_list, spline_list, rms_list 
+
+def _calculate_proxy_spline(path,proxy_index,match_level,t0,t1):
+    
+    # Compute the path spline for each coordinate
+    # and its derivatives w.r.t. interior nodes
+    
+    c,dc = [],[] 
+    
+    x = path[proxy_index] # The x values of the node points
+    nq = path.shape[0] 
+    
+    for i in range(nq): # For each coordinate
+        y = path[i]     # The spline function values 
+        
+        #
+        # Calculate the spline parameters.
+        #
+        if match_level == 0:
+            # Value-only end-point conditions
+            ci,dci = cubic_spline(x,y,boundary = 'notaknot', return_jacobian = True)
+        elif match_level == 1:    
+            # Value and tangent end-point conditions
+            df = (t0[i], t1[i])
+            ci, dci = cubic_spline(x, y, boundary = 'first', 
+                                   boundary_value = df, return_jacobian = True)
+        else:
+            raise NotImplementedError("Only match_level = 0 or 1 is supported.")
+        
+        c.append(ci)
+        #
+        # We only need the derivatives of the spline parameters with respect to the
+        # **interior** node values. The first and last are fixed.
+        #
+        dc.append(dci[1:-1])
+    return c,dc 
+        
+def _update_spline_proxy_path(V, G, path, proxy_index,
+                              match_level, t0, t1):
+    """
+    Perform a single spline-proxy path update 
+
+    Parameters
+    ----------
+    V : DFun
+        The potential energy surface.
+    G : DFun
+        The inverse metric tensor.
+    path : (nq,nodes) ndarray
+        The current path nodes.
+    proxy_index : integer
+        The proxy coordinate index 
+    match_level : integer
+        The matching level, 0 or 1.
+    t0,t1: (nq,) ndarray
+        The end-point path tangent (for matching_level == 1).
+
+    Returns
+    -------
+    new_path : (nq,nodes) ndarray
+        The updated spline nodes.
+    rms : float
+        The estimated root-mean-square path error in mass-weighted distance.
+
+    """
+    #
+    # Given the current path nodes : 
+    #
+    # 1) Evaluate the path and its derivatives w.r.t. node values
+    #    at the segment mid-points
+    #
+    # 2) Evaluate the exact path tangent and derivative of the tangent
+    #    w.r.t coordinates at the interpolated path position at the
+    #    segment mid-points
+    #
+    # 3) Solve the least-squares system for matching the path tangent
+    #
+    
+    # -----------------------------
+    # 
+    # Calculate the spline and its parameter derivatives for the 
+    # current path.
+    #
+    nq = path.shape[0]     # The number of coordinates 
+    nnode = path.shape[1]  # The total number of nodes, including end-points 
+    nsample = nnode - 1    # The number of sample points (i.e. segments)
+    
+    #
+    # The number of **interior** nodes is nnode - 2 
+    #
+    
+    c,dc = _calculate_proxy_spline(path,proxy_index,match_level,t0,t1)
+        
+    # Evaluate the spline at the mid-point of each segment
+    x = path[proxy_index] # The x values of the node points
+    x_sample = (x[1:] + x[:-1]) / 2.0 
+    p_sample = np.array([cubic_spline_val(x_sample, ci, x) for ci in c])
+    # p_sample[i,j] is the value of the i**th coordinate at the j**th sample point
+    dp_sample = np.array([
+            [cubic_spline_val(x_sample, dci[k], x) for dci in dc]
+            for k in range(len(x)-2)])
+    #
+    # dp_sample[k,i,j] is the derivative of the i**th coordinate value at the j**th
+    # sample point with respect to the k**th interior node value of the i**th coordinate
+    #
+    
+    # Evaluate the spline tangent at the mid-point of each segment
+    t_sample = np.array([cubic_spline_derivative(x_sample, ci, x) for ci in c])
+    #
+    # and the deriative of the spline tangent at the sample points with respect to the
+    # node values
+    #
+    dt_sample = np.array([
+        [cubic_spline_derivative(x_sample, dci[k], x) for dci in dc]
+        for k in range(len(x)-2)])
+    #
+    # Calculate the true path tangent and derivative thereof 
+    # at each sample point 
+    #
+    w0,W,G0 = LQA_nonstationary(p_sample, V, G, arclength = 'proxy', proxy_index = proxy_index)
+    
+    def matrix_inversesqrt(A):
+        #
+        # A ... (n,n,...) real symmetric
+        #
+        A = np.moveaxis(A, (0,1), (-2,-1)) # move array indices to end 
+        w,U = np.linalg.eigh(A)
+        # A = U @ diag[w] @ U.T
+        # irt[A] = U @ diag[1/sqrt[w]] @ U.T 
+        irtA = np.einsum('...ij,...j,...kj->...ik', U, 1.0 / np.sqrt(w), U) 
+        # irtA currently has shape (...,n,n)
+        irtA = np.moveaxis(irtA, (-2,-1), (0,1)) # move back to front 
+        return irtA 
+    irtG = matrix_inversesqrt(G0)
+    
+    kron = np.eye(nq) # kronecker delta
+    
+    # 
+    # Construct the least-squares array and vector
+    #
+    C = np.einsum('ilj,klj->ijlk',W,dp_sample) - np.einsum('il,klj->ijlk',kron,dt_sample)
+    b = t_sample - w0 
+    
+    # Apply weighting by G^-1/2 for "proper" mass-weighted least squares
+    C = np.einsum('imj,mjlk->ijlk', irtG, C) 
+    b = np.einsum('imj,mj->ij', irtG, b) 
+    
+    # Reshape to matrix-vector problem
+    C = np.reshape(C, (nq*nsample, nq*(nsample-1))) 
+    b = np.reshape(b, (nq*nsample,))
+    
+    #
+    # Solve C @ dy = b by least-squares
+    #
+    dy,res,_,_ = np.linalg.lstsq(C,b, rcond = None) 
+    dy = np.reshape(dy, (nq,nsample-1))
+    #
+    # dy[i,k] is the correction to the i**th coordinate at the k**th interior node value 
+    
+    # `res` is the sum of squared residuals.
+    # Because the residuals are already mass-weighted,
+    # the rms of `res` gives the average path error in `proper` mass-weighted distance.
+    #
+    rms = np.sqrt(res / nsample)
+    
+    new_path = path.copy() 
+    new_path[:,1:-1] += dy 
+    
+    return new_path , rms 
     
