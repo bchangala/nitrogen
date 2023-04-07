@@ -1197,6 +1197,21 @@ def spline_proxy_path(V, G, q0, q1, proxy_index, nodes,
         The cubic spline parameters for each update.
     rms_list : list of float
         The path rms for each update.
+        
+    Notes
+    -----
+    
+    An initial guess of the spline nodes is formed by a minimial polynomial 
+    interpolantion that meets the matching conditions 
+    (a linear interpolant for `match_level` = 0, and a cubic interpolant for
+    `match_level` = 1). The positions of the spline nodes are updated by a 
+    Newton optimization scheme based on a local quadratic approximation 
+    to the path tangent near each node point.
+    
+    See Also
+    --------
+    cubic_spline_val : Evaluate the cubic spline functions.
+    
 
     """
     
