@@ -1482,4 +1482,151 @@ def _update_spline_proxy_path(V, G, path, proxy_index,
     new_path[:,1:-1] += dy 
     
     return new_path , rms 
+
+def christoffel_symbol(q, G, kind = 'first'):
+    """
+    Calculate the Christoffel symbols, :math:`\\Gamma_{ijk}` or :math:`\\Gamma^i{}_{jk}`.
+
+    Parameters
+    ----------
+    q : (nq,...) array_like
+        The evaluation points.
+    G : DFun
+        The inverse metric tensor, :math:`G^{ij}`.
+    kind : {'first','second'}, optional
+        Calculate symbols of the first or second kind. 'first' is the default.
     
+    Returns
+    -------
+    Gamma : (nq,nq,nq,...) ndarray
+        The Christoffel symbols.
+        
+    Notes
+    -----
+    
+    The Christoffel symbols of the first kind are
+    
+    ..  math::
+        
+        \\Gamma_{ijk} = \\frac{1}{2}\\left( \\partial_k g_{ij} + \\partial_j g_{ik} - \\partial_i g_{jk} \\right)
+
+
+    The Christoffel symbols of the second kind are
+    
+    ..  math::
+        
+        \\Gamma^i{}_{jk} = G^{im} \\Gamma_{mjk}
+        
+    Either kind is symmetric in the last two indices.
+    
+    """
+    
+    # Calculate the inverse metric G
+    # and its first derivatives 
+    
+    q = np.array(q)
+    nq = q.shape[0] 
+    base_shape = q.shape[1:]
+    
+    if kind != 'first' and kind != 'second':
+        raise ValueError("kind must be 'first' or 'second'")
+    
+    dG = symfull_axis(G.f(q, deriv = 1), axis = 1)
+    G0 = dG[0]   # G[i,j]
+    G1 = dG[1:]  # d_i G[j,k]
+    
+    # Calculate the metric tensor, g, 
+    # and its inverse 
+    g0 = np.linalg.inv(np.moveaxis(G0,(0,1), (-2,-1)))
+    g0 = np.moveaxis(g0, (-2,-1), (0,1))
+    #
+    #      G @ g = I
+    # -->  (dG) @ g + G @ (dg) = 0 
+    # -->   dg = -g @ dG @ g
+    #
+    g1 = -np.einsum('jl...,ilm...,mk...->ijk...', g0, G1, g0)
+    
+    # g0 ... g[i,j]
+    # g1 ... d_i g[j,k]
+    #
+    
+    # Calculate Christoffel symbols of the first kind 
+    Gamma = np.empty_array((nq,nq,nq) + base_shape, dtype = g0.dtype)
+    
+    for c in range(nq):
+        for a in range(nq):
+            for b in range(nq):
+                
+                val = 0.5 * (g1[b,c,a] + g1[a,c,b] - g1[c,a,b])
+                
+                if len(base_shape) == 0: # Single-point
+                    Gamma[c,a,b] = val   # Assign scalar value
+                else:
+                    np.copyto(Gamma[c,a,b], val) 
+                    
+    if kind == 'first':
+        return Gamma 
+    else:
+        # Calculate symbols of the second kind 
+        Gamma = np.einsum('il...,ljk...->ijk...',G0,Gamma)
+        return Gamma 
+    
+def covariant_hessian(q,V,G):
+    """
+    Calculate the covariant Hessian tensor, :math:`\\nabla_i \\nabla_j V`.
+
+    Parameters
+    ----------
+    q : (nq,...)
+        The evaluation points.
+    V : DFun
+        The potential energy surface.
+    G : DFun
+        The inverse metric tensor.
+
+    Returns
+    -------
+    f : (nq,...)
+        The gradient.
+    H : (nq,nq,...)
+        The covariant Hessian.
+        
+    Notes
+    -----
+    
+    The covariant gradient is equal to the regular gradient, 
+    :math:`\\nabla_i V = \\partial_i V`. The covariant Hessian is
+    
+    ..  math::
+        
+        H_{ij} &= \\nabla_i \\nabla_j V \\
+            
+               &= \\nabla_i f_j \\ 
+            
+               &= \\partial_i \\partial_j V - f_k \\Gamma^k{}_{ij}
+
+    The covariant Hessian is symmetric, :math:`H_{ij} = H_{ji}`.
+    
+    """
+    
+    
+    # Calculate the regular gradient and Hessian.
+    _,f,K = [a[0] for a in V.vjh(q)]
+    
+    # Calculate the Christoffel symbols
+    # (of the second kind)
+    Gamma = christoffel_symbol(q, G, kind = 'second')
+    
+    # Calculate the covariant Hessian
+    #
+    # K_ij = d_i f_j  ...  the regular Hessian
+    # 
+    # H_ij = D_i f_j  ...  the covariant Hessian (where D_i is covariant deriv.)
+    #
+    #      = d_i f_j - f_k Gamma^k_ij
+    #
+    
+    H = K - np.einsum('k...,kij...->ij...', f, Gamma) 
+    
+    return f,H
+
