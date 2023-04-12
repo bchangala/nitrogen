@@ -380,7 +380,7 @@ class LinearTrans(CoordTrans):
 class PathTrans(CoordTrans):
     """
     
-    A generic reactin path coordinate transformation
+    A generic reaction path coordinate transformation
     
     Attributes
     ----------
@@ -400,7 +400,7 @@ class PathTrans(CoordTrans):
         path_fun : (1,) -> (nQ,) DFun
             The reaction path function, :math:`P_i(s)`.
         disp_fun : (1,) -> (nQ * n) DFun
-            The path displacement vectors.
+            The path displacement vectors, :math:`T_{ij}(s)`.
 
         Notes
         -----
@@ -414,6 +414,8 @@ class PathTrans(CoordTrans):
         by the displacements vectors :math:`T_{ij}(s)`
         returned by `disp_fun`. (`disp_fun` returns the elements
         of `T` in row major order.)
+        
+        The input variable order is :math:`(s,d_0,d_1,\\ldots,d_{n-1})`.
         
         The output coordinates are calculated as 
         
