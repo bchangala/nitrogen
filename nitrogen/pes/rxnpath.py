@@ -1551,7 +1551,7 @@ def christoffel_symbol(q, G, kind = 'first'):
     #
     
     # Calculate Christoffel symbols of the first kind 
-    Gamma = np.empty_array((nq,nq,nq) + base_shape, dtype = g0.dtype)
+    Gamma = np.empty((nq,nq,nq) + base_shape, dtype = g0.dtype)
     
     for c in range(nq):
         for a in range(nq):
@@ -1630,3 +1630,252 @@ def covariant_hessian(q,V,G):
     
     return f,H
 
+def pathvib_nonstationary(q, V, G, hbar = None):
+    """
+    Calculate reaction path normal modes
+    using the orthogonally projected covariant Hessian.
+
+    Parameters
+    ----------
+    q : (nq,...) array_like
+        The evaluation points at non-stationary geometries.
+    V : DFun
+        The potential energy surface.
+    G : DFun
+        The inverse metric tensor.
+    hbar : float, optional
+        The value of :math:`\\hbar`. If None, the default
+        NITROGEN units will be used. 
+
+    Returns
+    -------
+    omega : (nq-1,...) ndarray
+        The orthogonal path frequencies in energy units.
+    T : (nq,nq-1,...) ndarray
+        The displacement vectors of the `nq`-1 orthogonal modes, 
+        normalized as reduced dimensionless normal coordinates.
+        ``T[i,j]`` is the displacement of coordinate ``i`` for 
+        unit amplitude of normal mode ``j``.
+    Tl : (nq,nq-1,...) ndarray
+        The lowered-index transformation of `T`.
+    """
+    
+    ####################################
+    #
+    # The covariant Hessian will be evaluated
+    # at each point and projected against the
+    # local gradient. The remaining non-zero-
+    # frequency vibrations will be calculated.
+    #
+    q = np.array(q)
+    nq = q.shape[0] 
+    base_shape = q.shape[1:]
+    
+    
+    f,H = covariant_hessian(q, V, G)
+    G0 = symfull_axis(G.f(q, deriv = 0)[0], axis = 0)
+    # We will also need the inverse of G later 
+    iG = np.linalg.inv(np.moveaxis(G0, (0,1), (-2,-1)))
+    iG = np.moveaxis(iG, (-2,-1), (0,1)) 
+    
+    # Raise the first index of H_{ij}
+    Hp = np.einsum('ij...,jk...->ik...',G0,H)
+    
+    # Calculate the projection matrix P
+    # 
+    # P^i_j = delta_ij - f^i f_j / |f|^2
+    #
+    # where f is the local gradient
+    #
+    # The normal gradient `f` is f_j with a lowered index
+    # Calculate F = f^i, with an upper index
+    F = np.einsum('ij...,j...->i...', G0, f) 
+    f2 = np.sum(F*f,axis=0) 
+    
+    # Construct kronecker delta
+    delta = np.zeros((nq,nq) + base_shape) 
+    for i in range(nq):
+        delta[i,i] = 1.0  
+    
+    P = delta - np.einsum('i...,j...->ij...',F,f)/f2 
+    
+    #
+    # Project the Hessian ... P.H.P
+    #
+    Htilde = np.einsum('ij...,jk...,kl...->il...',P,Hp,P)
+    
+    #
+    # Calculate its eigenvalues and eigenvectors 
+    #
+    M = np.moveaxis(Htilde,(0,1), (-2,-1)) # move axes to right
+    w,U = np.linalg.eig(M)
+    w = np.moveaxis(w, -1, 0)
+    U = np.moveaxis(U, (-2,-1), (0,1)) 
+    
+    # w contains the eigenvalues of the projected Hessian
+    # One eigenvalue is zero, corresponding to the projected-out gradient vector
+    #
+    # Sort the eigenvalues by magnitude
+    # (Note use of take_along_axis for arbitrary base_shape)
+    I = np.argsort(abs(w), axis = 0)
+    w = np.take_along_axis(w, I, axis = 0)
+    U = np.array([np.take_along_axis(U[i], I, axis = 0) for i in range(nq)])
+    
+    # Check that the zero-frequency eigenvector is parallel to gradient
+    # (i.e. that there is not some accidental zero-frequeny vector from an
+    #  orthogonal mode)
+    U0 = U[:,0] * np.sqrt(np.sum(F*F,axis=0))
+    cos = abs( np.sum(f*U0,axis=0) / f2 )
+    if np.any( (1.0 - cos) > 1e-5 ):
+        print("Warning: Zero-frequency vector may be mis-identified.")
+    
+    #
+    # Normalize orthogonal vibration displacements
+    # to the usual reduced dimensionless coordinates
+    # 
+    # i.e. V = 0.5 * omega * q^2
+    #
+    if hbar is None:
+        hbar = nitrogen.constants.hbar 
+    
+    w_ortho = w[1:] # The orthogonal eigenvalues
+    
+    # Calculate orthogonal harmonic frequencies
+    omega = hbar * np.sqrt(np.abs(w_ortho))  # Calculate harmonic energies
+    omega[w_ortho < 0] = -omega[w_ortho < 0] # Imaginary frequencies will be flagged as negative
+     
+    # Calculate the normal coordinate transformation matrix
+    # for the "dimensionless normal coordinates" which are
+    # normalized as V = 0.5 * omega * q^2
+    #
+    Uortho = U[:,1:] # The orthogonal displacement vectors 
+    
+    T = Uortho.copy() 
+    for i in range(nq-1):
+        ui = Uortho[:,i] 
+        # Hii = Ui.T @ Htilde @ ui
+        #     = ui @ G^-1  @ Htilde @ ui 
+        # (Htilde is calculated as Htilde ^i _j)
+        #
+        Hii = np.einsum('k...,ki...,ij...,j...', ui, iG, Htilde, ui)
+        
+        T[:,i] *= np.sqrt( np.abs(omega[i] / Hii) )
+
+    Tl = np.einsum('ij...,jk...->ik...',iG,T)
+    
+    return omega, T, Tl 
+
+def correct_vib_order(omega, T, Tl, hbar = None):
+    """
+    Correct the ordering and phase of reaction path vibrational modes.
+
+    Parameters
+    ----------
+    omega : (nq,N) ndarray
+        The harmonic frequncies (in energy units.)
+    T : (nq,nm,N) ndarray 
+        The displacement vectors normalized as reduced dimensionless
+        normal modes.
+    Tl : (nq,nm,N) ndarray 
+        The left-hand displacement vectors (i.e. `T` multiplied by the 
+        effective metric tensor).
+    hbar : float, optional
+        The value of :math:`\\hbar`. If None, the default
+        NITROGEN units will be used. 
+
+    Returns
+    -------
+    omega_new : (nq,N) ndarray
+        The ordered frequencies
+    T_new : (nq,nm,N) ndarray 
+        The ordered displacement vectors.
+    Tl_new : (nq,nm,N) ndarray 
+        The ordered left-hand vectors.
+    
+    See Also
+    --------
+    pathvib_nonstationary : Calculates `omega`, `T`, and `Tl`.
+
+    """
+    
+    ##########################################
+    #
+    # We assume the vibrational coordinates have been calculated
+    # along a sufficiently smooth 1D path (e.g. a reaction path)
+    # 
+    # We will compare the vectors point-by-point to correct
+    # the mode ordering and phase (i.e. sign)
+    #
+    # Because of different coordinate scaling, the only consistent
+    # comparison between displacement vectors is via the
+    # proper inner-product between right- and left-hand vectors
+    #
+    # 
+    
+    omega_new = omega.copy() 
+    T_new = T.copy() 
+    Tl_new = Tl.copy() 
+    
+    if hbar is None:
+        hbar = nitrogen.constants.hbar 
+        
+    nq,nm,N = T.shape 
+    # nq ... the number of coordinates
+    # nm ... the number of modes (typically nq - 1)
+    # N  ... the number of points in the 1D path
+    
+    # We assume the first point is already correct.
+    # This defines the reference phase and ordering 
+    
+    for i in range(1,N): 
+        # Move sequentially through points 
+        
+        T_prev = T_new[:,:,i-1]  # The previous point's right-hand vectors
+        Tl_curr = Tl[:,:,i]  # The current left-hand vectors 
+
+        idx_best = [None] * nm 
+        
+        for j in range(nm): # For the j**th mode
+            # Find the vector which is closest 
+            max_product = 0.0 
+            max_k = -1
+            
+            Tj = T_prev[:,j]
+            omegaj = omega_new[j,i-1]
+            
+            for k in range(nm):
+                tk = Tl_curr[:,k]
+                omegak = omega_new[k,i]
+                
+                # Compute inner product of T_j and t_k
+                #
+                # The reduced dimensionless normal coordinates
+                # are normalized such that the dot product 
+                # of the left and right vectors equal
+                # hbar**2 / omega 
+                # (where omega is the harmonic energy)
+                #
+                
+                prod = np.sum(Tj*tk) * np.sqrt(abs(omegaj*omegak)) / hbar**2
+                prod = abs(prod)
+                
+                if prod > max_product:
+                    max_product = prod
+                    max_k = k 
+                
+                idx_best[j] = max_k
+        
+        if len(np.unique(idx_best)) != len(idx_best):
+            print(f"Warning: duplicate match! (point i = {i:d})")
+            print(idx_best)
+        
+        omega_new[:,i] = omega[idx_best,i]
+        for j in range(nm):
+            tnew = T[:,idx_best[j],i].copy()
+            if np.sum(tnew * T_prev[:,j]) < 0.0:
+                tnew *= -1.0 
+            np.copyto(T_new[:,j,i], tnew) 
+            
+    return omega_new, T_new, Tl_new 
+        
+    
