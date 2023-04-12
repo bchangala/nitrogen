@@ -517,4 +517,108 @@ def productP(P1,P2):
     
     return P 
     
+def fitFourier(x,y,max_freq,period=None,symmetry=None):
+    """
+    Fit a Fourier series.
+
+    Parameters
+    ----------
+    x : (N,) array_like
+        The argument at `N` sampling points.
+    y : (N,) or (m,N) array_like
+        The values of one or more (`m`) functions.
+    max_freq : integer
+        The maximum frequency harmonic.
+    period : float, optional.
+        The period of `x`. If None (default), `period` = :math:`2\\pi` is assumed.
+    symmetry : integer or (m,) array_like, optional
+        The symmetry type of each function. If None (default), no symmetry
+        is assumed. See Notes.
+
+    Returns
+    -------
+    (n,) or (m,n) ndarray
+        The Fourier coefficients
+
+    Notes
+    -----
+    
+    The expansion coefficients are defined as 
+    
+    ..  math::
+        
+        f(x) = c_0 + c_1 \\sin \\sigma x + c_2 \\cos \\sigma  x +
+        c_3 \\sin 2 \\sigma  x + c_4 \\cos 2 \\sigma  x + \\cdots
+        
+    where :math:`\\sigma = 2\\pi/`\ `period`.
+    
+    The `symmetry` keyword specifies a constraint on the Fourier series for
+    each fitted function. A value of ``0`` fits all terms, ``1``
+    fits only cosine terms, ``2`` fits only sine terms, and ``-1`` fixes all
+    parameters to 0.
+    
+    """
+    
+    if period is None:
+        scale = 1.0 
+    else:
+        scale = 2*np.pi / period 
+        
+    x = np.array(x)
+    y = np.array(y)
+    is_scalar = False 
+    
+    if y.ndim == 1:
+        y = np.reshape((1,-1))
+        is_scalar = True 
+    m,N = y.shape # the number of functions to fit and the number of points 
+    
+    n = 1 + 2*max_freq # The number of coefficients 
+    
+    if symmetry is None:
+        symmetry = [0] * m 
+    elif np.isscalar(symmetry):
+        symmetry = [symmetry]
+    
+    # Construct the least-squares matrix for no symmetry 
+    C = np.ones((N,n))
+    
+    for i in range(1,max_freq+1):
+        C[:,2*i-1] = np.sin(x * i * scale)
+        C[:,2*i]   = np.cos(x * i * scale) 
+    
+    ########################
+    # Fit each function 
+    
+    c = np.zeros((m,n)) # the Fourier coefficients 
+    
+    for k in range(m):
+        
+        #
+        # Function k
+        # c[k] has been initialized to 0's
+        #
+        if symmetry[k] == -1:
+            continue  # All zeros
+        elif symmetry[k] == 0: 
+            # Fit all terms
+            c[k] = np.linalg.solve(C, y[k])
+        elif symmetry[k] == 1: 
+            # Fit only cosine (even terms)
+            c[k,::2] = np.linalg.solve(C[:,::2], y[k])
+        elif symmetry[k] == 2: 
+            # Fit only sine (odd terms)
+            c[k,1::2] = np.linalg.solve(C[:,1::2], y[k])
+        else:
+            raise ValueError("Invalid `symmetry` value")
+    
+    # All fits are complete 
+    
+    if is_scalar:
+        # Reshape c to 1d
+        c = c.reshape((n,))
+        
+    return c 
+        
+        
     
