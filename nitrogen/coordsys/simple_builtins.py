@@ -377,7 +377,245 @@ class LinearTrans(CoordTrans):
         
         return diag
 
+class PathTrans(CoordTrans):
+    """
+    
+    A generic reactin path coordinate transformation
+    
+    Attributes
+    ----------
+    path_fun : DFun
+        The coordinate path function.
+    disp_fun : DFun
+        The path displacement vectors.
+    
+    """
+    
+    def __init__(self, path_fun, disp_fun):
+        """
+        Create a PathTrans coordinate transformation.
 
+        Parameters
+        ----------
+        path_fun : (1,) -> (nQ,) DFun
+            The reaction path function, :math:`P_i(s)`.
+        disp_fun : (1,) -> (nQ * n) DFun
+            The path displacement vectors.
+
+        Notes
+        -----
+        
+        The `nQ` output coordinates :math:`Q_i` are the 
+        same as those given by the path function object,
+        `path_fun`. Its single argument, :math:`s`, 
+        is the path parameter.
+        
+        An additional `n` coordinates :math:`d_j` are defined
+        by the displacements vectors :math:`T_{ij}(s)`
+        returned by `disp_fun`. (`disp_fun` returns the elements
+        of `T` in row major order.)
+        
+        The output coordinates are calculated as 
+        
+        ..  math::
+                
+            Q_i = P_i(s) + \\sum_{j = 0}^{n-1} T_{ij}(s) d_j \\quad (i = 0\\ldots nQ-1)
+        
+        """
+        
+        if path_fun.nx != 1 or disp_fun.nx != 1:
+            raise ValueError("path_fun and disp_fun must have 1 input variable")
+        
+        # The number of output coordinates is defined by the
+        # number of output functions of `path_fun`
+        nQ = path_fun.nf
+        
+        # The number of input coordinates equals the number
+        # of path-displacements plus 1.
+        if disp_fun.nf % nQ != 0:
+            raise ValueError('dispfun.nf must be a multiple of nQ')
+        n = disp_fun.nf // nQ # The number of displacement coordinates 
+        
+        nQp = n + 1 # The total number of input coordinates 
+        
+        Qpstr = ['s'] + [f"d{i:d}'" for i in range(n)]
+        Qstr = [f"Q{i:d}" for i in range(nQ)]
+        
+        # The maxderiv is the minimum of either path_fun 
+        # or disp_fun 
+        maxderiv = dfun._merged_maxderiv(path_fun.maxderiv, disp_fun.maxderiv)
+        
+        # If the displace vectors have a finite zlevel, then the 
+        # zlevel for that term is just 1 more (from the linear dependence on 
+        # Q'). The total zlevel is then the merged zlevel of the path function
+        # and the displacement term 
+        #
+        if disp_fun.zlevel is None:
+            disp_zlevel = None 
+        else: 
+            disp_zlevel = disp_fun.zlevel + 1 
+        zlevel = dfun._merged_zlevel(path_fun.zlevel, disp_zlevel)
+        
+        super().__init__(self._pathtrans_fun, nQp = nQp, nQ = nQ,
+                         name = 'Path', Qpstr = Qpstr, Qstr = Qstr,
+                         maxderiv = maxderiv, zlevel = zlevel)
+        
+        self.path_fun = path_fun 
+        self.disp_fun = disp_fun
+        
+    def _pathtrans_fun(self, Qp, deriv = 0, out = None, var = None):
+        
+        
+        # Parse `out` and `var` first
+        out,var = self._parse_out_var(Qp, deriv, out, var)
+        nvar = len(var)
+        # out ... (nd,nQ,...)
+        
+        # Calculate the derivatives of the Q with respect to 
+        # the path parameter `s` and displacements `d`.
+        # 
+        #  Q_i = P_i(s) + T_ij(s) d_j
+        #
+        # We will consider two separate cases:
+        # 1) If `s` is a requested variable, and 
+        # 2) if `s` is not a requested variable.
+        
+        s = Qp[0:1] # (1,...)
+        d = Qp[1:]  # (n,...)
+        
+        n = self.nQp - 1  # The number of displacements 
+        base_shape = Qp.shape[1:]
+        
+        if 0 in var:
+            #
+            # `s` is requested. We need the derivatives
+            # of P and T with respect to `s` up to the
+            # requested derivative order
+            #
+            
+            dP = self.path_fun.f(s, deriv = deriv) # (deriv+1, nQ, ...)
+            dT = self.disp_fun.f(s, deriv = deriv) # (deriv+1, nQ*n,...)
+            
+            # Reshape dT to its array shape
+            dT = np.reshape(dT, (deriv+1, self.nQ, n) + base_shape) 
+            
+            ################################
+            # Now compute derivatives. Most of these will 
+            # be zero. 
+            out.fill(0.0)
+            
+            # Compute non-zero derivatives organized
+            # by the total degree of displacement coordinates,
+            # which has a maximum of 1.
+            #
+            s_pos = var.index(0) # The position of `s` in the multi-index
+            m = nvar - s_pos - 1 # The number of variables after `s` in var order
+            
+            nck = adf.ncktab(nvar + deriv)
+            
+            for k in range(deriv + 1):
+                
+                if k <= deriv:
+                    # Multi-index [0 ... k ... 0]
+                    idx0 = nck[nvar + k, k] - nck[m + k, k]
+                    np.copyto(out[idx0], dP[k] + np.einsum('ij...,j...->i...',dT[k],d))
+                
+                if (k+1) <= deriv:
+                    
+                    for j in range(0,s_pos):
+                        # Consider multi-indices with a 1 before the k
+                        #
+                        #      j -p-   --m--
+                        # [0.. 1 ... k ... 0 ]
+                        # 
+                        p = s_pos - j - 1 # The number of 0's between 1 and k
+                        #
+                        # The lexical increment from [0...k...0] to this 
+                        #
+                        delta_idx = nck[k+nvar,k+1] - nck[k+p+m+1,k+1]
+                        idx1 = idx0 + delta_idx 
+                        #
+                        # The derivative is just the (k) derivative of 
+                        #
+                        # T_{i, var[j]-1}
+                        #
+                        np.copyto(out[idx1], dT[k,:,var[j]-1]) 
+                    
+                    for j in range(s_pos+1, nvar):
+                        #
+                        # Consider multi-indices with a 1 after the k 
+                        #           ------m----
+                        # [0 .... k ... 1 ... 0]
+                        #           -p- j
+                        #
+                        # The lexical increment from [0...k...0] to this is
+                        #
+                        p = j - s_pos - 1 
+                        
+                        delta_idx = nck[k+m,k] + nck[k+nvar,k+1] - nck[k+1+m,k+1] + p + 1
+                        idx1 = idx0 + delta_idx 
+                        np.copyto(out[idx1], dT[k,:,var[j]-1]) 
+                #
+                # Derivatives with total displacement degree
+                # greater than or equal to 2 are strictly 
+                # zero.
+                #
+                
+        else:
+            # `s` is not requested
+            # only P and T values are needed
+            # Reshape T to its array shape
+            P = self.path_fun.val(s)  # (nQ,...)
+            T = self.disp_fun.val(s)  # (nQ*n,...)
+            T = np.reshape(T, (self.nQ,n) + base_shape) # T[i,j,...]
+            
+            # Calculate the zeroth derivative (i.e. value of Q_i)
+            #
+            # Qi = Pi + Tij dj
+            #
+            if deriv >= 0:
+                np.copyto(out[0], P + np.einsum('ij...,j...->i...',T,d) )
+            
+            # Calculate the first derivatives. We know these are
+            # all with respect to `d` variables because `s` is not
+            # requested.
+            # 
+            # The derivative w.r.t. d_j is just T_ij
+            #
+            if deriv >= 1:
+                for j in range(nvar):
+                    np.copyto(out[j+1], T[:,var[j]-1])
+            
+            # All higher deriatives w.r.t d_j are zero 
+            if deriv >=2 :
+                out[(nvar+1):].fill(0.0) 
+                
+        return out 
+        
+    def __repr__(self):
+        return f'PathTrans({self.path_fun!r}, {self.disp_fun!r})'
+    
+    def diagram(self):
+        """ CoordTrans diagram string """
+        
+        sQ =f"[{self.nQ:d}]"
+        sQp =f"[1+{self.nQp-1:d}]"
+        
+        diag = ""
+        
+        diag += "     │↓       \n"
+        diag +=f"     │Q'{sQp:<6s}\n"
+        diag += "   ╔═╧══════╗ \n"
+        diag += "   ║  Path  ║ \n"
+        diag += "   ║ Trans. ║ \n"
+        diag += "   ║  Q(s)  ║ \n"
+        diag += "   ╚═╤══════╝ \n"
+        diag +=f"     │Q {sQ:<6s}\n"
+        
+        return diag
+        
+    
+    
 class Polar(CoordSys):
     """
     Polar coordinates :math:`(r,\\phi)` in two dimensions.
