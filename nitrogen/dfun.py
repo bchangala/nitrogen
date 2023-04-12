@@ -1925,10 +1925,10 @@ class ConstantDFun(DFun):
         
         
         # The maxderiv is None (infinite)
-        # The zlevel is 1 (constant)
+        # The zlevel is 0 (constant)
         
         super().__init__(self._fconstantfun, nf = nf, nx = nx, maxderiv = None,
-                         zlevel = 1)
+                         zlevel = 0)
         
         self.val = val 
         
@@ -1936,7 +1936,7 @@ class ConstantDFun(DFun):
     def _fconstantfun(self, X, deriv = 0, out = None, var = None):
         
         #
-        # Return a zero-filled derivative array 
+        # Return a constant derivative array 
         #
         
         if var is None:
@@ -1955,7 +1955,56 @@ class ConstantDFun(DFun):
         
         return out 
         
+class IdentityDFun(DFun):
+    """
+    
+    A 1-to-1 identity function, :math:`f_i = x_i`.
+    
+    """
+    
+    def __init__(self, nx):
+        """
+        Create an IdentityDFun object
+
+        Parameters
+        ----------
+        nx : integer
+            The number of input variables.
+
+        """
         
+        if nx < 1 :
+            raise ValueError('nx must be at least 1')
+        
+        # The zlevel is 1 (up to first derivatives are non-zero)
+        
+        super().__init__(self._fidentityfun, nf = nx, nx = nx, maxderiv = None,
+                         zlevel = 1)
+        
+        
+    def _fidentityfun(self, X, deriv = 0, out = None, var = None):
+        
+        #
+        # Calculate derivative array 
+        # 
+        # The value is the just the input values
+        # The first deriatives are diagonal and unity
+        # Higher derivatives are zero 
+        
+        
+        out, var = self._parse_out_var(X, deriv, out, var)
+        
+        # X ... (nx,...)
+        # out ... (nd,nx...)
+        
+        out.fill(0.0) 
+        np.copyto(out[0], X) 
+        
+        if deriv > 0:
+            for i in range(self.nx):
+                out[i+1,i:(i+1)].fill(1.0)
+        
+        return out         
 
 def _min_maxderiv(maxA,maxB):
     return _composite_maxderiv(maxA,maxB)
