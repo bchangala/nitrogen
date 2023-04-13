@@ -2006,6 +2006,118 @@ class IdentityDFun(DFun):
         
         return out         
 
+class FourierSeries(DFun):
+    """
+    
+    A simple Fourier series
+    
+    Attributes
+    ----------
+    coeff : (nf,n) ndarray
+        The expansion coefficients
+    period : float
+        The period.
+    maxfreq : integer
+        The maximum harmonic.
+    
+    """
+    
+    def __init__(self,coeff,period = None):
+        """
+        Parameters
+        ----------
+        coeff : (n,) or (nf,n) array_like
+            The `n` expansion coefficients for one or `nf` functions.
+        period : float, optional
+            The period of the argument. If None (default), it is assumed
+            to be :math:`2\\pi`.
+        """
+        
+        if period is None:
+            period = 2*np.pi 
+            
+        c = np.array(coeff)
+        if c.ndim == 1:
+            c = np.reshape(c, (1,-1))
+        
+        nf = c.shape[0] # The number of functions 
+        
+        n = c.shape[1] # The number of expansion coefficients
+        # n should be odd
+        if n < 1 or n % 2 == 0:
+            raise ValueError('n should be 1, 3, 5, ...')
+        maxfreq = (n-1) // 2 # the max frequency multiple
+        
+        super().__init__(self._fourierseries_fun,
+                         nf = nf, nx = 1) 
+        
+        self.coeff = c
+        self.period = period 
+        self.maxfreq = maxfreq 
+        
+        return 
+        
+    def _fourierseries_fun(self, X, deriv = 0, out = None, var = None):
+        
+        out, var = self._parse_out_var(X, deriv, out, var)
+        
+        x = X[0] # The argument 
+        
+        # Calculate the derivatives of the sine/cosine expansion
+        # functions 
+        nd = out.shape[0] 
+        base_shape = x.shape
+        
+        basis = np.zeros((nd,2*self.maxfreq+1) + base_shape)
+        
+        # First basis function is just 1 constant.
+        basis[0:1,0].fill(1.0) # Value is 1.
+        # Leave all derivatives of 1 as zero.
+        
+        scale = 2*np.pi / self.period 
+        
+        for i in range(1,self.maxfreq+1):
+            # Frequency multiple i
+            # Basis functions: sin[i*x*scale] and 
+            # cos[i*x*scale]
+            #
+            for k in range(nd):
+                #
+                # The k**th scaled derivative 
+                # sin and cos
+                #
+                if k % 4 == 0:
+                    basis[k,2*i-1] = (i*scale)**k * np.sin(i*scale*x) 
+                    basis[k,2*i  ] = (i*scale)**k * np.cos(i*scale*x) 
+                elif k % 4 == 1:
+                    basis[k,2*i-1] = (i*scale)**k * np.cos(i*scale*x) 
+                    basis[k,2*i  ] = (i*scale)**k *-np.sin(i*scale*x) 
+                elif k % 4 == 2:
+                    basis[k,2*i-1] = (i*scale)**k *-np.sin(i*scale*x) 
+                    basis[k,2*i  ] = (i*scale)**k *-np.cos(i*scale*x) 
+                elif k % 4 == 3:
+                    basis[k,2*i-1] = (i*scale)**k *-np.cos(i*scale*x) 
+                    basis[k,2*i  ] = (i*scale)**k * np.sin(i*scale*x) 
+                    
+        # Scale by k!
+        kfact = 1.00
+        for k in range(1,nd):
+            kfact *= k 
+            basis[k,:] /= kfact 
+        
+        # basis[k,j] now contains the k**th scaled derivative 
+        # of the j**th basis function
+        
+        # Now sum the basis functions with the expansion
+        # coefficients and store in output
+        
+        out.fill(0.0)
+        for i in range(self.nf):
+            for j in range(2*self.maxfreq + 1):
+                out[:,i] += self.coeff[i,j] * basis[:,j]
+        
+        return out 
+        
 def _min_maxderiv(maxA,maxB):
     return _composite_maxderiv(maxA,maxB)
 def _max_zlevel(zlevelA,zlevelB):

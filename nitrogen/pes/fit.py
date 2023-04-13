@@ -557,6 +557,10 @@ def fitFourier(x,y,max_freq,period=None,symmetry=None):
     fits only cosine terms, ``2`` fits only sine terms, and ``-1`` fixes all
     parameters to 0.
     
+    See Also
+    --------
+    :func:`nitrogen.dfun.FourierSeries` : A Fourier series DFun.
+    
     """
     
     if period is None:
@@ -602,13 +606,16 @@ def fitFourier(x,y,max_freq,period=None,symmetry=None):
             continue  # All zeros
         elif symmetry[k] == 0: 
             # Fit all terms
-            c[k] = np.linalg.solve(C, y[k])
+            ck,_,_,_ = np.linalg.lstsq(C, y[k], rcond=None)
+            c[k] = ck
         elif symmetry[k] == 1: 
             # Fit only cosine (even terms)
-            c[k,::2] = np.linalg.solve(C[:,::2], y[k])
+            ck,_,_,_ = np.linalg.lstsq(C[:,::2], y[k], rcond=None)
+            c[k,::2] = ck
         elif symmetry[k] == 2: 
             # Fit only sine (odd terms)
-            c[k,1::2] = np.linalg.solve(C[:,1::2], y[k])
+            ck,_,_,_ = np.linalg.lstsq(C[:,1::2], y[k], rcond=None)
+            c[k,1::2] = ck
         else:
             raise ValueError("Invalid `symmetry` value")
     
