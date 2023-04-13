@@ -4,7 +4,7 @@ import nitrogen.dfun as dfun
 import numpy as np
 
 __all__ = ['Valence3','CartesianN','LinearTrans','Polar','Cylindrical',
-           'Spherical']
+           'Spherical','PathTrans']
 
 class Valence3(CoordSys):
     """

@@ -27,6 +27,7 @@ Coordinate transformations
 :class:`CoordTrans`            The coordinate transformation base class.
 :class:`CompositeCoordTrans`   Composite coordinate transformations.
 :class:`LinearTrans`           Linear transformations.
+:class:`PathTrans`             Generic reaction path transformation.
 =============================  =================================================
 
 """
