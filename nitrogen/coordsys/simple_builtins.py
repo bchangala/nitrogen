@@ -440,7 +440,7 @@ class PathTrans(CoordTrans):
         
         nQp = n + 1 # The total number of input coordinates 
         
-        Qpstr = ['s'] + [f"d{i:d}'" for i in range(n)]
+        Qpstr = ['s'] + [f"d{i:d}" for i in range(n)]
         Qstr = [f"Q{i:d}" for i in range(nQ)]
         
         # The maxderiv is the minimum of either path_fun 
@@ -552,9 +552,9 @@ class PathTrans(CoordTrans):
                         #
                         # The lexical increment from [0...k...0] to this is
                         #
-                        p = j - s_pos - 1 
+                        p_plus_1 = np.uint32(j - s_pos)
                         
-                        delta_idx = nck[k+m,k] + nck[k+nvar,k+1] - nck[k+1+m,k+1] + p + 1
+                        delta_idx = nck[k+m,k] + nck[k+nvar,k+1] - nck[k+1+m,k+1] + p_plus_1
                         idx1 = idx0 + delta_idx 
                         np.copyto(out[idx1], dT[k,:,var[j]-1]) 
                 #
