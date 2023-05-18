@@ -197,4 +197,47 @@ def read_cubic(filename, nvib = None, offset = 7):
     
     return F 
     
+def sample_QUADRATURE(filename, num_sample, use_bohr = False,
+                      rng_seed = None, stddev = 1.0):
+    """
+    Generate sample points using a CFOUR QUADRATURE file.
+
+    Parameters
+    ----------
+    filename : str
+        The QUADRATURE file path.
+    num_sample : integer
+        The number of sample points.
+    use_bohr : bool, optional
+        If True, return Cartesian coordintes in bohrs.
+        The default is False.
+    rng_seed : integer, optional
+        The RNG seed. 
+    stddev : float, optional
+        The standard deviation of the sampled dimensionless normal coordinates, :math:`q`.
+
+    Returns
+    -------
+    X : (3*N, num_sample) ndarray
+        The sampled geometries
     
+
+    """
+
+    # Read the QUADRATURE file
+    freq, T, ref_geo = read_QUADRATURE(filename, use_bohr = use_bohr)
+    
+    nvib = T.shape[1] # The number of vibrational modes 
+    
+    # Generate (nvib, num_sample) random numbers 
+    rng = np.random.default_rng(rng_seed)
+    # The default standard-normal has a std_dev of 1.0
+    x = rng.standard_normal((nvib, num_sample)) # <x**2> = 1.00 
+    # Rescale to `stddev`
+    q = stddev * x 
+    
+    # Calculate displaced geometries 
+    
+    X = T @ q + ref_geo.reshape((-1,1)) 
+    
+    return X
