@@ -228,7 +228,7 @@ def gaussianFWHM(x, fwhm, norm = 'area'):
     return y 
 
 
-def mpolyfit(x, y, deg):
+def mpolyfit(x, y, deg, rcond=None):
     """
     Multivariable polynomial least-squares fitting.
 
@@ -240,7 +240,9 @@ def mpolyfit(x, y, deg):
         The output value
     deg : int
         The degree of the polynomial
-
+    rcond : float, optional
+        `rcond` parameter passed to ``lstsq``.
+        
     Returns
     -------
     p : (nt,) ndarray
@@ -262,6 +264,10 @@ def mpolyfit(x, y, deg):
     x = x.reshape((N,-1)) # Force to 2-dim
     nx = x.shape[1]  # The number of variables 
     
+    # Check for Nan's 
+    if np.any(np.isnan(x)) or np.any(np.isnan(y)):
+        raise ValueError("Remove NaNs from input.")
+    
     # Calculate the powers
     # in standard lexical ordering
     pows = adf.idxtab(deg, nx) 
@@ -280,7 +286,7 @@ def mpolyfit(x, y, deg):
             C[:,r] *= xpow[i][pr[i]]
     
     # Now solve the linear least-squares problem
-    p,_,_,_ = np.linalg.lstsq(C, y, rcond=None)
+    p,_,_,_ = np.linalg.lstsq(C, y, rcond=rcond)
     
     res = y - C @ p
     
