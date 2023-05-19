@@ -305,9 +305,25 @@ def atom2yperm(P):
         py = []
         for i in range(n):
             for j in range(i+1,n):
-                # Variable y_ij maps to y_{p[i], p[j]}
+                ##################################
+                # Be careful of the P operator convention.
+                #
+                # For a given P, P[i] is the new label of 
+                # the original atom i 
+                # 
+                # The atomic P acts on the Cartesian coordinates
+                # of atom i as 
+                #
+                # P[ X_i ] = X_I  such that  P[I] = i  (**not P[i] = I**)
+                #
+                # Therefore 
+                #
+                # P[ y_ij ] = y_IJ  where P[I] = i and P[J] = j 
+                #
+                I = p.index(i)
+                J = p.index(j) 
                 
-                new_idx = yidx[p[i], p[j]]
+                new_idx = yidx[I,J]
                 py.append(new_idx)
         
         Py.append(py)
@@ -325,9 +341,14 @@ class InternuclearExp(nitrogen.dfun.DFun):
         The exponential length parameter
     n : integer
         The number of atoms.
+    r0: float
+        The reference length.
+    offset: float
+        The offset of each coordinate function.
+        
     """
 
-    def __init__(self, n, a):
+    def __init__(self, n, a, r0 = 0.0, offset = 0.0 ):
         """
 
         Parameters
@@ -336,7 +357,11 @@ class InternuclearExp(nitrogen.dfun.DFun):
             The number of atoms
         a : float
             The exponential length parameter.
-
+        r0 : float, optional
+            A reference length.
+        offset : float, optional
+            Offset of each coordinate function. 
+            
         """
         
         if n < 2 :
@@ -357,8 +382,9 @@ class InternuclearExp(nitrogen.dfun.DFun):
                          maxderiv = None, zlevel = None)
         
         self.n = n
-        self.a = a 
-        
+        self.a = a
+        self.r0 = r0 
+        self.offset = offset 
         return 
     
     
@@ -378,7 +404,7 @@ class InternuclearExp(nitrogen.dfun.DFun):
                 dz = x[3*i + 2] - x[3*j + 2]
                 
                 rij = adf.sqrt( dx*dx + dy*dy + dz*dz ) 
-                yij = adf.exp(-rij / self.a) 
+                yij = adf.exp(-(rij - self.r0) / self.a) - self.offset
                 y.append(yij)
                 
         return nitrogen.dfun.adf2array(y, out)
