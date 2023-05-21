@@ -1010,3 +1010,47 @@ class TriatomicRadialPolar(CoordSys):
         diag += "   ╚════════════════════╝      \n"
         
         return diag
+    
+    @staticmethod
+    def X2RRhoPhi(X): 
+        """
+        Calculate triatomic radial-polar coordinates
+        from Cartesian coordinates.
+        
+        Parameters
+        ----------
+        X : (9,...) array_like
+            The Cartesian coordinates
+            
+        Returns
+        -------
+        R, rho, phi : ndarray
+            The coordinates. :math:`\\phi` is returned 
+            in radians in the range :math:`[0,2\\pi)`.
+            
+        """
+        
+        X = np.array(X) 
+        
+        # Calculate the square-distances of 
+        # each pair of atoms.
+        rr1 = np.sum( (X[3:6] - X[6:9])**2, axis = 0)
+        rr2 = np.sum( (X[0:3] - X[6:9])**2, axis = 0)
+        rr3 = np.sum( (X[0:3] - X[3:6])**2, axis = 0)
+        
+        B = (rr1 + rr2 + rr3) / 3 # B = R**2 (1 + rho**2)
+        
+        x = (2*rr1 - rr2 - rr3) / 6   # x = R**2 rho cos
+        y = (rr2 - rr3) / np.sqrt(12) # y = R**2 rho sin
+            
+        A2 = x**2 + y**2 # A^2,  A = R**2 rho
+        
+        phi = np.arctan2(y,x) # tan = y/x
+        
+        phi = np.mod(phi, 2*np.pi)  # Move [-pi,pi] to [0, 2*pi)
+        
+        R2 = (B/2) * (1 + np.sqrt(abs(1 - 4*A2/B**2))) # R**2
+        R = np.sqrt(R2) 
+        rho = np.sqrt(A2) / R2 
+        
+        return R, rho, phi
