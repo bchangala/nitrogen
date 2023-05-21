@@ -594,7 +594,15 @@ class DFun:
         return out
     
     def _parse_out_var(self, X, deriv, out, var):
-        """ Parse a out and var, which may be None"""
+        """ Parse a out and var, which may be None
+        Returns
+        -------
+        out : ndarray
+            The output buffer.
+        var : list
+            The requested variables.
+        """
+        
         if var is None:
             var = [i for i in range(self.nx)]
         if out is None:

@@ -882,3 +882,131 @@ class Spherical(CoordSys):
         diag += "   ╚════════════════════╝      \n"
         
         return diag
+    
+
+class TriatomicRadialPolar(CoordSys):
+    """
+    Triatomic radial-polar coordinate system, :math:`(R,\\rho,\\phi)`.
+    
+    The three atoms lie in the :math:`xy` plane. Their
+    coordinates are 
+    
+    ..  math::
+        
+        x_1 &= \\frac{R}{\\sqrt{3} }\\left( 1 - \\rho \\cos \\phi \\right)
+
+        y_1 &= \\frac{R}{\\sqrt{3} } \\rho \\sin \\phi 
+        
+        
+        x_2 &= \\frac{R}{2 \\sqrt{3} } \\left ( -1 + \\rho\\cos\\phi + \\sqrt{3} \\rho \\sin \\phi \\right )
+        
+        y_2 &= \\frac{R}{2 \\sqrt{3} }  \\left( \\sqrt{3} + \\sqrt{3} \\rho\\cos\\phi - \\rho\\sin\\phi \\right )
+        
+        
+        x_3 &= \\frac{R}{2 \\sqrt{3} }  \\left(-1 + \\rho\\cos\\phi   - \\sqrt{3} \\rho\\sin\\phi \\right )
+        
+        y_3 &= \\frac{R}{2 \\sqrt{3} }  \\left(-\\sqrt{3} - \\sqrt{3} \\rho\\cos\\phi - \\rho\\sin\\phi \\right )
+        
+        z_1 &= z_2 = z_3 = 0
+    
+    :math:`R > 0` controls the total size scale, :math:` 0 \\leq \\rho \\leq 1` is the deformation magnitude,
+    and :math:`0 \\leq \\phi < 2 \\pi` determines the direction of deformation. For :math:`\\rho = 0`, the 
+    three particles form a triangle with side length :math:`R`. For :math:`\\rho = 1`, the three
+    particles are co-linear.
+    
+    Some useful identities include
+    
+    ..  math::
+        
+        \\frac{r_1^2 + r_2^2 + r_3^2}{3} &= R^2 ( 1 + \\rho^2 ) 
+        
+        \\frac{2r_1^2 - r_2^2 - r_3^2}{6} &=  R^2 \\rho \\cos \\phi 
+        
+        \\frac{r_2^2 - r_3^2}{\\sqrt{12}} &= R^2 \\rho \\sin \\phi
+    
+    where :math:`r_1 = | \\vec{x}_2 - \\vec{x}_3 |`, etc.
+    """
+    
+    def __init__(self, name = 'Triatomic radial-polar', angle = 'rad'):
+        
+        """
+        Parameters
+        ----------
+        name : str, optional
+            The coordinate system name. The default is 'Triatomic radial-polar'.
+        angle : {'rad', 'deg'}, optional
+            The angular units. The default is radians.
+    
+        """
+        
+        super().__init__(self._tripolar_q2x, nQ = 3, 
+                         nX = 9, name = name, 
+                         Qstr = ['R', 'rho', 'phi'],
+                         maxderiv = None, isatomic = True,
+                         zlevel = None)
+        
+        if angle == 'rad' or angle == 'deg':
+            self.angle = angle 
+        else:
+            raise ValueError('angle must be rad or deg')
+            
+        
+    def _tripolar_q2x(self, Q, deriv = 0, out = None, var = None):
+        """
+        """
+        
+        
+        nd, nvar = dfun.ndnvar(deriv, var, self.nx)
+        q = dfun.X2adf(Q, deriv, var)
+        
+        out, var = self._parse_out_var(Q, deriv, out, var)
+        
+        R = q[0]
+        rho = q[1] 
+        phi = q[2]
+        
+        if self.angle == 'deg':
+            phi = phi * (np.pi/180.0) 
+        # phi is now in radians 
+        
+        # Calculate rho * cos(phi) and 
+        # rho * sin(phi) 
+        #
+        cos = rho * adf.cos(phi)
+        sin = rho * adf.sin(phi) 
+        
+        rt3 = np.sqrt(3.0) 
+        
+        Rp = R / rt3 
+        
+        x0 = Rp * (1.0 - cos)
+        y0 = Rp * sin 
+        
+        x1 = Rp * ( -0.5    + 0.5 * cos + rt3/2 * sin )
+        y1 = Rp * ( rt3/2 + rt3/2 * cos   - 0.5 * sin )
+        
+        x2 = Rp * (-0.5     + 0.5 * cos   - rt3/2 * sin )
+        y2 = Rp * (-rt3/2 - rt3/2 * cos      -0.5 * sin )
+        
+        z0 = adf.const_like(0.0, R)
+        z1 = adf.const_like(0.0, R)
+        z2 = adf.const_like(0.0, R)
+        
+        return dfun.adf2array([x0,y0,z0,x1,y1,z1,x2,y2,z2], out)
+       
+    def __repr__(self):
+        return f"TriatomicRadialPolar({self.name!r},{self.angle!r})"
+    
+    def diagram(self):
+        # using U+250X box and U+219X arrows
+        diag = ""
+        
+        diag += "     │↓              ↑│        \n"
+        diag += "     │Q [3]      [9] X│        \n"
+        diag += "   ╔═╪════════════════╪═╗      \n"
+        diag += "   ║ │ ┌────────────┐ │ ║      \n"
+        diag += "   ║ ╰─┤  X3 polar  ├─╯ ║      \n"
+        diag += "   ║   └────────────┘   ║      \n"
+        diag += "   ╚════════════════════╝      \n"
+        
+        return diag
