@@ -4,7 +4,7 @@ import nitrogen.dfun as dfun
 import numpy as np
 
 __all__ = ['Valence3','CartesianN','LinearTrans','Polar','Cylindrical',
-           'Spherical','PathTrans']
+           'Spherical','PathTrans','TriatomicRadialPolar']
 
 class Valence3(CoordSys):
     """
@@ -1012,6 +1012,50 @@ class TriatomicRadialPolar(CoordSys):
         return diag
     
     @staticmethod
+    def DistanceSquared2RRhoPhi(rr1,rr2,rr3):
+        """
+        Calculate triatomic radial-polar coordinates
+        from the squares of the 
+        three internuclear distances
+        
+        Parameters
+        ----------
+        rr1,rr2,rr3 : array_like
+            The squared internuclear distance
+            
+            
+        Returns
+        -------
+        R, rho, phi : ndarray
+            The coordinates. :math:`\\phi` is returned 
+            in radians in the range :math:`[0,2\\pi)`.
+            
+        """
+        
+        # Calculate the square-distances of 
+        # each pair of atoms.
+        rr1 = np.array(rr1)
+        rr2 = np.array(rr2) 
+        rr3 = np.array(rr3)
+        
+        B = (rr1 + rr2 + rr3) / 3 # B = R**2 (1 + rho**2)
+        
+        x = (2*rr1 - rr2 - rr3) / 6   # x = R**2 rho cos
+        y = (rr2 - rr3) / np.sqrt(12) # y = R**2 rho sin
+            
+        A2 = x**2 + y**2 # A^2,  A = R**2 rho
+        
+        phi = np.arctan2(y,x) # tan = y/x
+        
+        phi = np.mod(phi, 2*np.pi)  # Move [-pi,pi] to [0, 2*pi)
+        
+        R2 = (B/2) * (1 + np.sqrt(abs(1 - 4*A2/B**2))) # R**2
+        R = np.sqrt(R2) 
+        rho = np.sqrt(A2) / R2 
+        
+        return R, rho, phi
+    
+    @staticmethod
     def X2RRhoPhi(X): 
         """
         Calculate triatomic radial-polar coordinates
@@ -1038,19 +1082,39 @@ class TriatomicRadialPolar(CoordSys):
         rr2 = np.sum( (X[0:3] - X[6:9])**2, axis = 0)
         rr3 = np.sum( (X[0:3] - X[3:6])**2, axis = 0)
         
-        B = (rr1 + rr2 + rr3) / 3 # B = R**2 (1 + rho**2)
+        return TriatomicRadialPolar.DistanceSquared2RRhoPhi(rr1,rr2,rr3)
+    
+    @staticmethod 
+    def Distance2RRhoPhi(r1,r2,r3):
+        """
+        Calculate triatomic radial-polar coordinates
+        from the three internuclear distances
         
-        x = (2*rr1 - rr2 - rr3) / 6   # x = R**2 rho cos
-        y = (rr2 - rr3) / np.sqrt(12) # y = R**2 rho sin
+        Parameters
+        ----------
+        r1,r2,r3 : array_like
+            The internuclear distance
             
-        A2 = x**2 + y**2 # A^2,  A = R**2 rho
+            
+        Returns
+        -------
+        R, rho, phi : ndarray
+            The coordinates. :math:`\\phi` is returned 
+            in radians in the range :math:`[0,2\\pi)`.
+            
+        """
         
-        phi = np.arctan2(y,x) # tan = y/x
+        # Calculate the square-distances of 
+        # each pair of atoms.
+        r1 = np.array(r1)
+        r2 = np.array(r2) 
+        r3 = np.array(r3)
         
-        phi = np.mod(phi, 2*np.pi)  # Move [-pi,pi] to [0, 2*pi)
+        rr1 = r1*r1
+        rr2 = r2*r2
+        rr3 = r3*r3
         
-        R2 = (B/2) * (1 + np.sqrt(abs(1 - 4*A2/B**2))) # R**2
-        R = np.sqrt(R2) 
-        rho = np.sqrt(A2) / R2 
+        return TriatomicRadialPolar.DistanceSquared2RRhoPhi(rr1,rr2,rr3)
+    
+    
         
-        return R, rho, phi

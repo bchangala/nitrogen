@@ -22,7 +22,8 @@ class ZMAT(CoordSys):
         A Z-matrix string that reproduces this ZMAT.
     angles : {'deg','rad'}
         The units (degrees or radians) used for angular coordinates.
-    supplementary
+    supplementary : bool
+        Use supplementary ABC angles.
         
     Notes
     -----
@@ -33,7 +34,8 @@ class ZMAT(CoordSys):
         
     """
     
-    def __init__(self, zmatrix, angles = 'deg', supplementary = False):
+    def __init__(self, zmatrix, angles = 'deg', supplementary = False,
+                 four_center_type = None):
         """
         Create a new ZMAT CoordSys.
         
@@ -46,6 +48,11 @@ class ZMAT(CoordSys):
             The default is 'deg'.
         supplementary : bool, optional
             Use supplementary angles. The default is False.
+        four_center_type : array_like, optional
+            The type of embedding for atom. If the entry is `0`, then standard
+            ZMAT angle and dihedral are used. If the entry is `1`, then the 
+            out-of-plane embedding is used. The entryies are ignored for the 
+            first three atoms. If None, all entries are assumed to be 0.
 
         """
         
@@ -71,6 +78,11 @@ class ZMAT(CoordSys):
         if nQ < 1 :
             raise ValueError("ZMAT must have at least one coordinate")
         
+        if four_center_type is None:
+            four_center_type = [0 for l in atomLabels] # default is all standard 
+        if len(four_center_type) != len(atomLabels):
+            raise ValueError("four_center_type must be same length as ZMAT")
+            
         #######################################
         # Initialize CoordSys
         super().__init__(self._zmat_q2x, nQ, nX, name = 'ZMAT',
@@ -84,6 +96,7 @@ class ZMAT(CoordSys):
         self.zmat = zmat                 # New uniformized z-matrix string
         self.angles = angles             # Angle unit ('deg' or 'rad')
         self.supplementary = supplementary # Use supplementary angles
+        self.four_center_type = four_center_type 
     
     def _zmat_q2x(self, Q, deriv = 0, out = None, var = None):
         """
@@ -239,13 +252,27 @@ class ZMAT(CoordSys):
                 th = Ci[1]
                 phi = Ci[2]
                 
-                r_sth = r * adf.sin(th)
-                
-                
-                t1 = r * adf.cos(th)         # r cos(th)
-                t2 = -r_sth * adf.sin(phi)   # -r sin(th) sin(phi)
-                t3 = -r_sth * adf.cos(phi)   # -r sin(th) cos(phi)
-                
+                if self.four_center_type[i] == 0:
+                    #
+                    # Standard ZMAT coordinates
+                    #
+                    r_sth = r * adf.sin(th)
+                    
+                    t1 = r * adf.cos(th)         # r cos(th)
+                    t2 = -r_sth * adf.sin(phi)   # -r sin(th) sin(phi)
+                    t3 = -r_sth * adf.cos(phi)   # -r sin(th) cos(phi)
+                    
+                elif self.four_center_type[i] == 1:
+                    r_cphi = r * adf.cos(phi)
+                    
+                    t1 = -r_cphi * adf.cos(th)
+                    t2 = r * adf.sin(phi)
+                    t3 = -r_cphi * adf.sin(th) 
+                    
+                else:
+                    raise RuntimeError(f"Unexpected four_center_type entry in ZMAT (i = {i:d})")
+                    
+                    
                 for j in range(3):
                     A[i,j] = A1[j] + t1 * U[j] + t2 * V[j] + t3 * W[j]
                 
