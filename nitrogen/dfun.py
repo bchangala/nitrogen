@@ -2027,6 +2027,15 @@ class FourierSeries(DFun):
         The period.
     maxfreq : integer
         The maximum harmonic.
+        
+    Notes
+    -----
+    
+    The expansion is 
+    
+    .. math :: 
+        
+        c_0 + c_1 \\sin(x) + c_2 \\cos(x) + c_3 \\sin(2x) + c_4 \\cos(2x) + \\cdots
     
     """
     
