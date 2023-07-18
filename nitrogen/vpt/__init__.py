@@ -49,6 +49,7 @@ def calc_rectilinear_modes(hes, mass, hbar = None, norm = 'dimensionless'):
     R : (3*N,3*N) ndarray
         Each column of `R` is the displacement
         vector for the corresponding normal mode. 
+        If `norm` is ''both'', then T and L are returned in that order.
         
     Notes
     -----
@@ -98,7 +99,7 @@ def calc_rectilinear_modes(hes, mass, hbar = None, norm = 'dimensionless'):
     # for the dimensionless normal coordinates
     #
     T = iMrt @ L
-    for i in range(9):
+    for i in range(3*N):
         v = T[:,i] 
         a = v.T @ hes @ v 
         T[:,i] *= np.sqrt(abs(w[i] / a))
