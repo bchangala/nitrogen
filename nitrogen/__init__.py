@@ -31,7 +31,7 @@ import matplotlib.pyplot as plt
 # Define some top-level constants
 pi = 3.14159265358979323846264338327950288419716939937510   # pi
 deg = pi / 180.0 # 1 degree in radians
-
+rad = 180.0 / pi # 1 radian in degrees 
 
 def X2xyz(X, elements, filename = "out.xyz", comment = None):
     """
@@ -89,6 +89,56 @@ def X2xyz(X, elements, filename = "out.xyz", comment = None):
     # Done
     return 
 
+def X2txt(X, filename = "grid.txt", write_index = True):
+    """
+    Create an indexed text file from an array of
+    Cartesian positions.
+
+    Parameters
+    ----------
+    X : (3*N,...) ndarray
+        Cartesian position of N atoms.
+    filename : str, optional
+        Output filename. The default is "grid.txt".
+    write_index : bool, optional
+        Include the point index. The default is True.
+
+    Returns
+    -------
+    None.
+
+    """
+    
+    if np.ndim(X) < 1 :
+        raise ValueError("X must have at least 1 dimension.")
+    if X.shape[0] % 3 != 0:
+        raise ValueError("The first dimension of X must be a multiple of 3.")
+    N = X.shape[0] // 3 # number of atoms 
+    if N < 1:
+        raise ValueError("The number of atoms must be >= 1")
+    
+    Xp = np.reshape(X, (N,3,-1)) 
+    
+    ng = Xp.shape[2] # The number of geometries 
+    
+    # Write .txt file 
+    with open(filename, 'w') as file :
+        
+        for i in range(ng): 
+            if write_index:
+                file.write(f"{i+1:5d} ") # write index 
+            
+            for j in range(N): # For each atom
+                x = Xp[j,0,i] # x
+                y = Xp[j,1,i] # y
+                z = Xp[j,2,i] # z
+                
+                file.write(f"{x:-18.15f} {y:-18.15f} {z:-18.15f} ")
+            
+            file.write("\n")
+    # Done
+    return 
+
 def podvr(prim_dvr, npo, i, qref, cs, pes_fun, masses, disp = 0):
     """
     Construct a potential-optimized contracted DVR based on the
@@ -111,7 +161,8 @@ def podvr(prim_dvr, npo, i, qref, cs, pes_fun, masses, disp = 0):
     masses : list of float
         The masses for the coordinate system.
     disp : integer, optional
-        The print level. Default is 0.
+        The print level. Default is 0. Level 1 prints eneriges.
+        Level 2 plots wavefunctions
 
     Returns
     -------
