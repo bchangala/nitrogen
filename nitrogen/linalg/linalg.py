@@ -6,10 +6,12 @@ import scipy.linalg
 
 __all__ = ['eigstrp','aslinearoperator','bounds',
            'chebauto', 'chebspec', 'chebwindow',
-           'full', 'msqrth', 'simple_corr']
+           'full', 'msqrth', 'simple_corr',
+           'RealOrthogonalProjector']
 
 def eigstrp(H, k = 5, pad = 10, tol = 1e-10, maxiter = None, v0 = None,
-            rper = 20, P = None, pper = 1, printlevel = 0, eigval = 'smallest'):
+            rper = 20, P = None, pper = 1, printlevel = 0, eigval = 'smallest',
+            projection_level = 2):
     """
     Thick-restart Lanczos iterative eigensolver with projection.
 
@@ -40,6 +42,14 @@ def eigstrp(H, k = 5, pad = 10, tol = 1e-10, maxiter = None, v0 = None,
         Print level. The default is 0.
     eigval : {'smallest', 'largest'}, optional
         Calculat the smallest or largest eigenvalues. The default is 'smallest'.
+    projection_level : integer, optional
+        The projection level determines how aggressively the projection operator
+        is applied at each iteration.
+        If 2 (default), it will be applied immediately
+        after the matrix-vector routine and again after orthogonalization.
+        If 1, it will be applied only after orthogonalization.
+        If 0, it will not be applied.
+        
 
     Returns
     -------
@@ -81,9 +91,12 @@ def eigstrp(H, k = 5, pad = 10, tol = 1e-10, maxiter = None, v0 = None,
     # Determine dtype of Lanczos vectors
     if P is None:
         vtype = H.dtype
+        project = False
     else:
-        raise NotImplementedError("Projection not yet supported.")
         vtype = np.result_type(H.dtype, P.dtype)
+        project = True 
+        
+    plevel = projection_level 
     
     if printlevel >= 1:
         print("--------------------------------")
@@ -101,7 +114,7 @@ def eigstrp(H, k = 5, pad = 10, tol = 1e-10, maxiter = None, v0 = None,
             v0 = v0.astype(vtype)
     
     # Project and normalize v0
-    if P is not None:
+    if project:
         v0 = P.matvec(v0)
     v0 /= np.linalg.norm(v0)
     
@@ -118,8 +131,17 @@ def eigstrp(H, k = 5, pad = 10, tol = 1e-10, maxiter = None, v0 = None,
     for i in range(k+pad):
         
         # Copy the i^th Lanczos vector into the Lanczos block
+        # 
+        # For projection, Lnext is already projected
+        
         np.copyto(L[:,i], Lnext)
         w = H.matvec(L[:,i])
+        
+        if project and i % pper == 0 and plevel >= 2:
+            w = P.matvec(w)
+            if printlevel >= 2:
+                print("Projecting w")
+        
         alpha = np.real(np.vdot(w, L[:,i]))  # Force real (should be anyway)
         T[i,i] = alpha
         if i > 0:
@@ -136,7 +158,14 @@ def eigstrp(H, k = 5, pad = 10, tol = 1e-10, maxiter = None, v0 = None,
         for j in range(i+1):
             c = np.vdot(L[:,j], w)
             w -= c * L[:,j] # Sequential Gram-Schmidt orthogonalization
-        # Renormalize and store in Lnext
+            
+        # Project 
+        if project and i % pper == 0 and plevel >= 1:
+            w = P.matvec(w)
+            if printlevel >= 2:
+                print("Projecting w")
+        
+        # Renormalize and store in Lnext 
         np.copyto(Lnext, w/np.linalg.norm(w))
     
     # T is filled to the first (k+pad, k+pad) block
@@ -155,6 +184,11 @@ def eigstrp(H, k = 5, pad = 10, tol = 1e-10, maxiter = None, v0 = None,
             np.copyto(L[:,i], Lnext) # Copy the i^th Lanczos vector into the block
             w = H.matvec(L[:,i])     # Calculate the next vector
             
+            if project and i % pper == 0 and plevel >= 2:
+                w = P.matvec(w)
+                if printlevel >= 2:
+                    print("Projecting w")
+                    
             alpha = np.real(np.vdot(w, L[:,i]))  # Force real (should be anyway)
             T[i,i] = alpha
             
@@ -179,11 +213,22 @@ def eigstrp(H, k = 5, pad = 10, tol = 1e-10, maxiter = None, v0 = None,
             for j in range(i+1):
                 c = np.vdot(L[:,j], w)
                 w -= c * L[:,j] # Sequential Gram-Schmidt orthogonalization
+            
+            # Project 
+            if project and i % pper == 0 and plevel >= 1: 
+                w = P.matvec(w)
+                if printlevel >= 2:
+                    print("Projecting w")
+                    
             w /= np.linalg.norm(w) # Normalize first
             for j in range(i+1):
                 c = np.vdot(L[:,j], w)
                 w -= c * L[:,j] # Sequential Gram-Schmidt orthogonalization
-            # Renormalize and store in Lnext
+            
+            
+
+            
+            # Renormalize and store in Lnext     
             np.copyto(Lnext, w/np.linalg.norm(w))
             
             itercnt += 1 # Increment the iteration count (counting H matvec calls)
@@ -763,4 +808,47 @@ def simple_corr(H, dt, n, v0):
         vt = eHt @ vt          # Propagate one step
     
     return C 
+
+class RealOrthogonalProjector(LinearOperator):
+    """
+    A projection operator to orthogonalize against a given 
+    set of vectors
+    
+    ..  math::
+        
+        \hat{P} = 1 - U U^T
+    
+    
+    """
+    
+    def __init__(self,U):
+        """
+        
+        Parameters
+        ----------
+        U : (N,n) ndarray
+            `n` column vectors to orthogonalize against. The columns
+            of `U` are assumed to be real and orthonormal.
+
+        """
+        
+        N = U.shape[0] 
+        self.shape = (N,N)
+        self.dtype = U.dtype # must be a real type!
+        
+        self.N = N 
+        self.U = U 
+        
+    def _matvec(self, x):
+        """
+        The matrix-vector product 
+        """
+        
+        x = x.reshape((self.N,))
+        
+        y = x.copy() 
+        
+        y -= self.U @ (self.U.T @ x) # Note tranpose b/c real 
+        
+        return y 
  
