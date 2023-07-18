@@ -2346,6 +2346,12 @@ def acos(x, out = None):
     
     return out
       
+# Aliases for acos and asin
+def arcsin(x, out = None):
+    return asin(x, out)
+def arccos(x, out = None):
+    return acos(x, out)
+
 def exp(x, out = None):
     """
     Exponential for :class:`adarray` objects.
