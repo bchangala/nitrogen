@@ -269,11 +269,11 @@ def eigstrp(H, k = 5, pad = 10, tol = 1e-10, maxiter = None, v0 = None,
                 # tolerance, we will continue
                 if printlevel >= 1:
                     print(f"End of restart {restart_cnt:d}. {nconverged:d}/{k:d} Ritz values have converged.")
-                if printlevel >= 2:
+                if printlevel >= 2 or (printlevel >= 1 and restart_cnt % 10 == 0):
                     print("Current Ritz values:")
                     for i in range(k):
                         diff = evals[i]-evals_old[i]
-                        print(f"  {evals[i]:.6E}  ({+diff:.6E})")
+                        print(f"  {evals[i]:.10E}  ({+diff:.10E})")
             else:
                 # All eigenvalues have converged, exit the restart loop
                 print("Convergence reached in {:d} restarts ({:d} iterations).".format(restart_cnt, itercnt))
