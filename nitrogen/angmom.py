@@ -323,6 +323,47 @@ def Jbf_cs(J):
     
     return Jx, Jy, Jz
 
+def Rpi_cs(J):
+    """
+    Calculate the matrix elements of R(pi) about the body-fixed
+    axes in the Condon-Shortley basis.
+
+    Parameters
+    ----------
+    J : integer
+        The angular momentum.
+
+    Returns
+    -------
+    Rx,Ry,Rz : ndarray
+        The rotation matrices
+
+    """
+    
+    NJ = 2*J + 1
+    # The CS basis ordering is k = -J, ..., +J
+    
+    # Following B&J Eq. 12-46, we have
+    # 
+    # Rz |Jk> = (-1)**k |Jk>
+    #
+    k = np.arange(-J, J+1) 
+    Rz = np.diag( (-1.0)**k )
+    
+    # B&J Eq. 12-47
+    #
+    # Rx |Jk> = (-1)**J |J, -k>  (i.e. alpha = 0)
+    Rx = np.zeros((NJ,NJ))
+    for i in range(NJ):
+        Rx[i,NJ-i-1] = (-1.0) ** J 
+    
+    # Ry |Jk> = (-1)**(J+k) |J, -k> (i.e. alpha = pi/2)
+    Ry = np.zeros((NJ,NJ))
+    for i in range(NJ):
+        Ry[i,NJ-i-1] = (-1.0) ** (J + k[i])
+        
+    return Rx, Ry, Rz 
+
 def U_wr2cs(J):
     """
     Wang transformation matrix, with additional
@@ -449,7 +490,45 @@ def iJiJbf_wr(J):
     
     return iJiJ
 
+def Rpi_wr(J):
+    """
+    Calculate the R(pi) rotation matrices in the Wang-Real representation.
 
+    Parameters
+    ----------
+    J : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    Rx,Ry,Rz : ndarray
+        The rotation matrices.
+
+    """
+    
+    NJ = 2*J+1 
+    
+    Rx = np.zeros((NJ,NJ))
+    Ry = np.zeros((NJ,NJ))
+    Rz = np.zeros((NJ,NJ))
+    
+    sgnJ = (-1.0) ** J 
+    
+    for i in range(J):
+        Rx[i,i] = -sgnJ 
+    for i in range(J,NJ):
+        Rx[i,i] = +sgnJ 
+        
+    for i in range(J):
+        Ry[i,i] = (-1.0)**(i + 1) 
+    for i in range(J,NJ):
+        Ry[i,i] = (-1.0)**(i) 
+    
+    for i in range(NJ):
+        Rz[i,i] = (-1.0)**(J + i) 
+        
+    return Rx, Ry, Rz 
+    
 def X2I(X, mass):
     """
     Calculate the inertia tensor from Cartesian
