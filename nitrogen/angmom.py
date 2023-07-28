@@ -1226,3 +1226,130 @@ def sigtau2Btau(sigma, tau):
         taup = np.tensordot(R, taup, axes = ([1], [-1]))
     
     return B, taup 
+
+
+def vectorRME_cs(Vbf,U1,U2):
+    """
+    Calculate the scaled reduced matrix element of a vector operator.
+
+    Parameters
+    ----------
+    Vbf : (3,N1,N2) array_like 
+        The vibronic matrix elements of the body-fixed components, 
+        :math:`V_{x,y,z}` between `N1` and `N2` vibronic basis functions
+    U1 : (N1, 2*J1+1, n1) ndarray
+        The rovibronic wavefunctions of `n1` eigenvectors.
+    U2 : (N2, 2*J2+1, n2) ndarray
+        The rovibronic wavefunctions of `n2` eigenvectors.
+
+    Returns
+    -------
+    
+    VRME : (n1,n2) ndarray
+        The scaled reduced matrix elements.
+
+    Notes
+    -----
+    The rotational basis functions are standard body-fixed symmetric top
+    wavefunctions in :math:`k = -J,\\ldots,+J` order using Condon-Shortley 
+    phase conventions.
+    
+    Integer :math:`J` only supported currently. 
+    
+    """
+    
+
+    Vbf = np.array(Vbf) 
+    
+    _,N1,N2 = Vbf.shape 
+    #
+    # N1 and N2 are the sizes of the left and right vibronic basis sets
+    #
+    _, NJ1, n1 = U1.shape # n1 and n2 are the number of eigenvectors 
+    _, NJ2, n2 = U2.shape 
+    J1 = (NJ1 - 1) // 2 
+    J2 = (NJ2 - 1) // 2 
+    
+    Vrme = np.zeros((n1,n2), dtype = np.complex128)
+    
+    # Check some quick selection rules 
+    
+    if abs(J1-J2) > 1 or (J1 == 0 and J2 == 0):
+        # \Delta J = -1, 0, +1  only
+        # and J = 0 -- 0 forbidden 
+        return Vrme  # Return all zeros 
+    
+    ################################################
+    # Precompute the Wigner 3-j symbols
+    #
+    w3j = np.zeros((NJ1, NJ2, 3)) 
+    #
+    for q in [-1,0,1]:
+        for k1 in range(-J1,J1+1):
+            for k2 in range(-J2,J2+1): 
+                
+                w3j[k1, k2, q] = wigner3j(2*J1, 2*J2, 2*1, 
+                                          2*k1,-2*k2, 2*q)
+               
+    #            
+    #################################################
+    
+    #################################################
+    # Calculate the spherical tensor components of 
+    # the body-fixed matrix elements 
+    # 
+    # Vq, q = 0, +1, -1
+    #
+    #   0  ... z
+    #  +1  ... -(x + iy) / sqrt[2]
+    #  -1  ... +(x - iy) / sqrt[2]
+    #
+    Vq = [  Vbf[2],
+           -(Vbf[0] + 1j*Vbf[1])/np.sqrt(2.0),
+           +(Vbf[0] - 1j*Vbf[1])/np.sqrt(2.0)]
+    #
+    ##################################################
+    
+    for i1 in range(n1):
+        for i2 in range(n2):
+            
+            val = 0.0 
+            
+            for q in [-1,0,1]:
+                for k1 in range(-J1,J1+1):
+                    #for k2 in range(-J2,J2+1):
+                        
+                    # The 3-j coefficient has a selection
+                    # rule of k1 - k2 + q = 0, 
+                    # i.e. k2 = k1 + q 
+                    k2 = k1 + q 
+                    if k2 < -J2 or k2 > J2: # Check that k2 is in bounds 
+                        continue 
+                    #
+                    # 
+                    # Calculate the rovibronic matrix element 
+                    # 
+                    # <J1 k1 ... | V_-q | J2, k2 ... >
+                    #
+                    psi1 = U1[:, k1+J1, i1] 
+                    psi2 = U2[:, k2+J2, i2] 
+                    Vme = psi1.conj().T @ Vq[-q] @ psi2
+                    
+                    # Now calculate direction cosines and such 
+                    #
+                    sign = (-1) ** (J1 + k2 + q)
+                    
+                    val += sign * w3j[k1,k2,q] * Vme 
+            
+            Vrme[i1,i2] = val 
+    # Scale the final finals
+    Vrme *= np.sqrt( NJ1 * NJ2 )
+        
+    # Return the scaled reduced matrix elements 
+    
+    return Vrme 
+            
+    
+    
+        
+    
