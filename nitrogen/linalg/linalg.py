@@ -103,6 +103,8 @@ def eigstrp(H, k = 5, pad = 10, tol = 1e-10, maxiter = None, v0 = None,
         print(" Starting thick-restart Lanczos ")
         print("--------------------------------")
     
+    #################################################
+    #
     # Initialize starting vector v0
     if v0 is None:
         v0 = np.random.rand(n).astype(vtype)
@@ -112,22 +114,31 @@ def eigstrp(H, k = 5, pad = 10, tol = 1e-10, maxiter = None, v0 = None,
         if v0.dtype != vtype:
             print("Supplied v0 is being recast")
             v0 = v0.astype(vtype)
-    
+    #
     # Project and normalize v0
     if project:
         v0 = P.matvec(v0)
     v0 /= np.linalg.norm(v0)
+    #
+    #
+    #################################################
     
+    #################################################
     # Allocate the block of Lanczos vectors
     nL = k + pad + rper
     L = np.ndarray((n, nL), dtype = vtype, order = 'F')
     Lnext = v0.copy()
-    
+    #
     # Allocate the sub-space Hamiltonian
     T = np.zeros((nL,nL), dtype = np.float64) # T will always be Real.
+    #
+    #################################################
     
+    #################################################
     # Perform the initial Lanczos sweep
-
+    # to populate the target space 
+    #
+    #
     for i in range(k+pad):
         
         # Copy the i^th Lanczos vector into the Lanczos block
@@ -171,15 +182,24 @@ def eigstrp(H, k = 5, pad = 10, tol = 1e-10, maxiter = None, v0 = None,
     # T is filled to the first (k+pad, k+pad) block
     # L is filled to the first k+pad columns
     # Lnext is the next Lanczos vector
+    #
+    ##################################################
     
-    # Begin a restart
     itercnt = 0
     restart_cnt = 0
     evals = None
     
     while True:
-        
-        # Calculate `rper` more Lanczos vectors
+        #########################################
+        # Begin a restart 
+        # 
+        # L contains the first k+pad Lanczos vectors 
+        # T is filled to the  (k+pad, k+pad) block 
+        # Lnext is the next Lanczos vector to add to the space.
+        #
+        # We need to calculate `rper` more Lanczos vectors and 
+        # fill the corresponding blocks in T.
+        #
         for i in range(k+pad, nL):
             np.copyto(L[:,i], Lnext) # Copy the i^th Lanczos vector into the block
             w = H.matvec(L[:,i])     # Calculate the next vector
@@ -224,9 +244,6 @@ def eigstrp(H, k = 5, pad = 10, tol = 1e-10, maxiter = None, v0 = None,
             for j in range(i+1):
                 c = np.vdot(L[:,j], w)
                 w -= c * L[:,j] # Sequential Gram-Schmidt orthogonalization
-            
-            
-
             
             # Renormalize and store in Lnext     
             np.copyto(Lnext, w/np.linalg.norm(w))
@@ -277,6 +294,12 @@ def eigstrp(H, k = 5, pad = 10, tol = 1e-10, maxiter = None, v0 = None,
             else:
                 # All eigenvalues have converged, exit the restart loop
                 print("Convergence reached in {:d} restarts ({:d} iterations).".format(restart_cnt, itercnt))
+                if printlevel >= 1 :
+                    print("Final Ritz values:")
+                    for i in range(k):
+                        diff = evals[i]-evals_old[i]
+                        print(f"  {evals[i]:.10E}  ({+diff:.10E})")
+                    
                 break
         
         restart_cnt += 1
