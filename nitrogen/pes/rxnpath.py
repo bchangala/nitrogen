@@ -60,7 +60,15 @@ def qderiv_nonstationary(q0, deriv, V, G, direction = 'descend'):
     # and the metric tensor (and inverse) to one
     # order less.
     #
-    dG = symfull_axis(G.f(q0, deriv - 1), axis = 1) 
+    if G is None:
+        # Identity
+        nd = nitrogen.dfun.nderiv(deriv-1, nvar)
+        dG = np.zeros((nd,nvar,nvar))
+        for i in range(nvar):
+            dG[0,i,i] = 1.0    
+    else:
+        dG = symfull_axis(G.f(q0, deriv - 1), axis = 1) # Reshape
+
     
     # 
     # Calculate the derivatives of the PES
@@ -177,7 +185,7 @@ def qderiv_stationary(q0, deriv, V, G, direction = 'normal'):
     V : DFun
         The potential energy surface.
     G : DFun
-        The inverse metric tensor.
+        The inverse metric tensor. If None, identity is assumed
     direction: {'normal', 'reverse'}, optional
         The direction of the path coordinate. If 'normal',
         the sign of the path tangent is determined by making
@@ -203,7 +211,14 @@ def qderiv_stationary(q0, deriv, V, G, direction = 'normal'):
         q = np.array(q0).copy().reshape((1,nvar))
         return q 
         
-    dG = symfull_axis(G.f(q0, deriv - 1), axis = 1) 
+    if G is None:
+        # Identity
+        nd = nitrogen.dfun.nderiv(deriv-1, nvar)
+        dG = np.zeros((nd,nvar,nvar))
+        for i in range(nvar):
+            dG[0,i,i] = 1.0    
+    else:
+        dG = symfull_axis(G.f(q0, deriv - 1), axis = 1) # Reshape
     
     # 
     # Calculate derivatives of the PES
