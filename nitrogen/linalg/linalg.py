@@ -11,7 +11,7 @@ __all__ = ['eigstrp','aslinearoperator','bounds',
 
 def eigstrp(H, k = 5, pad = 10, tol = 1e-10, maxiter = None, v0 = None,
             rper = 20, P = None, pper = 1, printlevel = 0, eigval = 'smallest',
-            projection_level = 2):
+            projection_level = 2, refine_per = 20):
     """
     Thick-restart Lanczos iterative eigensolver with projection.
 
@@ -49,6 +49,9 @@ def eigstrp(H, k = 5, pad = 10, tol = 1e-10, maxiter = None, v0 = None,
         after the matrix-vector routine and again after orthogonalization.
         If 1, it will be applied only after orthogonalization.
         If 0, it will not be applied.
+    refine_per : integer, optional
+        After `refine_per` restarts, the target Ritz vectors will 
+        be explicitly rediagonalized and reorthogonalized. The default is 20. 
         
 
     Returns
@@ -125,6 +128,20 @@ def eigstrp(H, k = 5, pad = 10, tol = 1e-10, maxiter = None, v0 = None,
     
     #################################################
     # Allocate the block of Lanczos vectors
+    #
+    #     _______nL_______
+    #    /                \
+    #     [target]   [restart]
+    #     --------   -------
+    #      k    pad    rper
+    #   +------+----+-------+
+    #   |      |    |       |
+    #   |      |    |       |
+    # n |      |    |       |
+    #   |      |    |       |
+    #   |      |    |       |
+    #   +------+----+-------+
+    #
     nL = k + pad + rper
     L = np.ndarray((n, nL), dtype = vtype, order = 'F')
     Lnext = v0.copy()
@@ -136,12 +153,11 @@ def eigstrp(H, k = 5, pad = 10, tol = 1e-10, maxiter = None, v0 = None,
     
     #################################################
     # Perform the initial Lanczos sweep
-    # to populate the target space 
-    #
+    # to populate the target space [k + pad]
     #
     for i in range(k+pad):
         
-        # Copy the i^th Lanczos vector into the Lanczos block
+        # Copy the i^th Lanczos vector into the Lanczos block, L
         # 
         # For projection, Lnext is already projected
         
@@ -164,6 +180,7 @@ def eigstrp(H, k = 5, pad = 10, tol = 1e-10, maxiter = None, v0 = None,
             print(f"Hvec ... alpha = {alpha:.3e}")
         
         # Calculate the next Lanczos vector
+        # ---------------------------------
         # Explicitly normalize first to help with finite precision errors
         w /= np.linalg.norm(w)
         for j in range(i+1):
@@ -185,8 +202,8 @@ def eigstrp(H, k = 5, pad = 10, tol = 1e-10, maxiter = None, v0 = None,
     #
     ##################################################
     
-    itercnt = 0
-    restart_cnt = 0
+    itercnt = 0       # The number of Lanczos iterations total
+    restart_cnt = 0   # The number of restarts performed
     evals = None
     
     while True:
@@ -196,6 +213,74 @@ def eigstrp(H, k = 5, pad = 10, tol = 1e-10, maxiter = None, v0 = None,
         # L contains the first k+pad Lanczos vectors 
         # T is filled to the  (k+pad, k+pad) block 
         # Lnext is the next Lanczos vector to add to the space.
+        #
+        ##########################################
+        #
+        # Check for a Ritz refinement
+        if restart_cnt > 0 and (restart_cnt % refine_per == 0):
+            #
+            # Refine the target Ritz vectors 
+            #
+            if printlevel >= 1 :
+                print("Refining target Ritz vectors")
+                
+            # 1) Reorthogonalize/project
+            # 2) Rediagonalize 
+            #
+            # 1) Reorthogonalize 
+            #
+            maxc = 0.0 
+            for i in range(k+pad):
+                #
+                for j in range(i):
+                    c = np.vdot(L[:,i], L[:,j]) #
+                    maxc = max(maxc, abs(c))
+                    L[:,i] -= c * L[:,j]   # GS orthogonalize 
+                    
+                if project and plevel >= 1:
+                    v = P.matvec(L[:,i]) # Reproject 
+                    np.copyto(L[:,i], v) 
+                    
+                L[:,i] /= np.linalg.norm(L[:,i])  # Renormalize 
+            #
+            if printlevel >= 1: 
+                print(f" (largest overlap = {maxc:.3E})")
+            # 2) Rediagonalize 
+            T.fill(0.0) 
+            for i in range(k+pad):
+                w = H.matvec(L[:,i])
+                for j in range(i+1):
+                    Hij = np.vdot(L[:,j], w)
+                    T[i,j] = Hij 
+                    T[j,i] = Hij 
+            #Lnext += w 
+            #Lnext = np.random.rand(len(Lnext))
+            
+            wT,UT = np.linalg.eigh(T[:(k+pad), :(k+pad)])
+            
+            T.fill(0)
+            for i in range(k+pad):
+                T[i,i] = wT[i] # Fill diagonal 
+            np.copyto(L[:, 0:(k+pad)], np.matmul(L[:,0:(k+pad)], UT))
+            
+            # # Reorthogonalize Lnext 
+            # if project and plevel >= 1: 
+            #     Lnext = P.matvec(Lnext) 
+            # for i in range(k+pad):
+            #     c = np.vdot(L[:,i], Lnext) 
+            #     Lnext -= c * L[:,i] 
+            # Lnext /= np.linalg.norm(Lnext) 
+            
+            #
+            #
+            # L now contains the refined k+pad Lanczos vectors 
+            # T is filled to the [k+pad, k+pad] block
+            # Lnext contains the next vector
+            # 
+            # END REFINEMENT
+        ################################################
+        #
+        #
         #
         # We need to calculate `rper` more Lanczos vectors and 
         # fill the corresponding blocks in T.
@@ -212,40 +297,77 @@ def eigstrp(H, k = 5, pad = 10, tol = 1e-10, maxiter = None, v0 = None,
             alpha = np.real(np.vdot(w, L[:,i]))  # Force real (should be anyway)
             T[i,i] = alpha
             
-            if restart_cnt > 0 and i == (k+pad):
-                # If this is the first loop in the restart block,
-                # then we need to calculate the "arrowhead"
-                for j in range(i):
-                    beta = np.real( np.vdot(w, L[:,j]) )
-                    T[i,j] = beta
-                    T[j,i] = beta
-            else:
-                # This is a normal Lanczos step
-                beta = np.real( np.vdot(w, L[:,i-1]) ) 
-                T[i,i-1] = beta
-                T[i-1,i] = beta
-            
             if printlevel >= 2:
                 print(f"Hvec ... alpha = {alpha:.3e}")
-            
-            # Calculate the next Lanczos vector
-            w /= np.linalg.norm(w) # Normalize first
-            for j in range(i+1):
+                
+            #####################################
+            # For a standard restarted Lanczos,
+            # the T matrix will have an "arrowhead"
+            # appearance. The block between the 
+            # target vectors and the restart vectors
+            # will be otherwise zero.
+            #
+            # I have found that loss of orthogonality
+            # amongst the Ritz vectors can creep in, 
+            # and it may be necessary to explicitly
+            # reorthogonalize the target space, which
+            # will spoil the Lanczos recursion and lead to 
+            # non-zero matrix elements between the 
+            # restart and target blocks. 
+            # 
+            # Since we are explicitly reorthogonalizing
+            # anyway, these matrix elements are already 
+            # being calculated, so its really no extra
+            # cost to compute them.
+            #
+            # First, calculate the matrix elements in the 
+            # [restart | restart] block, which maintains
+            # the Lanczos recursion
+            #
+            # 
+            # if i > (k+pad):
+            #    beta = np.real( np.vdot(w, L[:,i-1]) ) 
+            #    T[i,i-1] = beta
+            #    T[i-1,i] = beta
+            #
+            # Now calculate matrix elements between the current
+            # restart vector and the target block.
+            #
+            # We will do this during the usual first-pass 
+            # orthogonalization 
+            #
+            for j in range(k+pad):
                 c = np.vdot(L[:,j], w)
-                w -= c * L[:,j] # Sequential Gram-Schmidt orthogonalization
+                T[j,i] = c 
+                T[i,j] = c 
+                
+                # And orthogonalize
+                w -= c * L[:,j] 
+            # Finish orthogonalizing against current restart vectors
+            #
+            for j in range(k+pad,i+1):
+                c = np.vdot(L[:,j], w) # (nominally zero due to Lanczos recursion)
+                if j < i:
+                    T[j,i] = c 
+                    T[i,j] = c 
+                    
+                w -= c * L[:,j]
             
-            # Project 
+            # Normalize w 
+            w /= np.linalg.norm(w) 
+            
+            # Project after first-pass orthogonalization 
             if project and i % pper == 0 and plevel >= 1: 
                 w = P.matvec(w)
                 if printlevel >= 2:
                     print("Projecting w")
                     
-            w /= np.linalg.norm(w) # Normalize first
+            # And orthogonalize again (second pass)
             for j in range(i+1):
                 c = np.vdot(L[:,j], w)
                 w -= c * L[:,j] # Sequential Gram-Schmidt orthogonalization
             
-            # Renormalize and store in Lnext     
+            # Finally, renormalize and store in Lnext     
             np.copyto(Lnext, w/np.linalg.norm(w))
             
             itercnt += 1 # Increment the iteration count (counting H matvec calls)
@@ -258,7 +380,9 @@ def eigstrp(H, k = 5, pad = 10, tol = 1e-10, maxiter = None, v0 = None,
         
         evals,evecs = np.linalg.eigh(T)
         # eigh returns the evals in ascending order
-        if eigval == 'largest':
+        if eigval == 'smallest':
+            pass # do nothing
+        elif eigval == 'largest':
             # flip the order of the Ritz values/vectors
             evals = np.flip(evals)
             evecs = np.flip(evecs,axis = 1)
@@ -266,7 +390,11 @@ def eigstrp(H, k = 5, pad = 10, tol = 1e-10, maxiter = None, v0 = None,
         # Store the first k+pad Ritz vectors
         np.copyto(L[:, 0:(k+pad)], np.matmul(L,evecs[:,0:(k+pad)]))
     
-        # Refill T
+        ##########################
+        # Refill T 
+        # The target [k+pad] block will
+        # be diagonal
+        # 
         T.fill(0) 
         for i in range(k+pad):
             T[i,i] = evals[i]
