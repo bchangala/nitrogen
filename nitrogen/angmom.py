@@ -673,7 +673,24 @@ def X2PAS(X, mass):
     I = np.moveaxis(I, (0,1), (-2,-1))
     _,U = np.linalg.eigh(I)
     
-    # Check that they form a right-handed axis
+    #
+    # Attempt to orient new and old axes
+    # (this is useful is the original axis system is already
+    #  close to the final one; in other cases, it causes
+    #  no harm)
+    #
+    for a in range(3): # for each axis 
+    
+        dircos = U[a,a] # The cosine of the old and new axis
+        
+        if U.ndim == 2:
+            if dircos < 0: # Anti-aligned
+                U[:,a] *= -1 # Flip axis 
+        else:
+            U[:,a, dircos < 0] *= -1 
+            
+    
+    # Now, explicitly check that they form a right-handed axis
     # system
     #
     # Compute (a x b) . c
@@ -687,6 +704,12 @@ def X2PAS(X, mass):
             U *= -1 
     else:
         U[:,:, trip < 0] *= -1
+    #
+    # The PAS axis vectors are now right-handed, 
+    # the orientiation check before this guarantees that
+    # if the old and new axis systems are sufficiently 
+    # *aligned* they will also now be *oriented*.
+    #
     
     # The array that transforms vectors in 
     # the original frame to the PAS is
