@@ -8,7 +8,8 @@ import nitrogen.tensor as tensor
 import numpy as np 
 
 __all__ = ['NonLinearTO', 
-           'rovib_MP2'] 
+           'rovib_MP2','rovib_MP2_multi',
+           'calc_h4_energies','calc_h4_energies_J']
 
 
 
@@ -469,3 +470,400 @@ def rovib_MP2(Hvib, Crot, Crv, mp2_max, target = None, excitation_fun = None, pr
     return Evib, sigma, tau 
     #
     ##################################
+    
+def rovib_MP2_multi(Hvib, Crot, Crv, mp2_max, targets, 
+                    excitation_fun = None, printlevel = 1):
+    """
+    Multi-state second-order rotational effective Hamiltonian.
+
+    Parameters
+    ----------
+    Hvib : ConfigurationOperator
+        The configuration representation pure vibrational Hamiltonian.
+    Crot : nested list of ConfigurationOperator
+        The coefficients of :math:`[iJ_a/\\hbar, iJ_b/\\hbar]_+`.
+    Crv : list of ConfigurationOperator
+        The coefficients of :math:`[iJ_a/\\hbar]`.
+    mp2_max : scalar
+        The maximum excitation of the perturbative block.
+    targets : (nt, nmodes) array_like, optional
+        The target configurations.
+    excitation_fun : function, optional
+        The configuration excitation function. If None, then the sum
+        of configuration indices is used. See :func:`~nitrogen.scf.config_table`.
+        
+    Returns
+    -------
+    h0 : (nt,nt) ndarray
+        The MP2 pure vibrational Hamiltonian
+    h1 : (nt,nt,3) ndarray
+        The MP2 linear rotational coefficients.
+    h2 : (nt,nt,3,3) ndarray
+        The MP2 quadratic rotational coefficients.
+    h3 : (nt,nt,3,3,3) ndarray
+        The MP2 cubic rotational coefficients.
+    h4 : (nt,nt,3,3,3,3) ndarray
+        The MP2 quartic rotational coefficients.
+    
+    
+    Notes
+    -----
+    `Crot` is assumed to be a symmetric tensor, ``Crot[a][b] = Crot[b][a]``.
+    The matrix elements of `Crv` are assumed to be real and anti-symmetric
+    within the vibrational basis. 
+    
+    The effective Hamiltonian is defined by the ``h``n arrays as
+    
+    ..  math::
+        
+        H_\\mathrm{eff} &= h^0_{v_1,v_2} \\vert v_1 \\rangle \\langle v_2 \\vert 
+         
+         &+  h^1_{v_1,v_2,\\alpha} \\vert v_1 \\rangle \\langle v_2 \\vert 
+         (i J_\\alpha)
+         
+         &+  h^2_{v_1,v_2,\\alpha,\\beta} \\vert v_1 \\rangle \\langle v_2 \\vert 
+         (i J_\\alpha) (i J_\\beta)
+         
+         &+  h^3_{v_1,v_2,\\alpha,\\beta,\\gamma} \\vert v_1 \\rangle \\langle v_2 \\vert 
+         (i J_\\alpha) (i J_\\beta )(i J_\\gamma)
+         
+         &+  h^4_{v_1,v_2,\\alpha,\\beta,\\gamma,\\delta} \\vert v_1 \\rangle \\langle v_2 \\vert 
+         (i J_\\alpha) (i J_\\beta )(i J_\\gamma)(i J_\\delta)
+        
+    """
+    
+    #################################
+    # First, calculate the configurations that define
+    # perturbative space
+    index_range = Hvib.shape
+    n = len(index_range)     # The number of modes 
+    cfg = nitrogen.scf.config_table(mp2_max, n, fun = excitation_fun, index_range = index_range) 
+    #
+    # Now locate the position of the target configurations
+    #
+    targets = np.array(targets) 
+    if targets.shape[1] != cfg.shape[1]:
+        raise ValueError("Target array has unexpected number of modes.")
+        
+    nt = targets.shape[0] # The number of targets 
+    
+    istarget = np.zeros((cfg.shape[0],)).astype(bool) 
+    for i in range(nt):
+        # For each target configuration
+        # Union the `istarget` list
+        istarget = np.logical_or(istarget, (cfg == targets[i]).all(axis=1) )
+    # 
+    cfg_mp2 = cfg[~istarget] 
+    cfg_target = cfg[istarget]  # In config_table order, *not* `targets` order 
+    # nmp2 = len(cfg_mp2) # The number of perturbative states.
+    #
+    
+    ########################################
+    #
+    #
+    # The total Hamiltonian is
+    # 
+    #  H = Hv
+    #      + Crv[a] * iJa/hbar 
+    #      + Cr[a][b] * [iJa/hbar,iJb/hbar]_+
+    #
+    # Hv is partitioned into a zeroth order
+    # and first order part
+    # 
+    # i) The standard choice is 
+    #    H0 = <v|H|v'> ...  the diagonal-block elements
+    #    H1 = Hv - H0  ...  everything else
+    #
+    # At some point, the cheaper SCF energy choice will
+    # be added
+    #
+    ##########################################
+    #
+    # Initialize the rovibrational operators 
+    #
+    h0 = np.zeros((nt, nt))                 # Pure vibrational operator 
+    h1 = np.zeros((nt, nt, 3))              # Linear in iJa/hbar
+    h2 = np.zeros((nt, nt, 3, 3))           # Quadratic iJa/hbar * iJb/hbar
+    h3 = np.zeros((nt, nt, 3, 3, 3))        # Cubic " "
+    h4 = np.zeros((nt, nt, 3, 3, 3, 3))     # Quartic " " 
+    #
+    # 
+    #
+    ##########################################
+    # 
+    # Calculate the required blocks of Hv, Crv, and Cr 
+    #
+    Cr0 = [[None for a in range(3)] for b in range(3)]
+    Cr_i0 = [[None for a in range(3)] for b in range(3)]
+    Cr_0i = [[None for a in range(3)] for b in range(3)]
+    #
+    #
+    # a) The target - target block 
+    #
+    Hv0 = Hvib.block(cfg_target, cfg_target)
+    Crv0 = [Crv[a].block(cfg_target, cfg_target) for a in range(3)]
+    for a in range(3):
+        for b in range(a+1):
+            # Crot is symmetry w.r.t a<-->b
+            Cr0_ab = Crot[a][b].block(cfg_target, cfg_target)
+            Cr0[a][b] = Cr0_ab 
+            Cr0[b][a] = Cr0_ab 
+    #
+    # b) The excited - target block
+    Hv_i0 = Hvib.block(cfg_mp2, cfg_target)
+    Hv_0i = Hv_i0.T # Real, symmetric 
+    
+    Crv_i0 = [Crv[a].block(cfg_mp2, cfg_target) for a in range(3)]
+    Crv_0i = [-Crv_i0[a].T for a in range(3)] # Real, anti-symmetric  
+    
+    for a in range(3):
+        for b in range(a+1):
+            # Crot is symmetry w.r.t a<-->b
+            Cri0_ab = Crot[a][b].block(cfg_mp2, cfg_target)
+            Cr_i0[a][b] = Cri0_ab 
+            Cr_i0[b][a] = Cri0_ab 
+            
+    for a in range(3):
+        for b in range(3):
+            Cr_0i[a][b] = Cr_i0[a][b].T # Real, symmetric
+    #
+    ############################################
+    #
+    # Calculate the zeroth-order energies
+    #
+    E0 = np.diag(Hv0).copy() # The zeroth order energies  # (nt,)
+    Ei = Hvib.block(cfg_mp2, ket_configs = 'diagonal')    # (nmp2,)
+    #
+    # Calculate the energy denominators 
+    #
+    # Delta_i0 = 1 / (Ei - E0)
+    # 
+    Deltai0 = 1.0 / (Ei.reshape((-1,1)) - E0.reshape((1,-1)))  # (nmp2, nt)
+    Delta0i = -Deltai0.T # Delta is anti-symmetric
+    
+    #
+    #
+    ############################################
+    # 
+    # Now for the Effective Hamiltonian
+    #
+    # 0th order:
+    #
+    h0 += Hv0
+    #
+    ###################################################
+    #
+    # 1st order:
+    #
+    # The pure vib. contribution is none.
+    # 
+    # The Crv contribution
+    #
+    for a in range(3):
+        h1[:,:,a] += Crv0[a]
+        
+    # And the Crot contribution
+    # 
+    for a in range(3):
+        for b in range(3):
+            # [iJa, iJb]_+
+            h2[:,:,a,b] += Cr0[a][b]
+            h2[:,:,b,a] += Cr0[a][b]
+    #
+    ##################################################
+    #
+    # 2nd order:
+    #
+    # The first-order Hamiltonian is H' = H1 + Crv ... + Crot ...
+    #
+    # The 2nd order contribution to 
+    # target block <v1|...|v2>
+    #
+    #    1/2 * sum{i} ( Delta[v1,i] - Delta[i,v2] ) * (H')v1,i * (H')i,v2
+    #
+    # Note that Delta is anti-symmetric.
+    #
+    def calcVibBlock1(A0i,Bi0):
+        # Calculate the 2nd-order block for a single first-order term, A
+        #
+        block =  +0.5 * ( (Delta0i * A0i) @ Bi0 )
+        block += -0.5 * ( A0i @ (Deltai0 * Bi0) )
+        return block 
+        
+    def calcVibBlock2(A0i,Ai0,B0i,Bi0):
+        # Calculate the 2nd-order block 
+        # for a pair of first-order Hamiltonian terms, A and B 
+        #
+        # This function is symmetric w.r.t A <--> B 
+        #
+        block =  +0.5 * ( (Delta0i * A0i) @ Bi0 )
+        block += +0.5 * ( (Delta0i * B0i) @ Ai0 )
+        block += -0.5 * ( A0i @ (Deltai0 * Bi0) )
+        block += -0.5 * ( B0i @ (Deltai0 * Ai0) )
+        return block 
+    
+    # 
+    # (i) vib - vib (i.e. pure vibrational MP2)
+    #
+    h0 += calcVibBlock1(Hv_0i, Hv_i0) 
+    #
+    # (ii) vib - rv 
+    for a in range(3):
+        h1[:,:,a] += calcVibBlock2(Hv_0i, Hv_i0, Crv_0i[a], Crv_i0[a])
+    #
+    # (iii) vib - rot 
+    for a in range(3):
+        for b in range(3):
+            h2ab = calcVibBlock2(Hv_0i, Hv_i0, Cr_0i[a][b], Cr_i0[a][b])
+            h2[:,:,a,b] += h2ab 
+            h2[:,:,b,a] += h2ab  # Anti-commutator 
+    #
+    # (iv) rv - rv 
+    for a in range(3):
+        for b in range(3):
+            h2[:,:,a,b] += calcVibBlock1(Crv_0i[a], Crv_i0[b]) 
+    #
+    # (v) rv - rot 
+    for a in range(3):
+        for b in range(3):
+            for c in range(3):
+                #
+                # iJa ... [iJb, iJc]_+ 
+                h3abc = calcVibBlock1(Crv_0i[a], Cr_i0[b][c])
+                h3[:,:,a,b,c] += h3abc 
+                h3[:,:,a,c,b] += h3abc 
+                
+                # 
+                # [iJb, iJc]_+ ... iJa 
+                # 
+                # h3abc = calcVibBlock1(Cr_0i[b][c], Crv_i0[a]) 
+                # This is the negative of previous (because Crv is anti-symmetric
+                # and Cr is symmetric)
+                #
+                h3[:,:,b,c,a] -= h3abc 
+                h3[:,:,c,b,a] -= h3abc 
+    #
+    # (vi) rot - rot 
+    for a in range(3):
+        for b in range(3):
+            for c in range(3):
+                for d in range(3):
+                    #
+                    # (These loops can be simplified further to 
+                    #  take advantage of a/b and c/d symmetry, but
+                    #  I will ignore for now.)
+                    #
+                    #
+                    # [iJa, iJb]_+ ... [iJc,iJd]_+
+                    #
+                    h4abcd = calcVibBlock1(Cr_0i[a][b], Cr_i0[c][d])
+                    
+                    h4[:,:,a,b,c,d] += h4abcd 
+                    h4[:,:,b,a,c,d] += h4abcd 
+                    h4[:,:,a,b,d,c] += h4abcd 
+                    h4[:,:,b,a,d,c] += h4abcd 
+                    
+    # 
+    #
+    ##################################################
+    
+    
+    
+    return h0, h1, h2, h3, h4 
+    #
+    ##################################
+    
+    
+def calc_h4_energies(hrv, Jmax):
+    """
+    Calculate the energies for a quartic 
+    effective Hamiltonian.
+    
+    Parameters
+    ----------
+    hrv : list of ndarray
+        The rotational operator coefficients
+    Jmax : integer
+        The maxmimum value of :math:`J`.
+    
+    Returns
+    -------
+    eJ : list of ndarray
+        The energies for each value of :math:`J`
+    
+    """
+    
+    eJ = [] 
+    
+    for j in range(Jmax + 1):
+        
+        e = calc_h4_energies_J(hrv, j)
+        eJ.append(e)
+        
+    return eJ 
+    
+    
+def calc_h4_energies_J(hrv, J):
+    
+    """
+    Calculate the energies for a quartic 
+    effective Hamiltonian for a given value of :math:`J`.
+    
+    Parameters
+    ----------
+    hrv : list of ndarray
+        The rotational operator coefficients
+    Jmax : integer
+        The value of :math:`J`.
+    
+    Returns
+    -------
+    e: list of ndarray
+        The energies for this value of :math:`J`.
+    
+    """
+    
+    #
+    # Calculate the angular momentum operator matrices 
+    #
+    iJ = nitrogen.angmom.iJbf_wr(J) 
+    
+    nv = hrv[0].shape[0] # The number of vibrational states 
+    nj = 2*J + 1 # The number of rotational functions 
+    
+    htot = np.zeros((nv,nv,nj,nj)) # Each vibrational block 
+    
+    h0,h1,h2,h3,h4 = hrv 
+    
+    for i in range(nv):
+        for j in range(nv):
+            
+            # Calculate each rotational contribution 
+            #
+            # Pure vibrational 
+            htot[i,j] += h0[i,j] * np.eye(nj) 
+            
+            # Linear, quadratic, etc. 
+            for a in range(3):
+                htot[i,j] += h1[i,j,a] * iJ[a] 
+                
+                for b in range(3):
+                    htot[i,j] += h2[i,j,a,b] * (iJ[a] @ iJ[b])
+                    
+                    for c in range(3):
+                        htot[i,j] += h3[i,j,a,b,c] * (iJ[a] @ iJ[b] @ iJ[c])
+                        
+                        for d in range(3):
+                            htot[i,j] += h4[i,j,a,b,c,d] * (iJ[a] @ iJ[b] @ iJ[c] @ iJ[d])
+    
+    # htot has shape (nv, nv, nj, nj)
+    # Swap the middle 2 axes
+    #
+    htot = np.swapaxes(htot, 1, 2) # Now (nv, nj ; nv, nj)
+    # Reshape to final form 
+    htot = np.reshape(htot, (nv*nj, nv*nj)) 
+    #
+    # Calculate energies
+    e,_ = np.linalg.eigh(htot) 
+    
+    return e 
