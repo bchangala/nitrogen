@@ -4,7 +4,7 @@ import nitrogen.dfun as dfun
 import numpy as np
 
 __all__ = ['Valence3','CartesianN','LinearTrans','Polar','Cylindrical',
-           'Spherical','PathTrans','TriatomicRadialPolar']
+           'Spherical','PathTrans','TriatomicRadialPolar','Valence4']
 
 class Valence3(CoordSys):
     """
@@ -152,6 +152,162 @@ class Valence3(CoordSys):
         diag += "   ╔═╪════════════════╪═╗      \n"
         diag += "   ║ │ ┌────────────┐ │ ║      \n"
         diag += "   ║ ╰─┤ 3-atom val ├─╯ ║      \n"
+        diag += "   ║   └────────────┘   ║      \n"
+        diag += "   ╚════════════════════╝      \n"
+        
+        return diag
+    
+class Valence4(CoordSys):
+    """
+    A tetratomic valence coordinate system.
+    
+    The coordinates are :math:`r_1`, :math:`r_2`, :math:`r_3`,
+    :math:`\\theta_1`, :math:`\\theta_2`, and :math:`\\phi`.
+    See Notes for embedding conventions.
+    
+    """
+    
+    def __init__(self, name = 'Tetratomic valence', angle = 'rad', 
+                 embedding_mode = 'C2'):
+        
+        """
+        Create a new Valence3 object.
+        
+        Parameters
+        ----------
+        name : str, optional
+            The coordinate system name. The default is 'Tetratomic valence'.
+        angle : {'rad', 'deg'}, optional
+            The degree units. The default is radians ('rad').
+        embedding_mode : {'C2'}, optional
+            The embedding mode, see Notes.
+            
+        Notes
+        -----
+        
+        
+        """
+        
+        super().__init__(self._csv4_q2x, nQ = 6, 
+                         nX = 12, name = name, 
+                         Qstr = ['r1', 'r2', 'r3', 'theta1', 'theta2', 'phi'],
+                         maxderiv = None, isatomic = True,
+                         zlevel = None)
+        
+        if angle == 'rad' or angle == 'deg':
+            self.angle = angle 
+        else:
+            raise ValueError('angle must be rad or deg')
+            
+        if not embedding_mode in ['C2']:
+            raise ValueError('unexpected embedding_mode')
+            
+        # self.supplementary = supplementary 
+        self.embedding_mode = embedding_mode 
+        
+    def _csv4_q2x(self, Q, deriv = 0, out = None, var = None):
+        """
+        Tetratomic valence coordinate system Q2X instance method.
+        See :meth:`CoordSys.Q2X` for details.
+        
+        Parameters
+        ----------
+        Q : ndarray
+            Shape (self.nQ, ...)
+        deriv, out, var :
+            See :meth:`CoordSys.Q2X` for details.
+        
+        Returns
+        -------
+        out : ndarray
+            Shape (nd, self.nX, ...)
+
+        """
+        
+        natoms = 4 
+        base_shape =  Q.shape[1:]
+        
+        if var is None:
+            var = [0, 1, 2, 3, 4, 5] # Calculate derivatives for all Q
+        
+        nvar = len(var)
+        
+        # nd = adf.nck(deriv + nvar, min(deriv, nvar)) # The number of derivatives
+        nd = dfun.nderiv(deriv, nvar)
+        
+        # Create adf symbols/constants for each coordinate
+        q = [] 
+        for i in range(self.nQ):
+            if i in var: # Derivatives requested for this variable
+                q.append(adf.sym(Q[i], var.index(i), deriv, nvar))
+            else: # Derivatives not requested, treat as constant
+                q.append(adf.const(Q[i], deriv, nvar))
+        # q = r1, r2, r3, theta1, theta2, phi 
+        
+        if out is None:
+            out = np.ndarray( (nd, 3*natoms) + base_shape, dtype = Q.dtype)
+        out.fill(0) # Initialize out to 0
+        
+        # Calculate Cartesian coordinates
+        
+        if self.angle == 'deg':
+            q[3] = (np.pi / 180.0) * q[3] 
+            q[4] = (np.pi / 180.0) * q[4]
+            q[5] = (np.pi / 180.0) * q[5]
+    
+        # q[3-5] now in radians
+      
+        
+        r1,r2,r3,th1,th2,phi = q 
+        if self.embedding_mode == 'C2':
+            
+            #  C2 axis along z (for r1 == r2, and th1 == th2)
+            # 
+            #      1      4         ^ z
+            #     r1\    / r2       |
+            #        2--3           +-->x
+            #         r3
+            #               
+            #np.copyto(out[:,2], (-q[0]).d ) # -r1
+            #np.copyto(out[:,7], (q[1] * adf.sin(q[2])).d ) #  r2 * sin(theta)
+            #np.copyto(out[:,8], (-q[1] * adf.cos(q[2])).d ) # -r2 * cos(theta)
+            
+            np.copyto(out[:,3], -(r3.d)/2) # -r3/2 
+            np.copyto(out[:,6],  (r3.d)/2) # +r3/2 
+            
+            dx1 = r1 * adf.cos(th1)
+            dy1 = r1 * adf.sin(phi/2) * adf.sin(th1)
+            dz1 = r1 * adf.cos(phi/2) * adf.sin(th1) 
+            
+            dx2 = -r2 * adf.cos(th2)
+            dy2 = -r2 * adf.sin(phi/2) * adf.sin(th2)
+            dz2 = r2 * adf.cos(phi/2) * adf.sin(th2) 
+            
+            np.copyto(out[:,0], dx1.d - (r3.d)/2) 
+            np.copyto(out[:,1], dy1.d)
+            np.copyto(out[:,2], dz1.d)
+            
+            np.copyto(out[:,9],  dx2.d + (r3.d)/2)
+            np.copyto(out[:,10], dy2.d)
+            np.copyto(out[:,11], dz2.d)
+            
+        else:
+            raise RuntimeError("Unexpected embedding_mode")
+        
+        return out
+
+    def __repr__(self):
+        return f"Valence4({self.name!r},{self.name!r})"
+    
+    def diagram(self):
+        # using U+250X box and U+219X arrows
+        diag = ""
+        
+        diag += "     │↓              ↑│        \n"
+        diag += "     │Q [3]      [9] X│        \n"
+        diag += "   ╔═╪════════════════╪═╗      \n"
+        diag += "   ║ │ ┌────────────┐ │ ║      \n"
+        diag += "   ║ ╰─┤ 4-atom val ├─╯ ║      \n"
         diag += "   ║   └────────────┘   ║      \n"
         diag += "   ╚════════════════════╝      \n"
         
