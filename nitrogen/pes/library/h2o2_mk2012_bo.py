@@ -9,10 +9,15 @@ I understand to equal the "V+C+R+H" results.
 The surface is implemented in internal coordinates.
 
 X1 ... O1 -- H1 bond length (Angstroms)
+
 X2 ... O2 -- H2 bond length ( "    "  )
+
 X3 ... O1 -- O2 bond length ( "    "  )
+
 X4 ... O2-O1-H1 bond angle (degrees)
+
 X5 ... O1-O2-H2 bond angle ( "   " )
+
 X6 ... dihedral angle ( "   " )
 
 References
