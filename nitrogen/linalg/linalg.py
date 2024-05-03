@@ -338,8 +338,8 @@ def eigstrp(H, k = 5, pad = 10, tol = 1e-10, maxiter = None, v0 = None,
             #
             for j in range(k+pad):
                 c = np.vdot(L[:,j], w)
-                T[j,i] = c 
-                T[i,j] = c 
+                T[j,i] = np.real(c) 
+                T[i,j] = T[j,i]
                 
                 # And orthogonalize
                 w -= c * L[:,j] 
@@ -348,8 +348,8 @@ def eigstrp(H, k = 5, pad = 10, tol = 1e-10, maxiter = None, v0 = None,
             for j in range(k+pad,i+1):
                 c = np.vdot(L[:,j], w) # (nominally zero due to Lanczos recursion)
                 if j < i:
-                    T[j,i] = c 
-                    T[i,j] = c 
+                    T[j,i] = np.real(c) 
+                    T[i,j] = T[j,i]
                     
                 w -= c * L[:,j]
             
