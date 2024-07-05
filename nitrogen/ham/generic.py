@@ -2697,8 +2697,157 @@ class AzimuthalLinearRT(LinearOperator):
         print("------------------------------")
         
         return Lambda, SS1, sre_basis_list 
-        
     
+    def toDirectProduct(self, x):
+        """
+        Transform a vector in the working basis representation to the
+        direct product azimuthal basis .
+        
+        Parameters
+        ----------
+        x : (NH,...) ndarray
+            A set of vectors in the working representationg.
+
+        Returns
+        -------
+        y : (Nsre,) + fbr_shape + (...)
+            The vectors transformed to the direct product azimuthal representation
+
+        """
+        
+        # Transform a vector in the working basis representation 
+        #
+        base_shape = x.shape[1:]
+        
+        x_dp = np.zeros((self.NDP,)+base_shape, dtype = x.dtype)
+        x_dp[self.svm_1d,...] = x 
+        x_dp = np.reshape(x_dp, (self.Nsre,) + self.fbr_shape + base_shape) 
+        
+        return x_dp
+    
+    def toSREV(self, x):
+        """
+        Transform a vector in the working basis representation to the
+        SRE basis and a vibrational factor.
+
+        Parameters
+        ----------
+        x : (NH,...) ndarray
+            A set of vectors in the working representation.
+
+        Returns
+        -------
+        y : (Nsre,NV,...)
+            The vectors transformed to the direct product azimuthal representation
+
+        """
+        
+        # Transform a vector in the working basis representation 
+        #
+        base_shape = x.shape[1:]
+        
+        x_dp = np.zeros((self.NDP,)+base_shape, dtype = x.dtype)
+        x_dp[self.svm_1d,...] = x 
+        x_dp = np.reshape(x_dp, (self.Nsre,self.NV) + base_shape) 
+        
+        return x_dp
+        
+    def calcSREop(self, X, SRE_op):
+        """
+        Calculate the matrix elements of a SRE operator using vectors
+        in the working representation
+        
+        Parameters
+        ----------
+        X : (NH,n) ndarray
+            A set of vectors in the working representation.
+        SRE_op : (Nsre, Nsre) ndarray
+            The matrix representation of an operator in the SRE basis
+        
+        Returns
+        -------
+        M : (n,n) ndarray
+            The matrix elements of the operator.
+        """
+        
+        # First, transform the working vectors in the SRE-V direct product
+        Y = self.toSREV(X)
+        # Y has shape (Nsre, NV, n)
+        
+        #  n = X.shape[1] # The number of vectors 
+        
+        OY = np.tensordot(SRE_op, Y, axes = 1) # shape (Nsre, NV, n)
+        
+        M = np.einsum('abi,abj',np.conj(Y), OY) # Contract 
+        
+        return M 
+    
+    def calcSREpop(self, X):
+        """
+        Calculate the population of each SRE basis function of vectors
+        in the working representation
+
+        Parameters
+        ----------
+        X : (NH,n) ndarray
+            A set of vectors in the working representation.
+
+        Returns
+        -------
+        C : (Nsre,n) ndarray
+            The weights of each vector in the SRE space.
+
+        """
+        
+        # First, transform the working vectors in the SRE-V direct product
+        Y = self.toSREV(X)
+        # Y has shape (Nsre, NV, n)
+        
+        # Square and sum along the vibrational index
+        C = np.sum(np.abs(Y)**2, axis = 1)
+        
+        return C 
+    
+    def calcVibDensity(self, X):
+        """
+        Calculate the vibrational density in mixed DVR/FBR basis
+        set factor
+
+        Parameters
+        ----------
+        X : (NH,n) ndarray
+            A set of vectors in the working representation
+
+        Returns
+        -------
+        None.
+
+        """
+        
+        # First, transform the working representation 
+        # to the direct product azimuthal basis 
+        #
+        x_dp = self.toDirectProduct(X)
+        #
+        # Then, then transform to the mixed DVR/FBR basis
+        #
+        x_fbr = nitrogen.basis.ops.opTensorO(x_dp, self.az_U + [None]) 
+        #
+        # x_fbr: [SRE index, // mixed DVR/FBR indices // , ...]
+        nfactors = len(self.fbr_shape)
+        
+        vib_dens = [] 
+        for i in range(nfactors):
+            axes = np.arange(x_fbr.ndim - 1)
+            axes = axes[axes != i+1] 
+            # Sum over all indices except that of the factor of interest
+            # and the final index
+            #
+            vib_dens.append(np.sum(abs(x_fbr)**2, axis = tuple(axes)))
+        
+        return vib_dens 
+        
+        
     def _matvec(self, x):
         
         Nsre = self.Nsre
