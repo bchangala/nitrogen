@@ -251,9 +251,9 @@ def eigstrp(H, k = 5, pad = 10, tol = 1e-10, maxiter = None, v0 = None,
                 w = H.matvec(L[:,i])
                 for j in range(i+1):
                     Hij = np.vdot(L[:,j], w)
-                    T[i,j] = Hij 
-                    T[j,i] = Hij 
-            #Lnext += w 
+                    T[i,j] = np.real(Hij)  # should always be real
+                    T[j,i] = T[i,j]
+                    
             #Lnext = np.random.rand(len(Lnext))
             
             wT,UT = np.linalg.eigh(T[:(k+pad), :(k+pad)])
