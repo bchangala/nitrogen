@@ -313,6 +313,7 @@ def calcAlpha_anharm(Be, omega, aQ, f3):
     f3 : array_like
         The PES scaled derivative array including up to at least cubic derivatives.
         Only :math:`f_{kkk}` and :math:`f_{kkl}` type derivatives will be used.
+        These derivatives are w.r.t. the :math:`q` dimensionless normal coordinates.
 
     Returns
     -------
@@ -680,6 +681,7 @@ def analyzeAlpha(Xe,omega,Lvib,mass,f3, printing = True):
         The derivative array with up to at least cubic terms.
         Only :math:`f_{kkk}` and :math:`f_{kks}` types terms
         are used.
+        These derivatives are w.r.t. the :math:`q` dimensionless normal coordinates.
     printing : bool, optional
         Print report
         
@@ -746,3 +748,292 @@ def analyzeAlpha(Xe,omega,Lvib,mass,f3, printing = True):
         print("=========================================================")
     
     return alpha 
+
+def deltaijk(omega):
+    """
+    Calculate :math:`\\Delta_{ijk} = (\\omega_i + \\omega_j + \\omega_k)
+    (\\omega_i - \\omega_j - \\omega_k)
+    (-\\omega_i + \\omega_j - \\omega_k)
+    (-\\omega_i - \\omega_j + \\omega_k)`
+
+    Parameters
+    ----------
+    omega : (N,) array_like
+        The harmonic frequencies
+
+    Returns
+    -------
+    delta : (N,N,N) ndarray
+        The value of :math:`\\Delta_{ijk}`.
+
+    """
+    N = len(omega)
+    delta = np.zeros((N,N,N))
+    
+    for i in range(N):
+        for j in range(N):
+            for k in range(N):
+                delta[i,j,k] = (omega[i] + omega[j] + omega[k])*\
+                               (omega[i] - omega[j] - omega[k])*\
+                               (-omega[i] + omega[j] - omega[k])*\
+                               (-omega[i] - omega[j] + omega[k])
+    
+    return delta 
+
+def calc_g0(Be, omega, zeta, f4):
+    """
+    Evalulate the VPT2 value of the :math:`g_0` vibrational energy parameter.
+
+    Parameters
+    ----------
+    Be : (3,) array_like
+        The equilibrium rotational constants in :math:`hc \\times \\mathrm{cm}^{-1}`` units.
+    omega : (N,) array_like
+        The harmonic frequencies in :math:`hc \\times \\mathrm{cm}^{-1}`` units.
+    zeta : (N,N,3) array_like
+            The Coriolis :math:`zeta` constants.
+    f4 : ndarray
+        The derivative array with up to at least semi-diagonal quartic terms.
+        These derivatives are w.r.t. the :math:`q` dimensionless normal coordinates.
+
+    Returns
+    -------
+    g0 : float
+        The value of :math:`g_0`.
+    """
+    
+    N = len(omega) 
+    delta = deltaijk(omega)
+    nck = nitrogen.autodiff.forward.ncktab(N + 4) 
+    
+    g0 = 0.0 
+    #####################
+    # The expression for g_0 is taken from 
+    # Gong et al 2018, Eq. 26
+    #
+    # Note that the phi's in the paper are 
+    # *unscaled* derivatives w.r.t. q
+    #
+    # 1) Quartic contribution
+    for k in range(N):
+        
+        # Get derivative index
+        pos = np.array([0 for p in range(N)])
+        pos[k] += 4 
+        idx = nitrogen.autodiff.forward.idxpos(pos, nck)
+        
+        phi_kkkk = f4[idx] * 24.0  # Scale derivative
+    
+        g0 += phi_kkkk / 64.0 
+    
+    # 2a) One-mode cubic contribution
+    for k in range(N):
+        pos = np.array([0 for p in range(N)])
+        pos[k] += 3 
+        idx = nitrogen.autodiff.forward.idxpos(pos, nck)
+        phi_kkk = f4[idx] * 6.0 
+        
+        g0 += (-7.0 / 576.0) * phi_kkk**2 / omega[k] 
+    
+    # 2b) Two-mode cubic contribution 
+    for k in range(N):
+        for l in range(N):
+            if k == l:
+                continue 
+            
+            pos = np.array([0 for p in range(N)])
+            pos[k] += 2 
+            pos[l] += 1 
+            idx = nitrogen.autodiff.forward.idxpos(pos, nck)
+            phi_kkl = f4[idx] * 2.0  # 3/6 = 1/2 
+            
+            g0 += (3.0 / 64.0) * (omega[l] * phi_kkl**2) / (4*omega[k]**2 - omega[l]**2)
+    #
+    # 2c) Three-mode cubic contribution 
+    for k in range(N):
+        for l in range(k):
+            for m in range(l):
+                # m < l < k 
+                #
+                pos = np.array([0 for p in range(N)])
+                pos[k] += 1
+                pos[l] += 1 
+                pos[m] += 1 
+                idx = nitrogen.autodiff.forward.idxpos(pos, nck)
+                phi_klm = f4[idx] # 6/6 = 1 
+                
+                g0 += (-1.0 / 4.0) * omega[k] * omega[l] * omega[m] * phi_klm**2 / delta[k,l,m]
+    
+    #
+    # 3) Coriolis contribution 
+    for a in range(3):
+        for k in range(N):
+            for l in range(k):
+                # l < k 
+                
+                g0 += (-1/2) * Be[a] * zeta[k,l,a]**2
+        
+    
+    # 
+    # 4) Pseudo-potential contribution 
+    for a in range(3):
+        g0 += (-1/4) * Be[a] 
+                
+    return g0 
+
+def calc_xij(Be, omega, zeta, f4):
+    """
+    Evalulate the VPT2 anharmonicity parameters :math:`x_{ij}`.
+
+    Parameters
+    ----------
+    Be : (3,) array_like
+        The equilibrium rotational constants in :math:`hc \\times \\mathrm{cm}^{-1}`` units.
+    omega : (N,) array_like
+        The harmonic frequencies in :math:`hc \\times \\mathrm{cm}^{-1}`` units.
+    zeta : (N,N,3) array_like
+            The Coriolis :math:`zeta` constants.
+    f4 : ndarray
+        The derivative array with up to at least semi-diagonal quartic terms.
+        These derivatives are w.r.t. the :math:`q` dimensionless normal coordinates.
+
+    Returns
+    -------
+    g0 : float
+        The value of :math:`g_0`.
+    """
+    
+    N = len(omega) 
+    delta = deltaijk(omega)
+    nck = nitrogen.autodiff.forward.ncktab(N + 4) 
+    
+    xij = np.zeros((N,N)) 
+    
+    #####################
+    # The expressions for x_ii and x_i!=j
+    # are taken from Gong et al 2018, Eqs. 27-28
+    #
+    # Note that the phi's in the paper are 
+    # *unscaled* derivatives w.r.t. q
+    #
+    # First, calculate diagonal anharmonicity 
+    # constants, x_ii
+    #
+    for i in range(N):
+        # x_ii
+        
+        # 1) phi_iiii contribution 
+        pos = np.array([0 for p in range(N)])
+        pos[i] += 4 
+        idx = nitrogen.autodiff.forward.idxpos(pos, nck)
+        
+        phi_iiii = f4[idx] * 24.0 
+        
+        xij[i,i] += phi_iiii / 16.0 
+        
+        # 2) phi_iii contribution 
+        pos = np.array([0 for p in range(N)])
+        pos[i] += 3
+        idx = nitrogen.autodiff.forward.idxpos(pos, nck)
+        
+        phi_iii = f4[idx] * 6.0 
+        
+        xij[i,i] += (-5.0 / 48.0) * phi_iii**2 / omega[i] 
+        
+        # 3) phi_iik contribution 
+        for k in range(N):
+            if k == i:
+                continue 
+            # i != k 
+            pos = np.array([0 for p in range(N)])
+            pos[i] += 2 
+            pos[k] += 1 
+            idx = nitrogen.autodiff.forward.idxpos(pos, nck)
+            
+            phi_iik = f4[idx] * 2.0 
+            
+            xij[i,i] += (-1.0 / 16.0) * phi_iik**2 * (8*omega[i]**2 - 3*omega[k]**2) /\
+                ( omega[k] * (4*omega[i]**2 - omega[k]**2))
+    #
+    # Second, calculate the off-diagonal anharmonicity
+    # constants
+    #
+    for i in range(N):
+        for j in range(i):
+            # j < i 
+            
+            pos = np.array([0 for p in range(N)])
+            pos[i] += 2 
+            pos[j] += 2 
+            idx = nitrogen.autodiff.forward.idxpos(pos, nck)
+            phi_iijj = f4[idx] * 4.0  # 6/24 = 1/4
+            
+            pos = np.array([0 for p in range(N)])
+            pos[i] += 2 
+            pos[j] += 1
+            idx = nitrogen.autodiff.forward.idxpos(pos, nck)
+            phi_iij = f4[idx] * 2.0  # 3/6 = 1/2
+            
+            pos = np.array([0 for p in range(N)])
+            pos[i] += 1
+            pos[j] += 2
+            idx = nitrogen.autodiff.forward.idxpos(pos, nck)
+            phi_ijj = f4[idx] * 2.0  # 3/6 = 1/2
+            
+            pos = np.array([0 for p in range(N)])
+            pos[i] += 3
+            idx = nitrogen.autodiff.forward.idxpos(pos, nck)
+            phi_iii= f4[idx] * 6.0
+        
+            pos = np.array([0 for p in range(N)])
+            pos[j] += 3
+            idx = nitrogen.autodiff.forward.idxpos(pos, nck)
+            phi_jjj= f4[idx] * 6.0
+            
+            
+            # Two-mode terms
+            xij[i,j] += phi_iijj / 4.0 
+            
+            xij[i,j] += (-1/2) * phi_iij**2 * omega[i] / (4*omega[i]**2 - omega[j]**2)
+            xij[i,j] += (-1/2) * phi_ijj**2 * omega[j] / (4*omega[j]**2 - omega[i]**2)
+            
+            xij[i,j] += (-1/4) * phi_iii * phi_ijj / omega[i] 
+            xij[i,j] += (-1/4) * phi_jjj * phi_iij / omega[j] # typo in Gong 2018 (??)
+            
+            # three-mode term 
+            for k in range(N):
+                if k == i or k == j:
+                    continue 
+                # k != i != j
+                
+                pos = np.array([0 for p in range(N)])
+                pos[i] += 1
+                pos[j] += 1 
+                pos[k] += 1 
+                idx = nitrogen.autodiff.forward.idxpos(pos, nck)
+                phi_ijk = f4[idx] # 6/6 = 1
+                
+                pos = np.array([0 for p in range(N)])
+                pos[i] += 2
+                pos[k] += 1 
+                idx = nitrogen.autodiff.forward.idxpos(pos, nck)
+                phi_iik = f4[idx] * 2.0 # 3/6 = 1/2 
+                
+                pos = np.array([0 for p in range(N)])
+                pos[j] += 2
+                pos[k] += 1 
+                idx = nitrogen.autodiff.forward.idxpos(pos, nck)
+                phi_jjk = f4[idx] * 2.0 # 3/6 = 1/2 
+                
+                xij[i,j] += phi_ijk**2 * omega[k] * (omega[i]**2 + omega[j]**2 - omega[k]**2) / (2*delta[i,j,k])
+                xij[i,j] += (-1/4) * phi_iik * phi_jjk / omega[k] 
+            
+            # Coriolis term 
+            for a in range(3):
+                xij[i,j] += Be[a] * zeta[i,j,a]**2 * (omega[i]/omega[j] + omega[j]/omega[i])
+                
+        
+            
+            xij[j,i] = xij[i,j] 
+        
+    return xij
