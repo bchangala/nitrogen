@@ -240,4 +240,71 @@ def sample_QUADRATURE(filename, num_sample, use_bohr = False,
     
     X = T @ q + ref_geo.reshape((-1,1)) 
     
-    return X
+def QUADRATURE2xyz(filename, elements, out = "out.xyz", comment = ""):
+    """
+    Generate a .xyz file from a CFOUR QUADRATURE file.
+
+    Parameters
+    ----------
+    filename : str
+        The QUADRATURE file path.
+    elements : array_like
+        The element labels, e.g. ['H','O','H']
+    out : str, optional
+        The output file. The default is "out.xyz".
+    comment : str, optional
+        The .xyz file comment string. The default is None.
+
+    Returns
+    -------
+    None.
+    
+    Notes
+    -----
+    Note that the standard CFOUR QUADRATURE file uses bohr units,
+    and the default .xyz file uses Angstroms units. This unit
+    conversion is performed in this function.
+    
+    """
+    
+    freq, T, ref_geo = read_QUADRATURE(filename, use_bohr = False)
+    
+    N = T.shape[0] // 3  # the number of atoms 
+    Nvib = T.shape[1] # the number of vibrations
+    
+    ref_geo = np.reshape(ref_geo, (N,3) )
+    T = np.reshape(T,(N,3,Nvib))
+    
+    with open(out,"w") as file:
+        
+        # Write reference geometry
+        file.write(f"{N:d}\n") # number of atoms
+        file.write("Reference geometry " + comment + "\n")
+        
+        for j in range(N): # For each atom
+            e = elements[j] # element label
+            x = ref_geo[j,0] # x
+            y = ref_geo[j,1] # y
+            z = ref_geo[j,2] # z
+            
+            file.write(f"{e:s}   {x:.15f} {y:.15f} {z:.15f} \n")
+        
+        # Write each vibration 
+        for i in range(Nvib):
+            file.write(f"{N:d}\n") # number of atoms
+            file.write(f"Vibration {i+1:d} ({freq[i]:.2f} cm^-1) " + comment + "\n")
+            
+            for j in range(N): # For each atom
+                e = elements[j] # element label
+                x = ref_geo[j,0] # x
+                y = ref_geo[j,1] # y
+                z = ref_geo[j,2] # z
+                
+                # Displacements
+                dx = T[j,0,i]
+                dy = T[j,1,i]
+                dz = T[j,2,i]
+                
+                file.write(f"{e:s}   {x:.15f} {y:.15f} {z:.15f} {dx:.15f} {dy:.15f} {dz:.15f} \n")
+    
+    return 
