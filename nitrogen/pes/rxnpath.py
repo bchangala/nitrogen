@@ -1078,12 +1078,13 @@ class InverseMetric(nitrogen.dfun.DFun):
         Notes
         -----
         
-        The `planar_axis` parameter is used to avoide indeterminances in the 
+        The `planar_axis` parameter is used to avoid indeterminancies in the 
         inverse metric at linear geometries. In this case, only strictly 
         planar coordinate systems should be used. The block of the metric tensor
         for the two in-plane axes (which is singular)
         decouples from the rest of the metric and 
         can be ignored for calculating the vibrational block of the inverse metric.
+        
         """
         
         nQ = cs.nQ 
