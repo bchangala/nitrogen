@@ -3620,4 +3620,58 @@ def tensordot(A,B,axes=2):
     return out 
         
         
-       
+        
+def calc_product_table(k, ni):
+    """
+    Calculate the direct product table for derivative 
+    array product.
+
+    Parameters
+    ----------
+    k : integer
+        The maximum derivative order.
+    ni : integer
+        The number of variables.
+
+    Returns
+    -------
+    table : (3,tablesize) ndarray
+        The direct product table
+    
+    Notes
+    -----
+    
+    Z[table[0,i]] <-- X[table[1,i]] * Y[table[2,i]]
+    
+    """
+    
+    nck = ncktab(k+ni)   # Binomial coefficients
+    idx = idxtab(k, ni)  # The derivative indices 
+    
+    nd = idx.shape[0] # The number of derivatives 
+    
+    tZ = [] 
+    tX = [] 
+    tY = [] 
+    
+    for iX in range(nd):
+        kX = sum(idx[iX])
+        
+        for iY in range(nd):
+            kY = sum(idx[iY]) 
+            
+            if kX + kY > k :
+                continue # product order out of range 
+            
+            idxZ = idx[iX] + idx[iY] # The product index 
+            iZ = idxpos(idxZ, nck) 
+            
+            tZ.append(iZ)
+            tX.append(iX)
+            tY.append(iY) 
+    
+    table = np.array([tZ,tX,tY], dtype = np.int32) 
+    return table 
+
+            
+        
