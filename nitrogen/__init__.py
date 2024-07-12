@@ -26,6 +26,7 @@ __version__ = '2.2.dev0'
 
 import numpy as np 
 import matplotlib.pyplot as plt 
+import re 
 
 #################################################################
 # Define some top-level constants
@@ -193,6 +194,50 @@ def podvr(prim_dvr, npo, i, qref, cs, pes_fun, masses, disp = 0):
 
     return dvrs[i].contract(u[:,:npo])
 
+def parseFormula(formula):
+    """
+    Parse a chemical formula into a list of element symbols.
 
+    Parameters
+    ----------
+    formula : str
+        The chemical formula
+
+    Returns
+    -------
+    list
+        The list of element symbols
+        
+    Examples
+    --------
+    >>> n2.parseFormula('H2O')
+    ['H', 'H', 'O']
+    >>> n2.parseFormula('CH3OH')
+    ['C', 'H', 'H', 'H', 'O', 'H']
+    >>> n2.parseFormula('CFBrClI')
+    ['C', 'F', 'Br', 'Cl', 'I']
+    
+    """
+    
+    ###############
+    # The formula is first split by capital letters,
+    # then any numbers specify repetition.
+    
+    symbols = [] 
+    
+    toks = re.findall('[A-Z][^A-Z]*', formula)
+    
+    for t in toks:
+        sym_num = re.split('(\d+)',t)
+        
+        sym = sym_num[0] 
+        if len(sym_num) > 1 : 
+            num = int(sym_num[1])
+        else:
+            num = 1 
+            
+        symbols = symbols + [sym]*num 
+    
+    return symbols 
 
     
