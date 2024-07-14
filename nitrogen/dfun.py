@@ -624,10 +624,12 @@ class CompositeDFun(DFun):
         The outer function.
     B : DFun
         The inner function.
+    force_general : bool
+        If True, overrides hand-coded low-order expressions.
     
     """
     
-    def __init__(self, A, B):
+    def __init__(self, A, B, force_general = False):
         """
         Composite function A(B(x))
 
@@ -637,6 +639,9 @@ class CompositeDFun(DFun):
             The outer function.
         B : DFun
             The inner function.
+        force_general : bool, optional
+            If True, force evaluation using a general Taylor series expansion,
+            overriding hand-coded expressions for small `deriv`.
 
         """
         if not isinstance(A, DFun) or not isinstance(B, DFun):
@@ -653,18 +658,13 @@ class CompositeDFun(DFun):
         super().__init__(self._hx, A.nf, B.nx, maxderiv, zlevel)
     
         self.A = A 
-        self.B = B 
+        self.B = B
+        self.force_general = force_general 
         
     # Define the derivative array evaluation
     # function for the composition H(x) = A(B(x))
     #
-    # Instead of using the Faa di Bruno formula
-    # for the derivatives of a composite, we 
-    # will simply compute the Taylor series of the
-    # composite up to the requested deriv level.
-    # It can be shown that the deriv's of the 
-    # Taylor series are correct up to the deriv level
-    #
+
     def _hx(self, X, deriv = 0, out = None, var = None):
         
         A = self.A
@@ -687,9 +687,7 @@ class CompositeDFun(DFun):
         else:
             azlevel = A.zlevel
             
-        # Calculate the derivatives of H w.r.t x
-        # via a Taylor series
-        #
+        # 
         # H has shape (ndh, A.nf, ...)
         base_shape = X.shape[1:]
         ndh = b.shape[0]
@@ -698,68 +696,588 @@ class CompositeDFun(DFun):
             out = np.ndarray((ndh, nfh) + base_shape, dtype = a.dtype)
         out.fill(0)
         #
-        # We will need the powers of each of the
-        # B.nf intermediate parameters
-        bpow = np.ndarray((B.nf,deriv+1), dtype = adf.adarray)
         
-        one = np.ones(base_shape, dtype = out.dtype)
-        # Determine the zlevel of the derivative
-        # arrays of B
-        if B.zlevel is None:
-            bzlevel = deriv 
-        else:
-            bzlevel = B.zlevel
-        # Zero the value of the B_j derivative arrays
-        b[0:1].fill(0)
-        # If the b's had a zlevel of 0 (constant)
-        # they now have a zlevel of -1 (identically 0)
-        if bzlevel == 0:
-            bzlevel = -1
-            
-        # Calculate the powers of the shifted B_j's
-        for j in range(B.nf):
-            for betaj in range(deriv+1):
-                
-                if betaj == 0: # B_j ** 0
-                    bpow[j,betaj] = adf.const(one, deriv, nvar)
-                elif betaj == 1: # B_j ** 1
-                    bpow[j,betaj] = adf.array(b[:,j], deriv, nvar,
-                                              copyd = False, zlevel = bzlevel) 
-                else:
-                    bpow[j,betaj] = bpow[j, 1] * bpow[j, betaj-1]
-        # bpow now contains adarrays for all required
-        # powers of all intermediate arguments B_j
+        # Summary of derivative array shapes
         #
-        Aidxtab = adf.idxtab(deriv, B.nf)
-        m,_ = Aidxtab.shape
+        # b : (ndb = ndb, B.nf = A.nx, ...)
+        # a : (nda      , A.nf = H.nf, ...)
+        # h : (ndh = ndb, "  "  "  " , ...)
+        #
         
-        # Initialize the H adf object
-        H = np.ndarray((A.nf,) , dtype = adf.adarray)
-        for i in range(A.nf):
-            H[i] = adf.const(np.zeros(base_shape, dtype = out.dtype), deriv, nvar)
-        adfone = adf.const(one, deriv, nvar)
-        for k in range(m): # For each derivative of A
-            Aidx = Aidxtab[k]
-            if np.sum(Aidx) > azlevel:
-                # This A derivative and all
-                # remaining will be zero
-                break
-            temp = adfone
-            for j in range(B.nf):
-                temp = temp * bpow[j, Aidx[j]]
-            for i in range(A.nf):
-                H[i] = H[i] + (temp * a[k,i])
-                # Note the order of temp*a[k,i]
-                # The other way around will use
-                # a[k,i] 's __mul__. If a[k,i] is
-                # still an ndarray, then it
-                # will just broadcast temp
-                # to an ndarray -- not what we want
-                # 
+        if deriv <= 4 and not self.force_general:
+            # 
+            # Use evaluated expressions for low-order
+            # derivatives. These will be much more efficient
+            # than the Taylor expansion approach.
+            #
+            h = out # reference alias for output 
+            # h = out is already initialized to 0
+            #
+            #
+            if deriv >= 0:
+                # Value 
+                # h[0] = a[0] 
+                np.copyto(h[0], a[0])
             
-        # Copy H data to out
-        for i in range(A.nf):
-            np.copyto(out[:,i], H[i].d)
+            if deriv >= 1: 
+                # First derivatives
+                # Simple multi-variate chain rule 
+                #
+                # dH / dx_k = (dA/db_j) (dB_j/dx_k)
+                #
+                for k in range(nvar):
+                    #
+                    # Derivative of h w.r.t input k
+                    #
+                    for j in range(A.nx): 
+                        #
+                        # Contribution from a_j
+                        #
+                        h[1+k] += a[1+j] * b[1+k,j]
+                        # broadcast over H.nf outputs and base shape
+            
+            if deriv >= 2: 
+                #
+                # Second derivatives
+                #
+                cnt = 1 + nvar  # The starting index of the second deriatives
+                
+                for i in range(nvar):
+                    for j in range(i,nvar):
+                        # Compute h_{ij} scaled derivative
+                        
+                        # contribution from first derivatives of A 
+                        # 2 = 2
+                        for k in range(A.nx):
+                            h[cnt] += a[1+k] * b[cnt,k]
+                            # broadcast over H.nf outputs 
+                            # broadcast over nh values and base shape
+                        
+                        
+                        # contribution from second derivatives of A 
+                        # 2 = 1 + 1
+                        
+                        cnt2 = 1 + A.nx
+                        for k in range(A.nx):
+                            for l in range(k,A.nx):
+                                h[cnt] += a[cnt2] *\
+                                    (b[1+i,k] * b[1+j,l] +\
+                                     b[1+i,l] * b[1+j,k]) / (1 + +(i==j))
+                                
+                                cnt2 += 1
+                
+                        cnt += 1
+                        
+            if deriv >= 3:
+                #
+                # Third derivatives 
+                #
+                
+                
+                # Calculate a look-up table for the 
+                # position of (i,j) second deriatives 
+                #
+                idx2 = np.zeros((nvar,nvar),dtype = np.uint32)
+                cntidx = 1 + nvar 
+                for i in range(nvar):
+                    for j in range(i,nvar):
+                        idx2[i,j] = cntidx  
+                        idx2[j,i] = idx2[i,j] 
+                        cntidx += 1
+                
+                
+                # The starting index of the third derivatives 
+                # ( = the total number of 0,1,2 derivatives)
+                cnt = ((nvar+1) * (nvar+2))//2
+                
+                for i in range(nvar):
+                    for j in range(i,nvar):
+                        for k in range(j,nvar):
+                            #
+                            # Scaled derivative [i <= j <= k]
+                            #
+
+                                
+                            
+                            # Contribution from first derivatives
+                            # of A 
+                            # 3 = 3 
+                            #
+                            for m in range(A.nx):
+                                h[cnt] += a[1+m] * b[cnt,m] 
+                            
+                            # Contribution from second derivatives
+                            # of A 
+                            #
+                            # 3 = 1 + 2  
+                            #
+                            # 
+                            if i == j and j == k:
+                                scale1 = 3
+                                scale2 = 1 
+                            elif i == j or j == k:
+                                scale1 = 1 
+                                scale2 = 0
+                            else:
+                                scale1 = 1 
+                                scale2 = 1 
+                                
+                            cntA = 1 + A.nx
+                            for m in range(A.nx):
+                                for n in range(m,A.nx):
+                                    
+                                    h[cnt] += a[cntA] * (
+                                        b[1+i,m] * b[idx2[j,k],n] + \
+                                        scale2 * b[1+j,m] * b[idx2[i,k],n] + \
+                                        b[1+k,m] * b[idx2[i,j],n] + \
+                                    
+                                        b[1+i,n] * b[idx2[j,k],m] + \
+                                        scale2 * b[1+j,n] * b[idx2[i,k],m] + \
+                                        b[1+k,n] * b[idx2[i,j],m] )/scale1
+                                    
+                                    cntA += 1 
+                            
+                            
+                            # Contribution from third derivatives of 
+                            # A 
+                            # 3 = 1 + 1 + 1
+                            #
+                            if i == j and j == k:
+                                scale = 6 
+                            elif i == j or j == k:
+                                scale = 2 
+                            else:
+                                scale = 1
+                                
+                            cntA = ((1+A.nx)*(2+A.nx))//2 # The starting index of third
+                            for m in range(A.nx):
+                                for n in range(m,A.nx):
+                                    for o in range(n,A.nx):
+                                        
+                                        h[cnt] += a[cntA] * (
+                                            b[1+i,m] * b[1+j,n] * b[1+k,o] + \
+                                            b[1+i,m] * b[1+j,o] * b[1+k,n] + \
+                                            b[1+i,n] * b[1+j,m] * b[1+k,o] + \
+                                            b[1+i,n] * b[1+j,o] * b[1+k,m] + \
+                                            b[1+i,o] * b[1+j,m] * b[1+k,n] + \
+                                            b[1+i,o] * b[1+j,n] * b[1+k,m])/scale 
+                                        
+                                        cntA += 1 
+                            
+                            cnt += 1 
+                                        
+            if deriv >= 4: 
+                #
+                # Quartic derivatives 
+                #
+                
+                # Evaluate the starting index of quartic derivatives
+                # ( = the total 0, 1, 2, 3 derivatives)
+                #
+                
+                idx3 = np.zeros((nvar,nvar,nvar),dtype = np.uint32)
+                
+                cntidx = ( (nvar+1) * (nvar+2) ) // 2
+                for i in range(nvar):
+                    for j in range(i,nvar):
+                        for k in range(j,nvar):
+                            idx3[i,j,k] = cntidx 
+                            idx3[i,k,j] = cntidx
+                            idx3[j,i,k] = cntidx 
+                            idx3[j,k,i] = cntidx 
+                            idx3[k,i,j] = cntidx 
+                            idx3[k,j,i] = cntidx 
+                            cntidx += 1
+                
+                cnt = ( (nvar+1) * (nvar+2) * (nvar+3) ) // 6 
+                
+                for i in range(nvar):
+                    for j in range(i,nvar):
+                        for k in range(j,nvar):
+                            for l in range(k,nvar):
+                                
+                                #
+                                # Scaled derivative [i <= j <= k <= l]
+                                #
+                                # Contribution from first derivatives
+                                # of A 
+                                # 4 = 4 
+                                #
+                                for m in range(A.nx):
+                                    h[cnt] += a[1+m] * b[cnt,m] 
+                                
+                                # Contribution from second derivatives
+                                # of A 
+                                # 4 = 1 + 3
+                                #   = 2 + 2
+                                
+                                cntA = 1 + A.nx 
+                                for m in range(A.nx):
+                                    for o in range(m,A.nx):
+                                        #
+                                        #
+                                        # For each case, 
+                                        # I put the 4 = 1 + 3 combinations first,
+                                        # then the 4 = 2 + 2 combinations
+                                        #
+                                        #
+                                        if i == j and j == k and k == l:
+                                            # AAAA
+                                            h[cnt] += a[cntA] * (
+                                                b[1+i,m] * b[idx3[j,k,l],o] + \
+                                                b[1+i,o] * b[idx3[j,k,l],m])
+                                            
+                                            h[cnt] += a[cntA] * (
+                                                b[idx2[i,j],m] * b[idx2[k,l],o])
+                                            
+                                        elif (i==j and j==k):
+                                            # AAAB
+                                            h[cnt] += a[cntA] * (
+                                                b[1+i,m] * b[idx3[j,k,l],o] + \
+                                                b[1+l,m] * b[idx3[j,k,i],o] + \
+                                                b[1+i,o] * b[idx3[j,k,l],m] + \
+                                                b[1+l,o] * b[idx3[j,k,i],m])
+                                                
+                                            h[cnt] += a[cntA] * (
+                                                b[idx2[i,j],m] * b[idx2[k,l],o] + \
+                                                b[idx2[k,l],m] * b[idx2[i,j],o])
+                                            
+                                        elif (j==k and k==l):
+                                            # ABBB
+                                            h[cnt] += a[cntA] * (
+                                                b[1+i,m] * b[idx3[j,k,l],o] + \
+                                                b[1+l,m] * b[idx3[j,k,i],o] + \
+                                                b[1+i,o] * b[idx3[j,k,l],m] + \
+                                                b[1+l,o] * b[idx3[j,k,i],m])
+                                            
+                                            h[cnt] += a[cntA] * (
+                                                b[idx2[i,j],m] * b[idx2[k,l],o] + \
+                                                b[idx2[k,l],m] * b[idx2[i,j],o])
+                                                
+                                        elif i==j and k==l:
+                                            # AABB
+                                            h[cnt] += a[cntA] * (
+                                                b[1+i,m] * b[idx3[j,k,l],o] + \
+                                                b[1+l,m] * b[idx3[j,k,i],o] + \
+                                                b[1+i,o] * b[idx3[j,k,l],m] + \
+                                                b[1+l,o] * b[idx3[j,k,i],m])
+                                            
+                                            h[cnt] += a[cntA] * (
+                                                b[idx2[i,j],m] * b[idx2[k,l],o] + \
+                                                b[idx2[k,l],m] * b[idx2[i,j],o] + \
+                                                b[idx2[i,k],m] * b[idx2[j,l],o])
+                                                
+                                        elif i==j: 
+                                            # AABC
+                                            h[cnt] += a[cntA] * (
+                                                b[1+i,m] * b[idx3[j,k,l],o] + \
+                                                b[1+k,m] * b[idx3[j,i,l],o] + \
+                                                b[1+l,m] * b[idx3[j,k,i],o] + \
+                                                b[1+i,o] * b[idx3[j,k,l],m] + \
+                                                b[1+k,o] * b[idx3[j,i,l],m] + \
+                                                b[1+l,o] * b[idx3[j,k,i],m])
+                                            
+                                            h[cnt] += a[cntA] * (
+                                                b[idx2[i,j],m] * b[idx2[k,l],o] + \
+                                                b[idx2[k,l],m] * b[idx2[i,j],o] + \
+                                                b[idx2[i,k],m] * b[idx2[j,l],o] + \
+                                                b[idx2[i,l],m] * b[idx2[j,k],o])
+                                                    
+                                        elif j==k:
+                                            # ABBC
+                                            h[cnt] += a[cntA] * (
+                                                b[1+i,m] * b[idx3[j,k,l],o] + \
+                                                b[1+k,m] * b[idx3[j,i,l],o] + \
+                                                b[1+l,m] * b[idx3[j,k,i],o] + \
+                                                b[1+i,o] * b[idx3[j,k,l],m] + \
+                                                b[1+k,o] * b[idx3[j,i,l],m] + \
+                                                b[1+l,o] * b[idx3[j,k,i],m])
+                                            
+                                            h[cnt] += a[cntA] * (
+                                                b[idx2[i,j],m] * b[idx2[k,l],o] + \
+                                                b[idx2[k,l],m] * b[idx2[i,j],o] + \
+                                                b[idx2[j,k],m] * b[idx2[i,l],o] + \
+                                                b[idx2[i,l],m] * b[idx2[j,k],o])
+                                            
+                                        elif k==l:
+                                            # ABCC
+                                            h[cnt] += a[cntA] * (
+                                                b[1+i,m] * b[idx3[j,k,l],o] + \
+                                                b[1+j,m] * b[idx3[k,i,l],o] + \
+                                                b[1+l,m] * b[idx3[j,k,i],o] + \
+                                                b[1+i,o] * b[idx3[j,k,l],m] + \
+                                                b[1+j,o] * b[idx3[k,i,l],m] + \
+                                                b[1+l,o] * b[idx3[j,k,i],m])
+                                            
+                                            h[cnt] += a[cntA] * (
+                                                b[idx2[i,j],m] * b[idx2[k,l],o] + \
+                                                b[idx2[k,l],m] * b[idx2[i,j],o] + \
+                                                b[idx2[j,k],m] * b[idx2[i,l],o] + \
+                                                b[idx2[i,l],m] * b[idx2[j,k],o])
+                                            
+                                        else:
+                                            # ABCD
+                                            h[cnt] += a[cntA] * (
+                                                b[1+i,m] * b[idx3[j,k,l],o] + \
+                                                b[1+j,m] * b[idx3[k,i,l],o] + \
+                                                b[1+k,m] * b[idx3[j,i,l],o] + \
+                                                b[1+l,m] * b[idx3[j,k,i],o] + \
+                                                b[1+i,o] * b[idx3[j,k,l],m] + \
+                                                b[1+j,o] * b[idx3[k,i,l],m] + \
+                                                b[1+k,o] * b[idx3[j,i,l],m] + \
+                                                b[1+l,o] * b[idx3[j,k,i],m])
+                                            
+                                            h[cnt] += a[cntA] * (
+                                                b[idx2[i,j],m] * b[idx2[k,l],o] + \
+                                                b[idx2[k,l],m] * b[idx2[i,j],o] + \
+                                                b[idx2[j,k],m] * b[idx2[i,l],o] + \
+                                                b[idx2[j,l],m] * b[idx2[i,k],o] + \
+                                                b[idx2[i,l],m] * b[idx2[j,k],o] + \
+                                                b[idx2[i,k],m] * b[idx2[j,l],o])
+                                        
+                                        cntA += 1 
+                                        
+                                
+                                
+                                # Contribution from third derivatives
+                                # of A 
+                                # 4 = 1 + 1 + 2
+                                #
+                                cntA = ((1+A.nx)*(2+A.nx)) // 2
+                                for m in range(A.nx):
+                                    for n in range(m,A.nx):
+                                        for o in range(n,A.nx):
+                                            
+                                            for MNO in [[m,n,o],[n,o,m],[o,m,n]]:
+                                                M,N,O = MNO
+                                            
+                                                # !!! DEBUG. THERE IS AN ERROR HERE
+                                                if i == j and j == k and k == l:
+                                                    # AAAA
+                                                    h[cnt] += a[cntA] * (
+                                                        b[1+i,M] * b[1+j,N] * b[idx2[k,l],O])
+                                                    
+                                                elif (i==j and j==k):
+                                                    # AAAB
+                                                    h[cnt] += a[cntA] * (
+                                                        b[1+i,M] * b[1+j,N] * b[idx2[k,l],O] + \
+                                                        b[1+i,M] * b[1+l,N] * b[idx2[j,k],O] + \
+                                                        b[1+l,M] * b[1+i,N] * b[idx2[j,k],O])
+                                                    
+                                                elif (j==k and k==l):
+                                                    # ABBB
+                                                    h[cnt] += a[cntA] * (
+                                                        b[1+i,M] * b[1+j,N] * b[idx2[k,l],O] + \
+                                                        b[1+j,M] * b[1+i,N] * b[idx2[k,l],O] + \
+                                                        b[1+l,M] * b[1+j,N] * b[idx2[i,k],O])
+      
+                                                elif i==j and k==l:
+                                                    # AABB
+                                                    h[cnt] += a[cntA] * (
+                                                        b[1+i,M] * b[1+j,N] * b[idx2[k,l],O] + \
+                                                        b[1+k,M] * b[1+l,N] * b[idx2[i,j],O] + \
+                                                        b[1+k,M] * b[1+i,N] * b[idx2[j,l],O] + \
+                                                        b[1+i,M] * b[1+k,N] * b[idx2[j,l],O])
+                                                        
+                                                elif i==j: 
+                                                    # AABC
+                                                    h[cnt] += a[cntA] * (
+                                                        b[1+i,M] * b[1+j,N] * b[idx2[k,l],O] + \
+                                                        b[1+k,M] * b[1+i,N] * b[idx2[j,l],O] + \
+                                                        b[1+j,M] * b[1+k,N] * b[idx2[i,l],O] + \
+                                                        b[1+l,M] * b[1+i,N] * b[idx2[j,k],O] + \
+                                                        b[1+j,M] * b[1+l,N] * b[idx2[i,k],O] + \
+                                                        b[1+l,M] * b[1+k,N] * b[idx2[i,j],O] + \
+                                                        b[1+k,M] * b[1+l,N] * b[idx2[i,j],O])
+                                                            
+                                                elif j==k:
+                                                    # ABBC
+                                                    h[cnt] += a[cntA] * (
+                                                        b[1+k,M] * b[1+j,N] * b[idx2[i,l],O] + \
+                                                        b[1+i,M] * b[1+j,N] * b[idx2[k,l],O] + \
+                                                        b[1+k,M] * b[1+i,N] * b[idx2[j,l],O] + \
+                                                        b[1+l,M] * b[1+j,N] * b[idx2[i,k],O] + \
+                                                        b[1+k,M] * b[1+l,N] * b[idx2[i,j],O] + \
+                                                        b[1+i,M] * b[1+l,N] * b[idx2[j,k],O] + \
+                                                        b[1+l,M] * b[1+i,N] * b[idx2[j,k],O])
+                                                    
+                                                elif k==l:
+                                                    # ABCC
+                                                    h[cnt] += a[cntA] * (
+                                                        b[1+k,M] * b[1+l,N] * b[idx2[i,j],O] + \
+                                                        b[1+i,M] * b[1+k,N] * b[idx2[j,l],O] + \
+                                                        b[1+k,M] * b[1+i,N] * b[idx2[j,l],O] + \
+                                                        b[1+j,M] * b[1+k,N] * b[idx2[i,l],O] + \
+                                                        b[1+k,M] * b[1+j,N] * b[idx2[i,l],O] + \
+                                                        b[1+i,M] * b[1+j,N] * b[idx2[k,l],O] + \
+                                                        b[1+j,M] * b[1+i,N] * b[idx2[k,l],O])
+                                                    
+                                                else:
+                                                    # ABCD
+                                                    h[cnt] += a[cntA] * (
+                                                        b[1+i,M] * b[1+j,N] * b[idx2[k,l],O] + \
+                                                        b[1+i,M] * b[1+k,N] * b[idx2[j,l],O] + \
+                                                        b[1+i,M] * b[1+l,N] * b[idx2[j,k],O] + \
+                                                        b[1+j,M] * b[1+i,N] * b[idx2[k,l],O] + \
+                                                        b[1+j,M] * b[1+k,N] * b[idx2[i,l],O] + \
+                                                        b[1+j,M] * b[1+l,N] * b[idx2[i,k],O] + \
+                                                        b[1+k,M] * b[1+i,N] * b[idx2[j,l],O] + \
+                                                        b[1+k,M] * b[1+j,N] * b[idx2[i,l],O] + \
+                                                        b[1+k,M] * b[1+l,N] * b[idx2[i,j],O] + \
+                                                        b[1+l,M] * b[1+i,N] * b[idx2[j,k],O] + \
+                                                        b[1+l,M] * b[1+j,N] * b[idx2[i,k],O] + \
+                                                        b[1+l,M] * b[1+k,N] * b[idx2[i,j],O])
+                                            
+                                            cntA += 1 
+                                
+                                
+                                # Contribution from fourth derivatives
+                                # of A 
+                                # 4 = 1 + 1 + 1 + 1
+                                #
+                                if i == j and j == k and k == l:
+                                    scale = 24  # AAAA
+                                elif (i==j and j==k) or (j==k and k==l):
+                                    scale = 6   # AAAB, ABBB
+                                elif i==j and k==l:
+                                    scale = 4   # AABB
+                                elif i==j or j==k or k==l:
+                                    scale = 2   # AABC, ABBC, ABCC
+                                else:
+                                    scale = 1   # ABCD
+                                
+                                cntA = ((1+A.nx)*(2+A.nx)*(3+A.nx)) // 6
+                                for m in range(A.nx):
+                                    for n in range(m,A.nx):
+                                        for o in range(n,A.nx):
+                                            for p in range(o,A.nx):
+                                                
+                                                h[cnt] += a[cntA] * (
+                                                    b[1+i,m] * b[1+j,n] * b[1+k,o] * b[1+l,p] + \
+                                                    b[1+i,m] * b[1+j,n] * b[1+k,p] * b[1+l,o] + \
+                                                    b[1+i,m] * b[1+j,o] * b[1+k,n] * b[1+l,p] + \
+                                                    b[1+i,m] * b[1+j,o] * b[1+k,p] * b[1+l,n] + \
+                                                    b[1+i,m] * b[1+j,p] * b[1+k,n] * b[1+l,o] + \
+                                                    b[1+i,m] * b[1+j,p] * b[1+k,o] * b[1+l,n] + \
+                                                    b[1+i,n] * b[1+j,m] * b[1+k,o] * b[1+l,p] + \
+                                                    b[1+i,n] * b[1+j,m] * b[1+k,p] * b[1+l,o] + \
+                                                    b[1+i,n] * b[1+j,o] * b[1+k,m] * b[1+l,p] + \
+                                                    b[1+i,n] * b[1+j,o] * b[1+k,p] * b[1+l,m] + \
+                                                    b[1+i,n] * b[1+j,p] * b[1+k,m] * b[1+l,o] + \
+                                                    b[1+i,n] * b[1+j,p] * b[1+k,o] * b[1+l,m] + \
+                                                    b[1+i,o] * b[1+j,m] * b[1+k,n] * b[1+l,p] + \
+                                                    b[1+i,o] * b[1+j,m] * b[1+k,p] * b[1+l,n] + \
+                                                    b[1+i,o] * b[1+j,n] * b[1+k,m] * b[1+l,p] + \
+                                                    b[1+i,o] * b[1+j,n] * b[1+k,p] * b[1+l,m] + \
+                                                    b[1+i,o] * b[1+j,p] * b[1+k,m] * b[1+l,n] + \
+                                                    b[1+i,o] * b[1+j,p] * b[1+k,n] * b[1+l,m] + \
+                                                    b[1+i,p] * b[1+j,m] * b[1+k,n] * b[1+l,o] + \
+                                                    b[1+i,p] * b[1+j,m] * b[1+k,o] * b[1+l,n] + \
+                                                    b[1+i,p] * b[1+j,n] * b[1+k,m] * b[1+l,o] + \
+                                                    b[1+i,p] * b[1+j,n] * b[1+k,o] * b[1+l,m] + \
+                                                    b[1+i,p] * b[1+j,o] * b[1+k,m] * b[1+l,n] + \
+                                                    b[1+i,p] * b[1+j,o] * b[1+k,n] * b[1+l,m]) / scale 
+                                                
+                                                cntA += 1 
+                                
+                                
+                                
+                                cnt += 1 
+                                
+                
+                
+            #
+            ###########################################
+
+        else:
+            #
+            # Use general algorithm
+            #
+            # Instead of using the Faa di Bruno formula
+            # for the derivatives of a composite, we 
+            # will simply compute the Taylor series of the
+            # composite up to the requested deriv level.
+            # It can be shown that the deriv's of the 
+            # Taylor series are correct up to the deriv level
+            #
+            #
+            # We will need the powers of each of the
+            # B.nf intermediate parameters
+            bpow = np.ndarray((B.nf,deriv+1), dtype = adf.adarray)
+            
+            one = np.ones(base_shape, dtype = out.dtype)
+            # Determine the zlevel of the derivative
+            # arrays of B
+            if B.zlevel is None:
+                bzlevel = deriv 
+            else:
+                bzlevel = B.zlevel
+            # Zero the value of the B_j derivative arrays
+            b[0:1].fill(0)
+            # If the b's had a zlevel of 0 (constant)
+            # they now have a zlevel of -1 (identically 0)
+            if bzlevel == 0:
+                bzlevel = -1
+                
+            # Calculate the powers of the shifted B_j's
+            for j in range(B.nf):
+                for betaj in range(deriv+1):
+                    
+                    if betaj == 0: # B_j ** 0
+                        bpow[j,betaj] = adf.const(one, deriv, nvar)
+                    elif betaj == 1: # B_j ** 1
+                        bpow[j,betaj] = adf.array(b[:,j], deriv, nvar,
+                                                  copyd = False, zlevel = bzlevel) 
+                    else:
+                        bpow[j,betaj] = bpow[j, 1] * bpow[j, betaj-1]
+            # bpow now contains adarrays for all required
+            # powers of all intermediate arguments B_j
+            #
+            Aidxtab = adf.idxtab(deriv, B.nf)
+            m,_ = Aidxtab.shape
+            
+            # Initialize the H adf object
+            H = np.ndarray((A.nf,) , dtype = adf.adarray)
+            for i in range(A.nf):
+                H[i] = adf.const(np.zeros(base_shape, dtype = out.dtype), deriv, nvar)
+            adfone = adf.const(one, deriv, nvar)
+            for k in range(m): # For each derivative of A
+                Aidx = Aidxtab[k]
+                if np.sum(Aidx) > azlevel:
+                    # This A derivative and all
+                    # remaining will be zero
+                    break
+                temp = adfone
+                for j in range(B.nf):
+                    temp = temp * bpow[j, Aidx[j]]
+                    #
+                    # This step is very slow.
+                    # Here, I am explicitly re-computing the 
+                    # monomial product of every B.nf factor,
+                    # which makes no use of recursion.
+                    #
+                    # By navigating the derivative array of A 
+                    # in a certain way, the monomials could be
+                    # accessed such that only a single multiplication
+                    # is needed each time. Only a list of monomials
+                    # equal to the derivative order would need
+                    # to be kept in hand, so the memory cost of 
+                    # this approach is small.
+                    
+                for i in range(A.nf):
+                    H[i] = H[i] + (temp * a[k,i])
+                    
+                    # Note the order of temp*a[k,i]
+                    # The other way around will use
+                    # a[k,i] 's __mul__. If a[k,i] is
+                    # still an ndarray, then it
+                    # will just broadcast temp
+                    # to an ndarray -- not what we want
+                    # 
+                
+            # Copy H data to out
+            for i in range(A.nf):
+                np.copyto(out[:,i], H[i].d)
         
         return out
     
