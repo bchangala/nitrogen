@@ -780,7 +780,7 @@ def deltaijk(omega):
     
     return delta 
 
-def calc_g0(Be, omega, zeta, f4):
+def calc_g0(Be, omega, zeta, f4, printlevel = 0):
     """
     Evalulate the VPT2 value of the :math:`g_0` vibrational energy parameter.
 
@@ -795,7 +795,9 @@ def calc_g0(Be, omega, zeta, f4):
     f4 : ndarray
         The derivative array with up to at least semi-diagonal quartic terms.
         These derivatives are w.r.t. the :math:`q` dimensionless normal coordinates.
-
+    printlevel : integer, optional
+        Print level. The default is 0.
+        
     Returns
     -------
     g0 : float
@@ -815,6 +817,7 @@ def calc_g0(Be, omega, zeta, f4):
     # *unscaled* derivatives w.r.t. q
     #
     # 1) Quartic contribution
+    gquartic = 0.0 
     for k in range(N):
         
         # Get derivative index
@@ -824,16 +827,18 @@ def calc_g0(Be, omega, zeta, f4):
         
         phi_kkkk = f4[idx] * 24.0  # Scale derivative
     
-        g0 += phi_kkkk / 64.0 
+        gquartic += phi_kkkk / 64.0 
+    g0 += gquartic 
     
     # 2a) One-mode cubic contribution
+    gcubic = 0.0 
     for k in range(N):
         pos = np.array([0 for p in range(N)])
         pos[k] += 3 
         idx = nitrogen.autodiff.forward.idxpos(pos, nck)
         phi_kkk = f4[idx] * 6.0 
         
-        g0 += (-7.0 / 576.0) * phi_kkk**2 / omega[k] 
+        gcubic += (-7.0 / 576.0) * phi_kkk**2 / omega[k] 
     
     # 2b) Two-mode cubic contribution 
     for k in range(N):
@@ -847,7 +852,7 @@ def calc_g0(Be, omega, zeta, f4):
             idx = nitrogen.autodiff.forward.idxpos(pos, nck)
             phi_kkl = f4[idx] * 2.0  # 3/6 = 1/2 
             
-            g0 += (3.0 / 64.0) * (omega[l] * phi_kkl**2) / (4*omega[k]**2 - omega[l]**2)
+            gcubic += (3.0 / 64.0) * (omega[l] * phi_kkl**2) / (4*omega[k]**2 - omega[l]**2)
     #
     # 2c) Three-mode cubic contribution 
     for k in range(N):
@@ -862,23 +867,42 @@ def calc_g0(Be, omega, zeta, f4):
                 idx = nitrogen.autodiff.forward.idxpos(pos, nck)
                 phi_klm = f4[idx] # 6/6 = 1 
                 
-                g0 += (-1.0 / 4.0) * omega[k] * omega[l] * omega[m] * phi_klm**2 / delta[k,l,m]
+                gcubic += (-1.0 / 4.0) * omega[k] * omega[l] * omega[m] * phi_klm**2 / delta[k,l,m]
     
     #
+    g0 += gcubic 
+    
     # 3) Coriolis contribution 
+    gcor = 0.0 
     for a in range(3):
         for k in range(N):
             for l in range(k):
                 # l < k 
                 
-                g0 += (-1/2) * Be[a] * zeta[k,l,a]**2
-        
+                gcor += (-1/2) * Be[a] * zeta[k,l,a]**2
+    g0 += gcor 
+    
     
     # 
     # 4) Pseudo-potential contribution 
+    gVT = 0.0 
+    
     for a in range(3):
-        g0 += (-1/4) * Be[a] 
-                
+        gVT += (-1/4) * Be[a] 
+    g0 += gVT 
+    
+    if printlevel > 0 :
+        print("------------------------")
+        print("  Contributions to g0")
+        print("------------------------")
+        print(f" Quartic ..... {gquartic:>+8.4f}")
+        print(f" Cubic ....... {gcubic:>+8.4f}")
+        print(f" Coriolis .... {gcor:>+8.4f}")
+        print(f" Pseud-pot ... {gVT:>+8.4f}")
+        print("")
+        print(f" Total ....... {g0:>+8.4f}")
+        print("")
+    
     return g0 
 
 def calc_xij(Be, omega, zeta, f4):
