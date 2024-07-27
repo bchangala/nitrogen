@@ -185,6 +185,8 @@ class Valence4(CoordSys):
         Notes
         -----
         
+        For :math:`r_1 = r_2` and :math:`\\theta_1 = \\theta_2`, the :math:`C_2`
+        axis is parallel to :math:`z` for embedding mode ``'C2'``.
         
         """
         

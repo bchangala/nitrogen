@@ -714,6 +714,22 @@ class CompositeDFun(DFun):
             # h = out is already initialized to 0
             #
             #
+            # The expressions for 0, 1, and 2 are 
+            # straightforward to derive by simple 
+            # differentiation.
+            #
+            # The combinatorics for higher orders become
+            # more complicated. For a given degree, k,
+            # we find the integer partitions of k.
+            # Each partition P corresponds to a type of 
+            # contributions to the derivatives. The
+            # *length*, |P|, of each partition corresponds to 
+            # contributions including derivatives of A
+            # of order |P|. Each element, E, of the partition
+            # indicates the derivative order of factors 
+            # of B derivatives.
+            #
+            #
             if deriv >= 0:
                 # Value 
                 # h[0] = a[0] 
@@ -1051,7 +1067,6 @@ class CompositeDFun(DFun):
                                             for MNO in [[m,n,o],[n,o,m],[o,m,n]]:
                                                 M,N,O = MNO
                                             
-                                                # !!! DEBUG. THERE IS AN ERROR HERE
                                                 if i == j and j == k and k == l:
                                                     # AAAA
                                                     h[cnt] += a[cntA] * (
@@ -1249,7 +1264,10 @@ class CompositeDFun(DFun):
                     break
                 temp = adfone
                 for j in range(B.nf):
-                    temp = temp * bpow[j, Aidx[j]]
+                    if Aidx[j] > 0:
+                        # If Aidx[j] == 0, then bpow[j,Aidx[j]]
+                        # is just constant 1.
+                        temp = temp * bpow[j, Aidx[j]]
                     #
                     # This step is very slow.
                     # Here, I am explicitly re-computing the 
@@ -2426,7 +2444,7 @@ class ConstantDFun(DFun):
     
     """
     
-    def __init__(self, nx, val):
+    def __init__(self, nx, value):
         """
         Create a ConstantDFun object
 
@@ -2434,7 +2452,7 @@ class ConstantDFun(DFun):
         ----------
         nx : integer
             The number of input variables.
-        val : (nf,) array_like
+        value : (nf,) array_like
             The constant function value(s). The length determines `nf`.
             If scalar, `nf` = 1 is assumed.
 
@@ -2443,11 +2461,11 @@ class ConstantDFun(DFun):
         if nx < 1 :
             raise ValueError('nx must be at least 1')
             
-        if np.isscalar(val):
-            val = [val]
-        val = np.array(val).copy() 
+        if np.isscalar(value):
+            value = [value]
+        value = np.array(value).copy() 
         
-        nf = len(val)
+        nf = len(value)
         
         
         # The maxderiv is None (infinite)
@@ -2456,7 +2474,7 @@ class ConstantDFun(DFun):
         super().__init__(self._fconstantfun, nf = nf, nx = nx, maxderiv = None,
                          zlevel = 0)
         
-        self.val = val 
+        self.value = value
         
         
     def _fconstantfun(self, X, deriv = 0, out = None, var = None):
@@ -2477,7 +2495,7 @@ class ConstantDFun(DFun):
             
         out.fill(0)
         for i in range(self.nf):
-            out[0:1,i].fill(self.val[i]) # Note range for first axis to guarantee fill works.
+            out[0:1,i].fill(self.value[i]) # Note range for first axis to guarantee fill works.
         
         return out 
         
