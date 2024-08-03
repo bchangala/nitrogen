@@ -140,7 +140,7 @@ def X2txt(X, filename = "grid.txt", write_index = True):
     # Done
     return 
 
-def podvr(prim_dvr, npo, i, qref, cs, pes_fun, masses, disp = 0):
+def podvr(prim_dvr, npo, i, qref, cs, pes_fun, masses, disp = 0, scale_idx = 1):
     """
     Construct a potential-optimized contracted DVR based on the
     contrained body-fixed Hamiltonian.
@@ -164,6 +164,8 @@ def podvr(prim_dvr, npo, i, qref, cs, pes_fun, masses, disp = 0):
     disp : integer, optional
         The print level. Default is 0. Level 1 prints eneriges.
         Level 2 plots wavefunctions
+    scale_idx : integer, optional
+        The excited energy index to use for plotting scaling. The default is 1.
 
     Returns
     -------
@@ -178,21 +180,26 @@ def podvr(prim_dvr, npo, i, qref, cs, pes_fun, masses, disp = 0):
     h1 = ham.hdpdvr_bfJ(dvrs, cs, pes_fun, masses, Jlist = 0)
     w,u = np.linalg.eigh(linalg.full(h1))
     
+    po_basis = dvrs[i].contract(u[:,:npo])
+    
     if disp >= 1:
         print(f"The PODVR energies for coordinate {i:d} are")
         print(w[:npo])
         
     if disp >= 2:
         # plot wavefunctions
-        scale = (w[1]-w[0]) / max(abs(u[:,0])) * 0.8 
+        scale = (w[scale_idx]-w[0]) / max(abs(u[:,0])) * 0.8 
         
         plt.figure() 
         for j in range(npo):
             plt.plot(prim_dvr.grid, scale * u[:,j] + w[j])
         plt.xlabel('q')
         plt.ylabel('Energy')
+        
+        for j in range(npo):
+            plt.plot(po_basis.grid[j], w[0], 'k.') # Plot new grid points
 
-    return dvrs[i].contract(u[:,:npo])
+    return po_basis 
 
 def parseFormula(formula):
     """
