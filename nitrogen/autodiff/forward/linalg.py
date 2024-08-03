@@ -52,25 +52,11 @@ def inv(M):
     #
     # where b and c are multi-indices
     #
-
-
-    M0 = M.d[0] # The value
     
     # Create the derivative array for the result.
     # This has the same shape and type as M
     iM = np.empty(M.d.shape, dtype = M.d.dtype)
-    
-    
-    #
-    # Compute the inverse matrix 
-    # and store in the value of the result array
-    #
-    np.copyto(iM[0], np.linalg.inv(M0)) 
-    
-    
-    
-    nd = M.nd # The number of derivatives 
-    
+
     # Loop through the derivatives of inv(M). The 
     # multi-index table is already sorted by increasing
     # order.
@@ -79,40 +65,9 @@ def inv(M):
     temp = np.empty(M.d.shape[1:], dtype = M.d.dtype) 
     
     #
-    # Start the loop beginning with first deriatives.
-    # (The value has already been computed)
+    # Compute matrix inverse
     #
-    for iC in range(1,nd):
-        # Compute the (C) derivative
-        idxC = M.idx[iC,:]    # The multi-index for (C)
-        kC = np.sum(idxC)     # The order of (C)
-        
-        # Loop through all derivatives B less than C
-        #
-        temp.fill(0) # Initialize temp <--- 0 
-        #
-        for iB in range(nd):
-            idxB = M.idx[iB,:]  # The derivative index of B
-            kB = np.sum(idxB)   # The derivative degree
-            
-            # Check that (B) < (C)
-            if kB >= kC:
-                break # Stop the B loop; all remaining are >= (C)
-            if np.any(idxB > idxC):
-                continue 
-            
-            # 
-            #  Accumulate - M(C-B) @ iM(B)  (Note the minus sign)
-            # 
-            iCmB = adf.idxpos(idxC-idxB, M.nck)
-            
-            temp -= M.d[iCmB] @ iM[iB]
-        
-        
-        #
-        # The (C) derivative is now iM(0) @ temp
-        #
-        np.matmul(iM[0], temp, out = iM[iC])
+    _inv_ad(M.d, iM, temp, M.idx, M.nck)
     
     
     #####################
@@ -138,6 +93,150 @@ def inv(M):
     
     return adf.array(iM, M.k, M.ni, zlevel = zlevel, zlevels = zlevels,
                      nck = M.nck, idx = M.idx)
+
+def _inv_ad(dM,diM,temp,idxtab,nck):
+    """
+    Compute derivatives of matrix inverse
+
+    Parameters
+    ----------
+    dM : (nd, ..., m,m) ndarray
+        Derivative array of a square matrix, in NumPy stacked format.
+    diM : (nd, ..., m,m) ndarray
+        The output array for the matrix inverse.
+    temp : (...,m,m) ndarray
+        Workspace
+    idxtab : ndarray
+        The derivative index table.
+    nck : ndarray
+        A binomial coefficient table appropriate for `dM`.
+
+    Returns
+    -------
+    None.
+
+    """
+    #
+    # Compute the inverse matrix 
+    # and store in the value of the result array
+    #
+    np.copyto(diM[0], np.linalg.inv(dM[0])) 
+    
+    nd = idxtab.shape[0] # The number of derivatives
+    
+    # Start the loop beginning with first derivatives.
+    # (The value has already been computed)
+    #
+    for iC in range(1,nd):
+        # Compute the (C) derivative
+        idxC = idxtab[iC,:]    # The multi-index for (C)
+        kC = np.sum(idxC)   # The order of (C)
+        
+        # Loop through all derivatives B less than C
+        #
+        temp.fill(0) # Initialize temp <--- 0 
+        #
+        for iB in range(nd):
+            idxB = idxtab[iB,:]  # The derivative index of B
+            kB = np.sum(idxB)   # The derivative degree
+            
+            # Check that (B) < (C)
+            if kB >= kC:
+                break # Stop the B loop; all remaining are >= (C)
+            if np.any(idxB > idxC):
+                continue 
+            
+            # 
+            #  Accumulate - M(C-B) @ iM(B)  (Note the minus sign)
+            # 
+            iCmB = adf.idxpos(idxC-idxB, nck)
+            
+            temp -= dM[iCmB] @ diM[iB]
+        
+        
+        #
+        # The (C) derivative is now iM(0) @ temp
+        #
+        np.matmul(diM[0], temp, out = diM[iC])
+    
+    return 
+
+def _inv_ad_table(dM,diM,temp,sorted_product_table):
+    """
+    Compute derivatives of matrix inverse with 
+    looping via a sorted product table.
+
+    Parameters
+    ----------
+    dM : (nd, ..., m,m) ndarray
+        Derivative array of a square matrix, in NumPy stacked format.
+    diM : (nd, ..., m,m) ndarray
+        The output array for the matrix inverse.
+    temp : (...,m,m) ndarray
+        Workspace
+    sorted_product_table : (3,nt)
+        The sorted product table 
+
+    Returns
+    -------
+    None.
+
+    """
+    #
+    # Compute the inverse matrix 
+    # and store in the value of the result array
+    #
+    np.copyto(diM[0], np.linalg.inv(dM[0])) 
+    
+    # nd = idxtab.shape[0] # The number of derivatives
+    
+    nt = sorted_product_table.shape[1]
+    
+    # 
+    # Start looping over the product table, which is
+    # sorted.
+    # The first row of the table is always (0, 0, 0),
+    # which is the value-operation. We skip it.
+    #
+    for i in range(1,nt):
+        
+        iC,iA,iB = sorted_product_table[:,i]
+        
+        # iC is the (C) derivative we are contributing to.
+
+        # Continue looping through all derivatives (B) less than (C)
+        #
+        if iA == 0:
+            # (A) = 0
+            # This is the start of a new value of iC. 
+            # Re-initialize the temp.
+            temp.fill(0) # Initialize temp <--- 0 
+            
+            # Because (B) must equal (C), this term
+            # does not contribute, so continue 
+            # to the next
+            continue 
+        
+        # Add the (A) @ (B) contribution to the temporary
+        # sum. (Note minus sign is already included here!)
+        #
+        # (C-B) = (A) by construction
+        # (B) < (C) because we skipped the (A) = 0 entry.
+        #
+        temp -= dM[iA] @ diM[iB]
+        #
+        #
+        #
+        if iB == 0:
+            # (B) = 0, so this is the last table entry for this value
+            # of (C).
+            # We can now compute the total contribution to (C),
+            # which is iM[0] @ temp.
+            #
+            #
+            np.matmul(diM[0], temp, out = diM[iC])
+    
+    return 
 
 def sqrtm(M, assumeh = False):
     """

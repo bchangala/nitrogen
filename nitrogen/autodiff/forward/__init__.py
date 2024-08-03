@@ -3623,7 +3623,7 @@ def tensordot(A,B,axes=2):
         
 def calc_product_table(k, ni):
     """
-    Calculate the direct product table for derivative 
+    Calculate the sorted direct product table for derivative 
     array product.
 
     Parameters
@@ -3636,12 +3636,37 @@ def calc_product_table(k, ni):
     Returns
     -------
     table : (3,tablesize) ndarray
-        The direct product table
+        The sorted direct product table. The elements equal 1-D indices 
+        of standard derivative array lexical ordering.
     
     Notes
     -----
     
-    Z[table[0,i]] <-- X[table[1,i]] * Y[table[2,i]]
+    The generalized Leibniz product for scaled derivative arrays is
+    
+    .. math::
+        
+        Z^{(\\gamma)} = \\sum_{\\alpha \\leq \\gamma} X^{(\\alpha)} Y^{(\\beta = \\gamma - \\alpha)}
+        
+    The direct product table pre-computes all multi-index triplets
+    :math:`(\\gamma, \\alpha, \\beta = \\gamma - \\alpha)`
+    in terms of their one-dimensional derivative array index:
+    
+    ``Z[table[0,i]] <-- X[table[1,i]] * Y[table[2,i]]``
+    
+    This function returns a *sorted* table. A sorted
+    table satisfies these conditions:
+        
+        1) The one-dimensional indices are ordered such that if
+           :math:`\\alpha < \\beta`, then :math:`idx(\\alpha) < idx(\\beta)`.
+           (The standard derivative array lexical ordering is sorted by 
+           :math:`\\vert \\alpha \\vert`, which guarantees it is also *sorted*
+           in this formal sense.)
+        2) ``table`` is sorted by ascending order of ``table[0]``.
+        3) For equal elements of ``table[0]``, the table is sorted by ``table[1]``.
+    
+    This ordering of the direct product table is useful for derivative array
+    routines that construct derivative arrays recursively.
     
     """
     
@@ -3671,7 +3696,50 @@ def calc_product_table(k, ni):
             tY.append(iY) 
     
     table = np.array([tZ,tX,tY], dtype = np.int32) 
-    return table 
+    
+    #
+    # As constructed, the table is sorted by iX then iY
+    # 
+    # We need to re-sort by iZ. If we use a *stable* sort,
+    # then for a given value of iZ, the rows will remain
+    # sorted by iX.
+    #
+    I = np.argsort(table[0], kind = 'stable')
+    table = table[:,I]
+    
+    return table
 
-            
+
+def _mul_ad_table(dZ,dX,dY,product_table, reduce = False):
+    """
+    Compute Leibniz product using product table.
+
+    Parameters
+    ----------
+    dZ : (nd, ...) ndarray
+        Derivative array output.
+    dX,dY : (nd, ...) ndarray
+        Derivative array input.
+    product_table : (3,nt)
+        The sorted product table 
+    reduce : bool
+        If True, add result to dZ 
+
+    Returns
+    -------
+    None.
+
+    """
+    
+    nt = product_table.shape[1] 
+    
+    if not reduce: 
+        dZ.fill(0)
         
+    for i in range(nt):
+        iZ,iX,iY = product_table[:,i]
+        
+        # np.multiply(dX[iX:(iX+1)], dY[iY:(iY+1)], out = dZ[iZ:(iZ+1)])
+        dZ[iZ] += dX[iX] * dY[iY] 
+    
+    return 
