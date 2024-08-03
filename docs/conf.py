@@ -25,6 +25,8 @@ if not on_rtd:
     #
 else:
     # On read-the-docs
+    sys.path.insert(0, os.path.abspath('..'))
+    sys.path.insert(0, os.path.abspath('.'))
     # Set up mock modules 
     # (See https://read-the-docs.readthedocs.io/en/latest/faq.html#i-get-import-errors-on-libraries-that-depend-on-c-modules)
     #
