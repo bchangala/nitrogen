@@ -220,6 +220,18 @@ def sample_QUADRATURE(filename, num_sample, use_bohr = False,
     -------
     X : (3*N, num_sample) ndarray
         The sampled geometries
+        
+    Notes
+    -----
+    
+    The harmonic oscillator ground-state wavefunction in terms of :math:`q` is
+    :math:`\\psi(q) \\propto \\exp[-q^2/2]`, and the ground-state density is
+    :math:`\\vert \\psi \\vert ^2 \\propto \\exp[-q^2]`. These distributions
+    have standard deviations of :math:`1` and 
+    :math:`\\sqrt{\\frac{1}{2}} \\approx 0.707`, respectively. Therefore,
+    setting the option `stddev` = 0.707 will sample the harmonic ground-state
+    density exactly. The default option (`stddev` = 1.0) samples the ground-state
+    amplitude, which is :math:`\\sqrt{2}`` wider.
     
 
     """
@@ -239,6 +251,8 @@ def sample_QUADRATURE(filename, num_sample, use_bohr = False,
     # Calculate displaced geometries 
     
     X = T @ q + ref_geo.reshape((-1,1)) 
+    
+    return X 
     
 def QUADRATURE2xyz(filename, elements, out = "out.xyz", comment = ""):
     """

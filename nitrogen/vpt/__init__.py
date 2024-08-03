@@ -9,6 +9,7 @@ Vibrational perturbation theory and harmonic oscillator methods
 
 
 import numpy as np 
+import nitrogen 
 import nitrogen.constants
 
 from . import ho_core
@@ -1061,3 +1062,74 @@ def calc_xij(Be, omega, zeta, f4):
             xij[j,i] = xij[i,j] 
         
     return xij
+
+def calcVibPT2(w,g0,xij,maxv = 2):
+    """
+    Calculate vibrational energies from second-order
+    anharmonic constants.
+    
+    ..  math::
+        
+        E = g_0 + \\sum_i \omega_i (v_i + \\frac{1}{2}) + 
+        \\sum_{i \\leq j} x_{ij}(v_i + \\frac{1}{2})(v_j + \\frac{1}{2})
+
+    Parameters
+    ----------
+    w : (nv,) array_like
+        The harmonic frequencies.
+    g0 : float
+        The :math:`g_0` constant correction.
+    xij : (nv,nv) array_like
+        The anharmonicity constants.
+    maxv : integer, optional
+        The maximum quanta. The default is 2.
+
+    Returns
+    -------
+    None.
+
+    """
+    
+    w = np.array(w)
+    xij = np.array(xij)
+    nv = len(w) # The number of modes
+    
+    # Calculate a list of quantum numbers 
+    vtab = nitrogen.autodiff.forward.idxtab(maxv,nv)
+    nlevels = vtab.shape[0] # The number of states 
+    
+    e = np.zeros((nlevels,))
+    
+    for i in range(nlevels):
+        
+        vi = vtab[i] # The vibrational quantum numbers 
+        
+        # Calculate vibrational energy 
+        e[i] = g0 
+        
+        for j in range(nv):
+            e[i] += w[j] * (vi[j] + 0.5) 
+            
+            for k in range(j+1):
+                e[i] += xij[j,k] * (vi[j] + 0.5) * (vi[k] + 0.5)
+    
+    # Now sort by energy and print 
+    e0 = e[0] # The zero-point energy 
+    I = np.argsort(e) 
+    e = e[I]
+    vtab = vtab[I,:] 
+    
+    for i in range(nlevels):
+        # Print quantum numbers 
+        for j in range(nv):
+            print(f" {vtab[i,j]:>2d}", end = "")
+        print(f" {e[i]:>8.2f}", end = "")
+        print(f" {e[i] - e0:>8.2f}", end = "")
+        
+        print("")
+    
+    return 
+    
+    
+    
+            
