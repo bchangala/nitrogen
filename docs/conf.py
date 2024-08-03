@@ -23,10 +23,12 @@ if not on_rtd:
     # the locally built version
     # See https://stackoverflow.com/questions/13238736/how-to-document-cython-function-on-readthedocs
     #
+    # Note also the Edit in the above URL describin changes in 2023/2024 
+    # when read-the-docs changed its virtualenv build options. This required
+    # adding the setuptools and `path` settings in the .readthedocs.yaml file.
+    #
 else:
     # On read-the-docs
-    # sys.path.insert(0, os.path.abspath('..'))
-    # sys.path.insert(0, os.path.abspath('.'))
     # Set up mock modules 
     # (See https://read-the-docs.readthedocs.io/en/latest/faq.html#i-get-import-errors-on-libraries-that-depend-on-c-modules)
     #
