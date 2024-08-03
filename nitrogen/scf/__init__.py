@@ -737,7 +737,8 @@ def simple_MP2(Hcfg, mp2_max, target = None, excitation_fun = None, printlevel =
     ##################################
     
 def Heff_aci_mp2(Hcfg, target_cfgs, mp2_max, tol = 1e-1, excitation_fun = None,
-                 max_iter = 20, target_char_tol = 0.20):
+                 max_iter = 20, target_char_tol = 0.20, skip_final_diag = False,
+                 return_final_cfg_space = False):
     """
     Iterative-adaptive CI effective Hamiltonian with second-order 
     corrections.
@@ -761,6 +762,13 @@ def Heff_aci_mp2(Hcfg, target_cfgs, mp2_max, tol = 1e-1, excitation_fun = None,
     target_char_tol : float, optional
         The minimum required target state character to be used
         for iterative expansion stage. The default is 0.20.
+    skip_final_diag : bool, optional
+        If True, then the final diagonalization step of the effective
+        Hamiltonian is skipped. The default is False. 
+    return_final_cfg_space : bool, optional
+        If True, the list of the final variational configuration states is
+        also returned.
+        
 
     Returns
     -------
@@ -926,10 +934,16 @@ def Heff_aci_mp2(Hcfg, target_cfgs, mp2_max, tol = 1e-1, excitation_fun = None,
     # via diagonalize-then-perturb 
     # 
     print("-----------------------")
-    print("Calculating final Heff-")
+    print("Calculating final Heff ")
     print(f"The final CI space contains {H00.shape[0]:d} configuration(s).")
     
-    w,U = np.linalg.eigh(H00)
+    if skip_final_diag:
+        # Skip the final diagonalization
+        w = np.diag(H00)
+        U = np.eye(len(w))
+    else:
+        # Diagonalize the H00 block.
+        w,U = np.linalg.eigh(H00)
     
     is_target_like = np.sum(U[:ntarget,:]**2, axis=0) >= target_char_tol 
     if np.sum(is_target_like) < 1:
@@ -962,7 +976,13 @@ def Heff_aci_mp2(Hcfg, target_cfgs, mp2_max, tol = 1e-1, excitation_fun = None,
             if i != j:
                 Heff[j,i] += h2 
     
-    return Heff  
+    
+    if return_final_cfg_space:
+        # Return the final effective Hamiltonian and the 
+        # final variational space 
+        return Heff, cfg0 
+    else:
+        return Heff  
 
 def scfStability(Hcfg, target_cfg = None):
     """

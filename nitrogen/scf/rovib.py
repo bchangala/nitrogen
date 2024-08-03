@@ -193,7 +193,7 @@ class NonLinearTO(tensor.TensorOperator):
             for b in range(3)]
         #
         # 
-        # Crv[k][a] is a coefficient of (iJa/hbar)
+        # Crv[a] is a coefficient of (iJa/hbar)
         #
         # Note that diagonal vibrational matrix elements of these terms 
         # are zero by anti-symmetry
@@ -461,6 +461,20 @@ def rovib_MP2(Hvib, Crot, Crv, mp2_max, target = None, excitation_fun = None, pr
     
     # 
     # The final sigma tensor is symmetric
+    if printlevel >= 1: # Print second-order rotational information
+        B2,_ = np.linalg.eigh(0.5 * sigma) 
+        print("")
+        print("Second-order rotational tensor (cm^-1):     ")
+        for a in range(3):
+            for b in range(a+1):
+                print(f" {0.5*sigma[a,b]:12.3E} ", end = "")
+            print("")
+        print("")
+        print("The second-order rotational constants are ")
+        lab = ['C','B','A']
+        for a in range(2,-1,-1):
+            print(f" {lab[a]:s} = {B2[a]:7.3f} cm^-1 =  {MHz * B2[a]:11.3f} MHz")
+        print("")
     #
     # The final tau tensor is symmetric w.r.t permutation of the first
     # pair of indices, the second pair of indices, or the first with the
