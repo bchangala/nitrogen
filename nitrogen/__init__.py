@@ -7,6 +7,8 @@ calculations and rovibronic spectroscopy.
 
 """
 
+__version__ = '2.2.dev0'
+
 # Import sub-packages and modules into namespace
 from . import autodiff
 from . import linalg 
@@ -22,7 +24,6 @@ from . import special
 from . import math 
 from . import vpt 
 
-__version__ = '2.2.dev0'
 
 import numpy as np 
 import matplotlib.pyplot as plt 
