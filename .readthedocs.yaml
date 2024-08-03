@@ -20,3 +20,5 @@ sphinx:
 python:
   install:
     - requirements: requirements.readthedocs.txt
+    - method: setuptools # runs setup.py
+      path: .
