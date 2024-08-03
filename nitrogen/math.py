@@ -690,3 +690,69 @@ def constrainedFourier(x, df, period = None):
     c = np.linalg.solve(C, b) 
     
     return c 
+
+def clenshawcurtis(n, bounds = (-1,1)):
+    """
+    Calculate the quadrature grid points and weights
+    for an `n`-point Clenshaw-Curtis quadrature.
+
+    Parameters
+    ----------
+    n : integer
+        The number of quadrature points.
+    bounds : (2,) tuple, optional
+        The integration end-points. The default is ``(-1,1)''.
+        If the bounds are in reverse order, the weights will be 
+        negative.
+
+    Returns
+    -------
+    x : ndarray
+        The quadrature points
+    w : ndarray
+        The quadrature weights
+        
+    Notes
+    -----
+    
+    The quadrature rule approximates the integral :math:`\\int_{-1}^{1} f(x) dx`.
+    
+    See ``Fast Construction of the Fejer and Clenshaw--Curtis Quadrature Rules'',
+    by Jörg Waldvogel, BIT Num. Math. 46, 195 (2006). doi: 10.1007/s10543-006-0045-4.
+    """
+    
+    # 
+    # Calculate the weights
+    # 
+    if n < 2:
+        raise ValueError("n must be >= 2")
+    
+    n = n - 1 # The `n` of the reference 
+    N = np.arange(1,n,2) 
+    l = len(N) 
+    m = n - l 
+    
+    v0 = np.concatenate([ 2.0 / (N * (N-2)), [1/N[-1]], np.zeros((m,))]) 
+    v2 = -v0[:-1] - v0[-1:0:-1] 
+    
+    g0 = -np.ones((n,))
+    g0[l] += n  
+    g0[m] += n
+    g = g0 / (n**2 - 1 + (n%2))
+    
+    w = np.real( np.fft.ifft(v2 + g) ) 
+    w = np.append(w, w[0])
+    
+    x = np.flip( np.cos( np.arange(n+1) * np.pi / n) )
+    
+    # Re-scale for new boundary points 
+    # 
+    # Weights will be negative for bounds in reverse order 
+    # 
+    scale = (bounds[1] - bounds[0]) / 2.0 
+    mid = (bounds[1] + bounds[0]) / 2.0 
+    
+    x = x * scale + mid 
+    w *= scale 
+    
+    return x,w 
