@@ -1009,7 +1009,7 @@ def cubic_spline_derivative(x,c,x0):
     ----------
     x : array_like
         The evaluation points.
-    c : (n-1,5)
+    c : (n-1,4)
         The spline parameters.
     x0 : array_like
         The ordered spline nodes.

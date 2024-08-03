@@ -24,6 +24,7 @@ from .opt import *
 # Submodules
 from . import fit 
 from . import rxnpath 
+from . import lapath  
 
 
 __all__ = ['loadpes', 'curvVib']

@@ -63,7 +63,7 @@ class CFOUR(dfun.DFun):
         
         All elements in `params` will be added as keywords to the
         ``*CFOUR()`` section of a CFOUR ``ZMAT`` input file. The
-        ``COORD``,``UNITS``, ``DERIV_LEV``, ``PRINT``, and ``VIB``
+        ``COORD``, ``UNITS``, ``DERIV_LEV``, ``PRINT``, and ``VIB``
         keywords are handled automatically.
         These should not be supplied by the user. Only methods
         for which ``VIB=ANALYTIC`` (i.e. analytic Hessians) is
