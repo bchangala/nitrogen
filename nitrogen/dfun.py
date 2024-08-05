@@ -13,6 +13,11 @@ functions. See :doc:`/tutorials/dfun` for an in-depth tutorial.
 :class:`DFun`                 The :class:`DFun` constructor
 :class:`FiniteDFun`           Finite-difference derivatives
 ---------------------------   -----------------------------------
+**Simple DFun objects**
+-----------------------------------------------------------------
+:class:`ConstantDFun`         Constant-valued function.
+:class:`IdentityDFun`         :math:`\\mathbb{R}^n\\rightarrow\\mathbb{R}^n` identity map.
+---------------------------   -----------------------------------
 **Modify single DFun objects**
 -----------------------------------------------------------------
 :class:`FixedInputDFun`       Fix input value(s).
@@ -2539,14 +2544,18 @@ class IdentityDFun(DFun):
         out, var = self._parse_out_var(X, deriv, out, var)
         
         # X ... (nx,...)
-        # out ... (nd,nx...)
+        # out ... (nd,nx,...)
         
         out.fill(0.0) 
         np.copyto(out[0], X) 
         
         if deriv > 0:
-            for i in range(self.nx):
-                out[i+1,i:(i+1)].fill(1.0)
+            # Fill first-derivatives
+            for i in range(len(var)):
+                # The i**th derivative is that of the var[i]**th 
+                # variable
+                v = var[i] 
+                out[i+1,v:(v+1)].fill(1.0)
         
         return out         
 
