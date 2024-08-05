@@ -59,8 +59,8 @@ if use_cython:
         Extension("nitrogen.cythontest", [ "nitrogen/cython/test.pyx" ]),
         Extension("nitrogen.basis.ndbasis_c", [ "nitrogen/basis/cython/ndbasis_c.pyx" ]),
         Extension("nitrogen.autodiff.cyad.cyad_core", ["nitrogen/autodiff/cyad/cyad_core.pyx"]),
-        Extension("nitrogen.pes.library.mal_mht2014.malpes", ["nitrogen/pes/library/mal_mht2014/malpes.pyx"],
-                  include_dirs = ["nitrogen/autodiff/cyad/"]),
+        Extension("nitrogen.pes.library.mal_mht2014.malpes", ["nitrogen/pes/library/mal_mht2014/malpes.pyx"]),
+        Extension("nitrogen.pes.fit.exppip", ["nitrogen/pes/fit/cython/exppip.pyx"]),
     ]
     
     cmdclass.update({ 'build_ext': build_ext })
@@ -70,8 +70,8 @@ else:
         Extension("nitrogen.cythontest", [ "nitrogen/cython/test.c" ]),
         Extension("nitrogen.basis.ndbasis_c", [ "nitrogen/basis/cython/ndbasis_c.c" ]),
         Extension("nitrogen.autodiff.cyad.cyad_core", ["nitrogen/autodiff/cyad/cyad_core.c"]),
-        Extension("nitrogen.pes.library.mal_mht2014.malpes", ["nitrogen/pes/library/mal_mht2014/malpes.c"],
-                  include_dirs = ["nitrogen/autodiff/cyad/"]),
+        Extension("nitrogen.pes.library.mal_mht2014.malpes", ["nitrogen/pes/library/mal_mht2014/malpes.c"]),
+        Extension("nitrogen.pes.fit.exppip", ["nitrogen/pes/fit/cython/exppip.c"]),
         
     ]
     
