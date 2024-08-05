@@ -35,6 +35,10 @@ __version__ = get_version("nitrogen/__init__.py")
 #
 # >> python setup.py build_ext --inplace
 #
+# To force a complete re-build, run 
+#
+# >> python setup.py build_ext --inplace --force
+#
 use_cython = True #'auto'
 #
 #
@@ -50,19 +54,29 @@ if use_cython:
 cmdclass = {}
 ext_modules = []
 if use_cython:
+    
     ext_modules += [
         Extension("nitrogen.cythontest", [ "nitrogen/cython/test.pyx" ]),
         Extension("nitrogen.basis.ndbasis_c", [ "nitrogen/basis/cython/ndbasis_c.pyx" ]),
+        Extension("nitrogen.autodiff.cyad.cyad_core", ["nitrogen/autodiff/cyad/cyad_core.pyx"]),
+        Extension("nitrogen.pes.library.mal_mht2014.malpes", ["nitrogen/pes/library/mal_mht2014/malpes.pyx"],
+                  include_dirs = ["nitrogen/autodiff/cyad/"]),
     ]
+    
     cmdclass.update({ 'build_ext': build_ext })
+    
 else:
     ext_modules += [
         Extension("nitrogen.cythontest", [ "nitrogen/cython/test.c" ]),
         Extension("nitrogen.basis.ndbasis_c", [ "nitrogen/basis/cython/ndbasis_c.c" ]),
+        Extension("nitrogen.autodiff.cyad.cyad_core", ["nitrogen/autodiff/cyad/cyad_core.c"]),
+        Extension("nitrogen.pes.library.mal_mht2014.malpes", ["nitrogen/pes/library/mal_mht2014/malpes.c"],
+                  include_dirs = ["nitrogen/autodiff/cyad/"]),
+        
     ]
     
-for e in ext_modules:
-    e.cython_directives = {'language_level': "3"} #all are Python-3
+#for e in ext_modules:
+#    e.cython_directives = {'language_level': "3"} #all are Python-3
     
 ######################################
 
@@ -95,5 +109,5 @@ setuptools.setup(
 	python_requires = '>=3.7.11', 
     install_requires=install_requires,
     cmdclass = cmdclass,
-    ext_modules = ext_modules
+    ext_modules = ext_modules,
 )

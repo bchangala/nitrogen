@@ -2041,7 +2041,7 @@ static PyObject *__pyx_codeobj__20;
 static PyObject *__pyx_codeobj__27;
 /* Late includes */
 
-/* "nitrogen/basis/cython/ndbasis_c.pyx":8
+/* "nitrogen/basis/cython/ndbasis_c.pyx":6
  * #
  * 
  * def _structured_op_double(double [:,:,:] X, double [:,:,:,:] Y, double [:,:] W,             # <<<<<<<<<<<<<<
@@ -2093,29 +2093,29 @@ static PyObject *__pyx_pw_8nitrogen_5basis_9ndbasis_c_1_structured_op_double(PyO
         case  1:
         if (likely((values[1] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_Y)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("_structured_op_double", 1, 5, 5, 1); __PYX_ERR(0, 8, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("_structured_op_double", 1, 5, 5, 1); __PYX_ERR(0, 6, __pyx_L3_error)
         }
         CYTHON_FALLTHROUGH;
         case  2:
         if (likely((values[2] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_W)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("_structured_op_double", 1, 5, 5, 2); __PYX_ERR(0, 8, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("_structured_op_double", 1, 5, 5, 2); __PYX_ERR(0, 6, __pyx_L3_error)
         }
         CYTHON_FALLTHROUGH;
         case  3:
         if (likely((values[3] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_idx_op)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("_structured_op_double", 1, 5, 5, 3); __PYX_ERR(0, 8, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("_structured_op_double", 1, 5, 5, 3); __PYX_ERR(0, 6, __pyx_L3_error)
         }
         CYTHON_FALLTHROUGH;
         case  4:
         if (likely((values[4] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_idx_sub)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("_structured_op_double", 1, 5, 5, 4); __PYX_ERR(0, 8, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("_structured_op_double", 1, 5, 5, 4); __PYX_ERR(0, 6, __pyx_L3_error)
         }
       }
       if (unlikely(kw_args > 0)) {
-        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "_structured_op_double") < 0)) __PYX_ERR(0, 8, __pyx_L3_error)
+        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "_structured_op_double") < 0)) __PYX_ERR(0, 6, __pyx_L3_error)
       }
     } else if (PyTuple_GET_SIZE(__pyx_args) != 5) {
       goto __pyx_L5_argtuple_error;
@@ -2126,15 +2126,15 @@ static PyObject *__pyx_pw_8nitrogen_5basis_9ndbasis_c_1_structured_op_double(PyO
       values[3] = PyTuple_GET_ITEM(__pyx_args, 3);
       values[4] = PyTuple_GET_ITEM(__pyx_args, 4);
     }
-    __pyx_v_X = __Pyx_PyObject_to_MemoryviewSlice_dsdsds_double(values[0], PyBUF_WRITABLE); if (unlikely(!__pyx_v_X.memview)) __PYX_ERR(0, 8, __pyx_L3_error)
-    __pyx_v_Y = __Pyx_PyObject_to_MemoryviewSlice_dsdsdsds_double(values[1], PyBUF_WRITABLE); if (unlikely(!__pyx_v_Y.memview)) __PYX_ERR(0, 8, __pyx_L3_error)
-    __pyx_v_W = __Pyx_PyObject_to_MemoryviewSlice_dsds_double(values[2], PyBUF_WRITABLE); if (unlikely(!__pyx_v_W.memview)) __PYX_ERR(0, 8, __pyx_L3_error)
-    __pyx_v_idx_op = __Pyx_PyObject_to_MemoryviewSlice_ds_int(values[3], PyBUF_WRITABLE); if (unlikely(!__pyx_v_idx_op.memview)) __PYX_ERR(0, 9, __pyx_L3_error)
-    __pyx_v_idx_sub = __Pyx_PyObject_to_MemoryviewSlice_ds_int(values[4], PyBUF_WRITABLE); if (unlikely(!__pyx_v_idx_sub.memview)) __PYX_ERR(0, 9, __pyx_L3_error)
+    __pyx_v_X = __Pyx_PyObject_to_MemoryviewSlice_dsdsds_double(values[0], PyBUF_WRITABLE); if (unlikely(!__pyx_v_X.memview)) __PYX_ERR(0, 6, __pyx_L3_error)
+    __pyx_v_Y = __Pyx_PyObject_to_MemoryviewSlice_dsdsdsds_double(values[1], PyBUF_WRITABLE); if (unlikely(!__pyx_v_Y.memview)) __PYX_ERR(0, 6, __pyx_L3_error)
+    __pyx_v_W = __Pyx_PyObject_to_MemoryviewSlice_dsds_double(values[2], PyBUF_WRITABLE); if (unlikely(!__pyx_v_W.memview)) __PYX_ERR(0, 6, __pyx_L3_error)
+    __pyx_v_idx_op = __Pyx_PyObject_to_MemoryviewSlice_ds_int(values[3], PyBUF_WRITABLE); if (unlikely(!__pyx_v_idx_op.memview)) __PYX_ERR(0, 7, __pyx_L3_error)
+    __pyx_v_idx_sub = __Pyx_PyObject_to_MemoryviewSlice_ds_int(values[4], PyBUF_WRITABLE); if (unlikely(!__pyx_v_idx_sub.memview)) __PYX_ERR(0, 7, __pyx_L3_error)
   }
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("_structured_op_double", 1, 5, 5, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(0, 8, __pyx_L3_error)
+  __Pyx_RaiseArgtupleInvalid("_structured_op_double", 1, 5, 5, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(0, 6, __pyx_L3_error)
   __pyx_L3_error:;
   __Pyx_AddTraceback("nitrogen.basis.ndbasis_c._structured_op_double", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __Pyx_RefNannyFinishContext();
@@ -2184,7 +2184,7 @@ static PyObject *__pyx_pf_8nitrogen_5basis_9ndbasis_c__structured_op_double(CYTH
   size_t __pyx_t_19;
   __Pyx_RefNannySetupContext("_structured_op_double", 0);
 
-  /* "nitrogen/basis/cython/ndbasis_c.pyx":12
+  /* "nitrogen/basis/cython/ndbasis_c.pyx":10
  * 
  *     cdef:
  *         size_t npre = X.shape[0]             # <<<<<<<<<<<<<<
@@ -2193,7 +2193,7 @@ static PyObject *__pyx_pf_8nitrogen_5basis_9ndbasis_c__structured_op_double(CYTH
  */
   __pyx_v_npre = (__pyx_v_X.shape[0]);
 
-  /* "nitrogen/basis/cython/ndbasis_c.pyx":13
+  /* "nitrogen/basis/cython/ndbasis_c.pyx":11
  *     cdef:
  *         size_t npre = X.shape[0]
  *         size_t Nb = X.shape[1]             # <<<<<<<<<<<<<<
@@ -2202,7 +2202,7 @@ static PyObject *__pyx_pf_8nitrogen_5basis_9ndbasis_c__structured_op_double(CYTH
  */
   __pyx_v_Nb = (__pyx_v_X.shape[1]);
 
-  /* "nitrogen/basis/cython/ndbasis_c.pyx":14
+  /* "nitrogen/basis/cython/ndbasis_c.pyx":12
  *         size_t npre = X.shape[0]
  *         size_t Nb = X.shape[1]
  *         size_t npost = X.shape[2]             # <<<<<<<<<<<<<<
@@ -2211,7 +2211,7 @@ static PyObject *__pyx_pf_8nitrogen_5basis_9ndbasis_c__structured_op_double(CYTH
  */
   __pyx_v_npost = (__pyx_v_X.shape[2]);
 
-  /* "nitrogen/basis/cython/ndbasis_c.pyx":16
+  /* "nitrogen/basis/cython/ndbasis_c.pyx":14
  *         size_t npost = X.shape[2]
  * 
  *         size_t nq = W.shape[0]             # <<<<<<<<<<<<<<
@@ -2220,7 +2220,7 @@ static PyObject *__pyx_pf_8nitrogen_5basis_9ndbasis_c__structured_op_double(CYTH
  */
   __pyx_v_nq = (__pyx_v_W.shape[0]);
 
-  /* "nitrogen/basis/cython/ndbasis_c.pyx":17
+  /* "nitrogen/basis/cython/ndbasis_c.pyx":15
  * 
  *         size_t nq = W.shape[0]
  *         size_t nb = W.shape[1]             # <<<<<<<<<<<<<<
@@ -2229,7 +2229,7 @@ static PyObject *__pyx_pf_8nitrogen_5basis_9ndbasis_c__structured_op_double(CYTH
  */
   __pyx_v_nb = (__pyx_v_W.shape[1]);
 
-  /* "nitrogen/basis/cython/ndbasis_c.pyx":19
+  /* "nitrogen/basis/cython/ndbasis_c.pyx":17
  *         size_t nb = W.shape[1]
  * 
  *         size_t nsub = Y.shape[2]             # <<<<<<<<<<<<<<
@@ -2238,7 +2238,7 @@ static PyObject *__pyx_pf_8nitrogen_5basis_9ndbasis_c__structured_op_double(CYTH
  */
   __pyx_v_nsub = (__pyx_v_Y.shape[2]);
 
-  /* "nitrogen/basis/cython/ndbasis_c.pyx":33
+  /* "nitrogen/basis/cython/ndbasis_c.pyx":31
  *     #
  *     # initialize Y to zero
  *     for ipre in range(npre):             # <<<<<<<<<<<<<<
@@ -2250,7 +2250,7 @@ static PyObject *__pyx_pf_8nitrogen_5basis_9ndbasis_c__structured_op_double(CYTH
   for (__pyx_t_3 = 0; __pyx_t_3 < __pyx_t_2; __pyx_t_3+=1) {
     __pyx_v_ipre = __pyx_t_3;
 
-    /* "nitrogen/basis/cython/ndbasis_c.pyx":34
+    /* "nitrogen/basis/cython/ndbasis_c.pyx":32
  *     # initialize Y to zero
  *     for ipre in range(npre):
  *         for m in range(nq):             # <<<<<<<<<<<<<<
@@ -2262,7 +2262,7 @@ static PyObject *__pyx_pf_8nitrogen_5basis_9ndbasis_c__structured_op_double(CYTH
     for (__pyx_t_6 = 0; __pyx_t_6 < __pyx_t_5; __pyx_t_6+=1) {
       __pyx_v_m = __pyx_t_6;
 
-      /* "nitrogen/basis/cython/ndbasis_c.pyx":35
+      /* "nitrogen/basis/cython/ndbasis_c.pyx":33
  *     for ipre in range(npre):
  *         for m in range(nq):
  *             for isub in range(nsub):             # <<<<<<<<<<<<<<
@@ -2274,7 +2274,7 @@ static PyObject *__pyx_pf_8nitrogen_5basis_9ndbasis_c__structured_op_double(CYTH
       for (__pyx_t_9 = 0; __pyx_t_9 < __pyx_t_8; __pyx_t_9+=1) {
         __pyx_v_isub = __pyx_t_9;
 
-        /* "nitrogen/basis/cython/ndbasis_c.pyx":36
+        /* "nitrogen/basis/cython/ndbasis_c.pyx":34
  *         for m in range(nq):
  *             for isub in range(nsub):
  *                 for ipost in range(npost):             # <<<<<<<<<<<<<<
@@ -2286,7 +2286,7 @@ static PyObject *__pyx_pf_8nitrogen_5basis_9ndbasis_c__structured_op_double(CYTH
         for (__pyx_t_12 = 0; __pyx_t_12 < __pyx_t_11; __pyx_t_12+=1) {
           __pyx_v_ipost = __pyx_t_12;
 
-          /* "nitrogen/basis/cython/ndbasis_c.pyx":37
+          /* "nitrogen/basis/cython/ndbasis_c.pyx":35
  *             for isub in range(nsub):
  *                 for ipost in range(npost):
  *                     Y[ipre,m,isub,ipost] = 0.0             # <<<<<<<<<<<<<<
@@ -2303,7 +2303,7 @@ static PyObject *__pyx_pf_8nitrogen_5basis_9ndbasis_c__structured_op_double(CYTH
     }
   }
 
-  /* "nitrogen/basis/cython/ndbasis_c.pyx":43
+  /* "nitrogen/basis/cython/ndbasis_c.pyx":41
  *     #
  * 
  *     for i in range(Nb):             # <<<<<<<<<<<<<<
@@ -2315,7 +2315,7 @@ static PyObject *__pyx_pf_8nitrogen_5basis_9ndbasis_c__structured_op_double(CYTH
   for (__pyx_t_3 = 0; __pyx_t_3 < __pyx_t_2; __pyx_t_3+=1) {
     __pyx_v_i = __pyx_t_3;
 
-    /* "nitrogen/basis/cython/ndbasis_c.pyx":44
+    /* "nitrogen/basis/cython/ndbasis_c.pyx":42
  * 
  *     for i in range(Nb):
  *         iop = idx_op[i]             # <<<<<<<<<<<<<<
@@ -2325,7 +2325,7 @@ static PyObject *__pyx_pf_8nitrogen_5basis_9ndbasis_c__structured_op_double(CYTH
     __pyx_t_4 = __pyx_v_i;
     __pyx_v_iop = (*((int *) ( /* dim=0 */ (__pyx_v_idx_op.data + __pyx_t_4 * __pyx_v_idx_op.strides[0]) )));
 
-    /* "nitrogen/basis/cython/ndbasis_c.pyx":45
+    /* "nitrogen/basis/cython/ndbasis_c.pyx":43
  *     for i in range(Nb):
  *         iop = idx_op[i]
  *         isub = idx_sub[i]             # <<<<<<<<<<<<<<
@@ -2335,7 +2335,7 @@ static PyObject *__pyx_pf_8nitrogen_5basis_9ndbasis_c__structured_op_double(CYTH
     __pyx_t_4 = __pyx_v_i;
     __pyx_v_isub = (*((int *) ( /* dim=0 */ (__pyx_v_idx_sub.data + __pyx_t_4 * __pyx_v_idx_sub.strides[0]) )));
 
-    /* "nitrogen/basis/cython/ndbasis_c.pyx":47
+    /* "nitrogen/basis/cython/ndbasis_c.pyx":45
  *         isub = idx_sub[i]
  * 
  *         for ipre in range(npre):             # <<<<<<<<<<<<<<
@@ -2347,7 +2347,7 @@ static PyObject *__pyx_pf_8nitrogen_5basis_9ndbasis_c__structured_op_double(CYTH
     for (__pyx_t_6 = 0; __pyx_t_6 < __pyx_t_5; __pyx_t_6+=1) {
       __pyx_v_ipre = __pyx_t_6;
 
-      /* "nitrogen/basis/cython/ndbasis_c.pyx":48
+      /* "nitrogen/basis/cython/ndbasis_c.pyx":46
  * 
  *         for ipre in range(npre):
  *             for ipost in range(npost):             # <<<<<<<<<<<<<<
@@ -2359,7 +2359,7 @@ static PyObject *__pyx_pf_8nitrogen_5basis_9ndbasis_c__structured_op_double(CYTH
       for (__pyx_t_10 = 0; __pyx_t_10 < __pyx_t_8; __pyx_t_10+=1) {
         __pyx_v_ipost = __pyx_t_10;
 
-        /* "nitrogen/basis/cython/ndbasis_c.pyx":52
+        /* "nitrogen/basis/cython/ndbasis_c.pyx":50
  *                 # idx_op[i] is the index of the current basis factor and
  *                 # idx_sub[i] is the index in the sub-structure
  *                 X_val = X[ipre,i,ipost]             # <<<<<<<<<<<<<<
@@ -2371,7 +2371,7 @@ static PyObject *__pyx_pf_8nitrogen_5basis_9ndbasis_c__structured_op_double(CYTH
         __pyx_t_16 = __pyx_v_ipost;
         __pyx_v_X_val = (*((double *) ( /* dim=2 */ (( /* dim=1 */ (( /* dim=0 */ (__pyx_v_X.data + __pyx_t_11 * __pyx_v_X.strides[0]) ) + __pyx_t_12 * __pyx_v_X.strides[1]) ) + __pyx_t_16 * __pyx_v_X.strides[2]) )));
 
-        /* "nitrogen/basis/cython/ndbasis_c.pyx":54
+        /* "nitrogen/basis/cython/ndbasis_c.pyx":52
  *                 X_val = X[ipre,i,ipost]
  * 
  *                 for m in range(nq):             # <<<<<<<<<<<<<<
@@ -2383,7 +2383,7 @@ static PyObject *__pyx_pf_8nitrogen_5basis_9ndbasis_c__structured_op_double(CYTH
         for (__pyx_t_11 = 0; __pyx_t_11 < __pyx_t_12; __pyx_t_11+=1) {
           __pyx_v_m = __pyx_t_11;
 
-          /* "nitrogen/basis/cython/ndbasis_c.pyx":55
+          /* "nitrogen/basis/cython/ndbasis_c.pyx":53
  * 
  *                 for m in range(nq):
  *                     Y[ipre, m, isub, ipost] += W[m,iop] * X_val             # <<<<<<<<<<<<<<
@@ -2402,7 +2402,7 @@ static PyObject *__pyx_pf_8nitrogen_5basis_9ndbasis_c__structured_op_double(CYTH
     }
   }
 
-  /* "nitrogen/basis/cython/ndbasis_c.pyx":57
+  /* "nitrogen/basis/cython/ndbasis_c.pyx":55
  *                     Y[ipre, m, isub, ipost] += W[m,iop] * X_val
  * 
  *     return             # <<<<<<<<<<<<<<
@@ -2411,7 +2411,7 @@ static PyObject *__pyx_pf_8nitrogen_5basis_9ndbasis_c__structured_op_double(CYTH
   __pyx_r = Py_None; __Pyx_INCREF(Py_None);
   goto __pyx_L0;
 
-  /* "nitrogen/basis/cython/ndbasis_c.pyx":8
+  /* "nitrogen/basis/cython/ndbasis_c.pyx":6
  * #
  * 
  * def _structured_op_double(double [:,:,:] X, double [:,:,:,:] Y, double [:,:] W,             # <<<<<<<<<<<<<<
@@ -16320,7 +16320,7 @@ static __Pyx_StringTabEntry __pyx_string_tab[] = {
   {0, 0, 0, 0, 0, 0, 0}
 };
 static CYTHON_SMALL_CODE int __Pyx_InitCachedBuiltins(void) {
-  __pyx_builtin_range = __Pyx_GetBuiltinName(__pyx_n_s_range); if (!__pyx_builtin_range) __PYX_ERR(0, 33, __pyx_L1_error)
+  __pyx_builtin_range = __Pyx_GetBuiltinName(__pyx_n_s_range); if (!__pyx_builtin_range) __PYX_ERR(0, 31, __pyx_L1_error)
   __pyx_builtin_ValueError = __Pyx_GetBuiltinName(__pyx_n_s_ValueError); if (!__pyx_builtin_ValueError) __PYX_ERR(1, 133, __pyx_L1_error)
   __pyx_builtin_MemoryError = __Pyx_GetBuiltinName(__pyx_n_s_MemoryError); if (!__pyx_builtin_MemoryError) __PYX_ERR(1, 148, __pyx_L1_error)
   __pyx_builtin_enumerate = __Pyx_GetBuiltinName(__pyx_n_s_enumerate); if (!__pyx_builtin_enumerate) __PYX_ERR(1, 151, __pyx_L1_error)
@@ -16529,17 +16529,17 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
   __Pyx_GOTREF(__pyx_tuple__18);
   __Pyx_GIVEREF(__pyx_tuple__18);
 
-  /* "nitrogen/basis/cython/ndbasis_c.pyx":8
+  /* "nitrogen/basis/cython/ndbasis_c.pyx":6
  * #
  * 
  * def _structured_op_double(double [:,:,:] X, double [:,:,:,:] Y, double [:,:] W,             # <<<<<<<<<<<<<<
  *                           int [:] idx_op, int [:] idx_sub):
  * 
  */
-  __pyx_tuple__19 = PyTuple_Pack(18, __pyx_n_s_X, __pyx_n_s_Y, __pyx_n_s_W, __pyx_n_s_idx_op, __pyx_n_s_idx_sub, __pyx_n_s_npre, __pyx_n_s_Nb, __pyx_n_s_npost, __pyx_n_s_nq, __pyx_n_s_nb, __pyx_n_s_nsub, __pyx_n_s_ipre, __pyx_n_s_ipost, __pyx_n_s_i, __pyx_n_s_m, __pyx_n_s_iop, __pyx_n_s_isub, __pyx_n_s_X_val); if (unlikely(!__pyx_tuple__19)) __PYX_ERR(0, 8, __pyx_L1_error)
+  __pyx_tuple__19 = PyTuple_Pack(18, __pyx_n_s_X, __pyx_n_s_Y, __pyx_n_s_W, __pyx_n_s_idx_op, __pyx_n_s_idx_sub, __pyx_n_s_npre, __pyx_n_s_Nb, __pyx_n_s_npost, __pyx_n_s_nq, __pyx_n_s_nb, __pyx_n_s_nsub, __pyx_n_s_ipre, __pyx_n_s_ipost, __pyx_n_s_i, __pyx_n_s_m, __pyx_n_s_iop, __pyx_n_s_isub, __pyx_n_s_X_val); if (unlikely(!__pyx_tuple__19)) __PYX_ERR(0, 6, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_tuple__19);
   __Pyx_GIVEREF(__pyx_tuple__19);
-  __pyx_codeobj__20 = (PyObject*)__Pyx_PyCode_New(5, 0, 18, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__19, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_nitrogen_basis_cython_ndbasis_c, __pyx_n_s_structured_op_double, 8, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__20)) __PYX_ERR(0, 8, __pyx_L1_error)
+  __pyx_codeobj__20 = (PyObject*)__Pyx_PyCode_New(5, 0, 18, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__19, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_nitrogen_basis_cython_ndbasis_c, __pyx_n_s_structured_op_double, 6, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__20)) __PYX_ERR(0, 6, __pyx_L1_error)
 
   /* "View.MemoryView":286
  *         return self.name
@@ -16952,22 +16952,22 @@ if (!__Pyx_RefNanny) {
   if (__Pyx_patch_abc() < 0) __PYX_ERR(0, 1, __pyx_L1_error)
   #endif
 
-  /* "nitrogen/basis/cython/ndbasis_c.pyx":8
+  /* "nitrogen/basis/cython/ndbasis_c.pyx":6
  * #
  * 
  * def _structured_op_double(double [:,:,:] X, double [:,:,:,:] Y, double [:,:] W,             # <<<<<<<<<<<<<<
  *                           int [:] idx_op, int [:] idx_sub):
  * 
  */
-  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_8nitrogen_5basis_9ndbasis_c_1_structured_op_double, NULL, __pyx_n_s_nitrogen_basis_ndbasis_c); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 8, __pyx_L1_error)
+  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_8nitrogen_5basis_9ndbasis_c_1_structured_op_double, NULL, __pyx_n_s_nitrogen_basis_ndbasis_c); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 6, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
-  if (PyDict_SetItem(__pyx_d, __pyx_n_s_structured_op_double, __pyx_t_1) < 0) __PYX_ERR(0, 8, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_d, __pyx_n_s_structured_op_double, __pyx_t_1) < 0) __PYX_ERR(0, 6, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
   /* "nitrogen/basis/cython/ndbasis_c.pyx":1
- * #cython: boundscheck=False, wraparound=False, nonecheck=False             # <<<<<<<<<<<<<<
+ * #cython: boundscheck=False, wraparound=False, nonecheck=False, language_level=3             # <<<<<<<<<<<<<<
  * #
- * #
+ * # Cython extension code for ndbasis
  */
   __pyx_t_1 = __Pyx_PyDict_NewPresized(0); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 1, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
