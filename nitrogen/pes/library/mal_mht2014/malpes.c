@@ -1301,9 +1301,6 @@ static CYTHON_INLINE int __Pyx_PyUnicode_Equals(PyObject* s1, PyObject* s2, int 
 #define __Pyx_PyString_Equals __Pyx_PyBytes_Equals
 #endif
 
-/* None.proto */
-static CYTHON_INLINE Py_ssize_t __Pyx_div_Py_ssize_t(Py_ssize_t, Py_ssize_t);
-
 /* UnaryNegOverflows.proto */
 #define UNARY_NEG_WOULD_OVERFLOW(x)\
         (((x) < 0) & ((unsigned long)(x) == 0-(unsigned long)(x)))
@@ -1538,9 +1535,6 @@ static CYTHON_INLINE int __Pyx_PyList_Append(PyObject* list, PyObject* x) {
 
 /* None.proto */
 static CYTHON_INLINE void __Pyx_RaiseUnboundLocalError(const char *varname);
-
-/* None.proto */
-static CYTHON_INLINE long __Pyx_div_long(long, long);
 
 /* ImportFrom.proto */
 static PyObject* __Pyx_ImportFrom(PyObject* module, PyObject* name);
@@ -4174,7 +4168,7 @@ static int __pyx_array___pyx_pf_15View_dot_MemoryView_5array___cinit__(struct __
         PyErr_SetString(PyExc_OverflowError, "value too large to perform division");
         __PYX_ERR(1, 180, __pyx_L1_error)
       }
-      __pyx_t_1 = __Pyx_div_Py_ssize_t(__pyx_v_self->len, __pyx_v_itemsize);
+      __pyx_t_1 = (__pyx_v_self->len / __pyx_v_itemsize);
       __pyx_t_9 = __pyx_t_1;
       for (__pyx_t_11 = 0; __pyx_t_11 < __pyx_t_9; __pyx_t_11+=1) {
         __pyx_v_i = __pyx_t_11;
@@ -12170,7 +12164,7 @@ static char *__pyx_pybuffer_index(Py_buffer *__pyx_v_view, char *__pyx_v_bufp, P
       PyErr_SetString(PyExc_OverflowError, "value too large to perform division");
       __PYX_ERR(1, 917, __pyx_L1_error)
     }
-    __pyx_v_shape = __Pyx_div_Py_ssize_t(__pyx_v_view->len, __pyx_v_itemsize);
+    __pyx_v_shape = (__pyx_v_view->len / __pyx_v_itemsize);
 
     /* "View.MemoryView":918
  *     if view.ndim == 0:
@@ -12475,7 +12469,7 @@ static int __pyx_memslice_transpose(__Pyx_memviewslice *__pyx_v_memslice) {
  *         j = ndim - 1 - i
  *         strides[i], strides[j] = strides[j], strides[i]
  */
-  __pyx_t_3 = __Pyx_div_long(__pyx_v_ndim, 2);
+  __pyx_t_3 = (__pyx_v_ndim / 2);
   __pyx_t_4 = __pyx_t_3;
   for (__pyx_t_1 = 0; __pyx_t_1 < __pyx_t_4; __pyx_t_1+=1) {
     __pyx_v_i = __pyx_t_1;
@@ -18058,7 +18052,7 @@ if (!__Pyx_RefNanny) {
   if (__Pyx_patch_abc() < 0) __PYX_ERR(0, 1, __pyx_L1_error)
   #endif
 
-  /* "nitrogen/pes/library/mal_mht2014/maldefs.pxi":6
+  /* "nitrogen/pes/library/mal_mht2014/maldefs.pxi":9
  * 
  * cdef:
  *     int nmorse = 9             # <<<<<<<<<<<<<<
@@ -18067,7 +18061,7 @@ if (!__Pyx_RefNanny) {
  */
   __pyx_v_8nitrogen_3pes_7library_11mal_mht2014_6malpes_nmorse = 9;
 
-  /* "nitrogen/pes/library/mal_mht2014/maldefs.pxi":7
+  /* "nitrogen/pes/library/mal_mht2014/maldefs.pxi":10
  * cdef:
  *     int nmorse = 9
  *     int ng1d = 80             # <<<<<<<<<<<<<<
@@ -18076,7 +18070,7 @@ if (!__Pyx_RefNanny) {
  */
   __pyx_v_8nitrogen_3pes_7library_11mal_mht2014_6malpes_ng1d = 80;
 
-  /* "nitrogen/pes/library/mal_mht2014/maldefs.pxi":8
+  /* "nitrogen/pes/library/mal_mht2014/maldefs.pxi":11
  *     int nmorse = 9
  *     int ng1d = 80
  *     int ng2d = 1728             # <<<<<<<<<<<<<<
@@ -18085,7 +18079,7 @@ if (!__Pyx_RefNanny) {
  */
   __pyx_v_8nitrogen_3pes_7library_11mal_mht2014_6malpes_ng2d = 0x6C0;
 
-  /* "nitrogen/pes/library/mal_mht2014/maldefs.pxi":9
+  /* "nitrogen/pes/library/mal_mht2014/maldefs.pxi":12
  *     int ng1d = 80
  *     int ng2d = 1728
  *     int ng3d = 1741             # <<<<<<<<<<<<<<
@@ -18094,7 +18088,7 @@ if (!__Pyx_RefNanny) {
  */
   __pyx_v_8nitrogen_3pes_7library_11mal_mht2014_6malpes_ng3d = 0x6CD;
 
-  /* "nitrogen/pes/library/mal_mht2014/maldefs.pxi":10
+  /* "nitrogen/pes/library/mal_mht2014/maldefs.pxi":13
  *     int ng2d = 1728
  *     int ng3d = 1741
  *     double shift = -0.3607460810980822E-01             # <<<<<<<<<<<<<<
@@ -18103,7 +18097,7 @@ if (!__Pyx_RefNanny) {
  */
   __pyx_v_8nitrogen_3pes_7library_11mal_mht2014_6malpes_shift = -0.3607460810980822E-01;
 
-  /* "nitrogen/pes/library/mal_mht2014/maldefs.pxi":16
+  /* "nitrogen/pes/library/mal_mht2014/maldefs.pxi":19
  *     # and function parameters: (re, alpha, De)
  *     #
  *     int[9] imorse = [1,4,3,10,11,18,20,25,30]             # <<<<<<<<<<<<<<
@@ -18121,7 +18115,7 @@ if (!__Pyx_RefNanny) {
   __pyx_t_1[8] = 30;
   memcpy(&(__pyx_v_8nitrogen_3pes_7library_11mal_mht2014_6malpes_imorse[0]), __pyx_t_1, sizeof(__pyx_v_8nitrogen_3pes_7library_11mal_mht2014_6malpes_imorse[0]) * (9));
 
-  /* "nitrogen/pes/library/mal_mht2014/maldefs.pxi":17
+  /* "nitrogen/pes/library/mal_mht2014/maldefs.pxi":20
  *     #
  *     int[9] imorse = [1,4,3,10,11,18,20,25,30]
  *     double[9][3] morse = [[ 0.2638930000000000E+01, 0.1031620000000000E+01, 0.4812016209449008E+00],             # <<<<<<<<<<<<<<
@@ -18132,7 +18126,7 @@ if (!__Pyx_RefNanny) {
   __pyx_t_2[1] = 0.1031620000000000E+01;
   __pyx_t_2[2] = 0.4812016209449008E+00;
 
-  /* "nitrogen/pes/library/mal_mht2014/maldefs.pxi":18
+  /* "nitrogen/pes/library/mal_mht2014/maldefs.pxi":21
  *     int[9] imorse = [1,4,3,10,11,18,20,25,30]
  *     double[9][3] morse = [[ 0.2638930000000000E+01, 0.1031620000000000E+01, 0.4812016209449008E+00],
  *          [ 0.2638930000000000E+01, 0.1031620000000000E+01, 0.4812016209449008E+00],             # <<<<<<<<<<<<<<
@@ -18143,7 +18137,7 @@ if (!__Pyx_RefNanny) {
   __pyx_t_3[1] = 0.1031620000000000E+01;
   __pyx_t_3[2] = 0.4812016209449008E+00;
 
-  /* "nitrogen/pes/library/mal_mht2014/maldefs.pxi":19
+  /* "nitrogen/pes/library/mal_mht2014/maldefs.pxi":22
  *     double[9][3] morse = [[ 0.2638930000000000E+01, 0.1031620000000000E+01, 0.4812016209449008E+00],
  *          [ 0.2638930000000000E+01, 0.1031620000000000E+01, 0.4812016209449008E+00],
  *          [ 0.2416120000000000E+01, 0.1035540000000000E+01, 0.5174427504565119E+00],             # <<<<<<<<<<<<<<
@@ -18154,7 +18148,7 @@ if (!__Pyx_RefNanny) {
   __pyx_t_4[1] = 0.1035540000000000E+01;
   __pyx_t_4[2] = 0.5174427504565119E+00;
 
-  /* "nitrogen/pes/library/mal_mht2014/maldefs.pxi":20
+  /* "nitrogen/pes/library/mal_mht2014/maldefs.pxi":23
  *          [ 0.2638930000000000E+01, 0.1031620000000000E+01, 0.4812016209449008E+00],
  *          [ 0.2416120000000000E+01, 0.1035540000000000E+01, 0.5174427504565119E+00],
  *          [ 0.2416120000000000E+01, 0.1035540000000000E+01, 0.5174427504565119E+00],             # <<<<<<<<<<<<<<
@@ -18165,7 +18159,7 @@ if (!__Pyx_RefNanny) {
   __pyx_t_5[1] = 0.1035540000000000E+01;
   __pyx_t_5[2] = 0.5174427504565119E+00;
 
-  /* "nitrogen/pes/library/mal_mht2014/maldefs.pxi":21
+  /* "nitrogen/pes/library/mal_mht2014/maldefs.pxi":24
  *          [ 0.2416120000000000E+01, 0.1035540000000000E+01, 0.5174427504565119E+00],
  *          [ 0.2416120000000000E+01, 0.1035540000000000E+01, 0.5174427504565119E+00],
  *          [ 0.2045130000000000E+01, 0.9514800000000000E+00, 0.4591742588604026E+00],             # <<<<<<<<<<<<<<
@@ -18176,7 +18170,7 @@ if (!__Pyx_RefNanny) {
   __pyx_t_6[1] = 0.9514800000000000E+00;
   __pyx_t_6[2] = 0.4591742588604026E+00;
 
-  /* "nitrogen/pes/library/mal_mht2014/maldefs.pxi":22
+  /* "nitrogen/pes/library/mal_mht2014/maldefs.pxi":25
  *          [ 0.2416120000000000E+01, 0.1035540000000000E+01, 0.5174427504565119E+00],
  *          [ 0.2045130000000000E+01, 0.9514800000000000E+00, 0.4591742588604026E+00],
  *          [ 0.1846610000000000E+01, 0.1824940000000000E+01, 0.2297085109437611E+00],             # <<<<<<<<<<<<<<
@@ -18187,7 +18181,7 @@ if (!__Pyx_RefNanny) {
   __pyx_t_7[1] = 0.1824940000000000E+01;
   __pyx_t_7[2] = 0.2297085109437611E+00;
 
-  /* "nitrogen/pes/library/mal_mht2014/maldefs.pxi":23
+  /* "nitrogen/pes/library/mal_mht2014/maldefs.pxi":26
  *          [ 0.2045130000000000E+01, 0.9514800000000000E+00, 0.4591742588604026E+00],
  *          [ 0.1846610000000000E+01, 0.1824940000000000E+01, 0.2297085109437611E+00],
  *          [ 0.1846610000000000E+01, 0.1824940000000000E+01, 0.2297085109437611E+00],             # <<<<<<<<<<<<<<
@@ -18198,7 +18192,7 @@ if (!__Pyx_RefNanny) {
   __pyx_t_8[1] = 0.1824940000000000E+01;
   __pyx_t_8[2] = 0.2297085109437611E+00;
 
-  /* "nitrogen/pes/library/mal_mht2014/maldefs.pxi":24
+  /* "nitrogen/pes/library/mal_mht2014/maldefs.pxi":27
  *          [ 0.1846610000000000E+01, 0.1824940000000000E+01, 0.2297085109437611E+00],
  *          [ 0.1846610000000000E+01, 0.1824940000000000E+01, 0.2297085109437611E+00],
  *          [ 0.2067890000000000E+01, 0.9825600000000000E+00, 0.4261818860533610E+00],             # <<<<<<<<<<<<<<
@@ -18209,7 +18203,7 @@ if (!__Pyx_RefNanny) {
   __pyx_t_9[1] = 0.9825600000000000E+00;
   __pyx_t_9[2] = 0.4261818860533610E+00;
 
-  /* "nitrogen/pes/library/mal_mht2014/maldefs.pxi":25
+  /* "nitrogen/pes/library/mal_mht2014/maldefs.pxi":28
  *          [ 0.1846610000000000E+01, 0.1824940000000000E+01, 0.2297085109437611E+00],
  *          [ 0.2067890000000000E+01, 0.9825600000000000E+00, 0.4261818860533610E+00],
  *          [ 0.2067890000000000E+01, 0.9825600000000000E+00, 0.4261818860533610E+00]]             # <<<<<<<<<<<<<<
@@ -18220,7 +18214,7 @@ if (!__Pyx_RefNanny) {
   __pyx_t_10[1] = 0.9825600000000000E+00;
   __pyx_t_10[2] = 0.4261818860533610E+00;
 
-  /* "nitrogen/pes/library/mal_mht2014/maldefs.pxi":17
+  /* "nitrogen/pes/library/mal_mht2014/maldefs.pxi":20
  *     #
  *     int[9] imorse = [1,4,3,10,11,18,20,25,30]
  *     double[9][3] morse = [[ 0.2638930000000000E+01, 0.1031620000000000E+01, 0.4812016209449008E+00],             # <<<<<<<<<<<<<<
@@ -18238,7 +18232,7 @@ if (!__Pyx_RefNanny) {
   memcpy(&(__pyx_t_11[8]), __pyx_t_10, sizeof(__pyx_t_11[0]));
   memcpy(&(__pyx_v_8nitrogen_3pes_7library_11mal_mht2014_6malpes_morse[0]), __pyx_t_11, sizeof(__pyx_v_8nitrogen_3pes_7library_11mal_mht2014_6malpes_morse[0]) * (9));
 
-  /* "nitrogen/pes/library/mal_mht2014/maldefs.pxi":26
+  /* "nitrogen/pes/library/mal_mht2014/maldefs.pxi":29
  *          [ 0.2067890000000000E+01, 0.9825600000000000E+00, 0.4261818860533610E+00],
  *          [ 0.2067890000000000E+01, 0.9825600000000000E+00, 0.4261818860533610E+00]]
  *     int[80] ig1d = [1, 4, 1, 4, 1, 4, 1, 4, 2, 7, 3, 10, 3, 10, 3, 10, 3, 10, 9, 9,             # <<<<<<<<<<<<<<
@@ -18327,7 +18321,7 @@ if (!__Pyx_RefNanny) {
   __pyx_t_12[79] = 31;
   memcpy(&(__pyx_v_8nitrogen_3pes_7library_11mal_mht2014_6malpes_ig1d[0]), __pyx_t_12, sizeof(__pyx_v_8nitrogen_3pes_7library_11mal_mht2014_6malpes_ig1d[0]) * (80));
 
-  /* "nitrogen/pes/library/mal_mht2014/maldefs.pxi":30
+  /* "nitrogen/pes/library/mal_mht2014/maldefs.pxi":33
  * 		18, 20, 18, 20, 18, 20, 18, 20, 18, 20, 18, 20, 18, 20, 18, 20, 18, 20, 18, 20,
  * 		18, 20, 18, 20, 18, 20, 18, 20, 25, 30, 25, 30, 25, 30, 25, 30, 25, 30, 26, 31 ]
  *     int[3456] ig2d = [ 2, 1, 7, 4, 3, 1, 10, 4, 3, 1, 10, 4, 3, 1, 10, 4, 3, 1, 10, 4,             # <<<<<<<<<<<<<<
@@ -21792,11 +21786,11 @@ if (!__Pyx_RefNanny) {
   __pyx_t_13[3455] = 35;
   if (unlikely((0xD80) != (3456))) {
     PyErr_Format(PyExc_ValueError, "Assignment to slice of wrong length, expected %" CYTHON_FORMAT_SSIZE_T "d, got %" CYTHON_FORMAT_SSIZE_T "d", (Py_ssize_t)(3456), (Py_ssize_t)(0xD80));
-    __PYX_ERR(2, 30, __pyx_L1_error)
+    __PYX_ERR(2, 33, __pyx_L1_error)
   }
   memcpy(&(__pyx_v_8nitrogen_3pes_7library_11mal_mht2014_6malpes_ig2d[0]), __pyx_t_13, sizeof(__pyx_v_8nitrogen_3pes_7library_11mal_mht2014_6malpes_ig2d[0]) * (3456));
 
-  /* "nitrogen/pes/library/mal_mht2014/maldefs.pxi":204
+  /* "nitrogen/pes/library/mal_mht2014/maldefs.pxi":207
  *                 36, 25, 36, 30, 36, 26, 36, 31, 36, 26, 36, 31, 36, 28, 36, 35]
  * 
  *     int[5223] ig3d = [ 3, 2, 1, 10, 7, 4, 4, 3, 2, 1, 10, 7, 8, 3, 1,             # <<<<<<<<<<<<<<
@@ -27028,11 +27022,11 @@ if (!__Pyx_RefNanny) {
   __pyx_t_14[5222] = 35;
   if (unlikely((0x1467) != (5223))) {
     PyErr_Format(PyExc_ValueError, "Assignment to slice of wrong length, expected %" CYTHON_FORMAT_SSIZE_T "d, got %" CYTHON_FORMAT_SSIZE_T "d", (Py_ssize_t)(5223), (Py_ssize_t)(0x1467));
-    __PYX_ERR(2, 204, __pyx_L1_error)
+    __PYX_ERR(2, 207, __pyx_L1_error)
   }
   memcpy(&(__pyx_v_8nitrogen_3pes_7library_11mal_mht2014_6malpes_ig3d[0]), __pyx_t_14, sizeof(__pyx_v_8nitrogen_3pes_7library_11mal_mht2014_6malpes_ig3d[0]) * (5223));
 
-  /* "nitrogen/pes/library/mal_mht2014/maldefs.pxi":554
+  /* "nitrogen/pes/library/mal_mht2014/maldefs.pxi":557
  *                 36, 28, 35]
  * 
  *     double[320] g1d = [2.7415340013592209, 11.111111111111111, -3.27567388775227382E-003, 0.91821795436848119,             # <<<<<<<<<<<<<<
@@ -27361,11 +27355,11 @@ if (!__Pyx_RefNanny) {
   __pyx_t_15[319] = 0.97907663089524277;
   if (unlikely((0x140) != (320))) {
     PyErr_Format(PyExc_ValueError, "Assignment to slice of wrong length, expected %" CYTHON_FORMAT_SSIZE_T "d, got %" CYTHON_FORMAT_SSIZE_T "d", (Py_ssize_t)(320), (Py_ssize_t)(0x140));
-    __PYX_ERR(2, 554, __pyx_L1_error)
+    __PYX_ERR(2, 557, __pyx_L1_error)
   }
   memcpy(&(__pyx_v_8nitrogen_3pes_7library_11mal_mht2014_6malpes_g1d[0]), __pyx_t_15, sizeof(__pyx_v_8nitrogen_3pes_7library_11mal_mht2014_6malpes_g1d[0]) * (320));
 
-  /* "nitrogen/pes/library/mal_mht2014/maldefs.pxi":636
+  /* "nitrogen/pes/library/mal_mht2014/maldefs.pxi":639
  * 
  * 
  *     double[10368] g2d = [4.6445018254319930, 2.9415340013592211, 1.3311367891239581,             # <<<<<<<<<<<<<<
@@ -37742,11 +37736,11 @@ if (!__Pyx_RefNanny) {
   __pyx_t_16[10367] = 0.81647787164115149;
   if (unlikely((0x2880) != (10368))) {
     PyErr_Format(PyExc_ValueError, "Assignment to slice of wrong length, expected %" CYTHON_FORMAT_SSIZE_T "d, got %" CYTHON_FORMAT_SSIZE_T "d", (Py_ssize_t)(10368), (Py_ssize_t)(0x2880));
-    __PYX_ERR(2, 636, __pyx_L1_error)
+    __PYX_ERR(2, 639, __pyx_L1_error)
   }
   memcpy(&(__pyx_v_8nitrogen_3pes_7library_11mal_mht2014_6malpes_g2d[0]), __pyx_t_16, sizeof(__pyx_v_8nitrogen_3pes_7library_11mal_mht2014_6malpes_g2d[0]) * (10368));
 
-  /* "nitrogen/pes/library/mal_mht2014/maldefs.pxi":4093
+  /* "nitrogen/pes/library/mal_mht2014/maldefs.pxi":4096
  *                5.96330198881137724E-002, 1.77110895977463413E-002, 0.81647787164115149]
  * 
  *     double[13928] g3d = [ 3.1941351191190530, 4.0666754020748774, 3.4415340013592202,             # <<<<<<<<<<<<<<
@@ -51683,7 +51677,7 @@ if (!__Pyx_RefNanny) {
   __pyx_t_17[13927] = 0.37340903803342568;
   if (unlikely((0x3668) != (13928))) {
     PyErr_Format(PyExc_ValueError, "Assignment to slice of wrong length, expected %" CYTHON_FORMAT_SSIZE_T "d, got %" CYTHON_FORMAT_SSIZE_T "d", (Py_ssize_t)(13928), (Py_ssize_t)(0x3668));
-    __PYX_ERR(2, 4093, __pyx_L1_error)
+    __PYX_ERR(2, 4096, __pyx_L1_error)
   }
   memcpy(&(__pyx_v_8nitrogen_3pes_7library_11mal_mht2014_6malpes_g3d[0]), __pyx_t_17, sizeof(__pyx_v_8nitrogen_3pes_7library_11mal_mht2014_6malpes_g3d[0]) * (13928));
 
@@ -51700,7 +51694,7 @@ if (!__Pyx_RefNanny) {
   __Pyx_DECREF(__pyx_t_18); __pyx_t_18 = 0;
 
   /* "nitrogen/pes/library/mal_mht2014/malpes.pyx":1
- * #cython: boundscheck=False, wraparound=False, nonecheck=False, language_level=3             # <<<<<<<<<<<<<<
+ * #cython: boundscheck=False, wraparound=False, nonecheck=False, cdivision=True, language_level=3             # <<<<<<<<<<<<<<
  * #
  * #
  */
@@ -52810,14 +52804,6 @@ return_ne:
 #endif
 }
 
-/* None */
-static CYTHON_INLINE Py_ssize_t __Pyx_div_Py_ssize_t(Py_ssize_t a, Py_ssize_t b) {
-    Py_ssize_t q = a / b;
-    Py_ssize_t r = a - q*b;
-    q -= ((r != 0) & ((r ^ b) < 0));
-    return q;
-}
-
 /* GetAttr */
 static CYTHON_INLINE PyObject *__Pyx_GetAttr(PyObject *o, PyObject *n) {
 #if CYTHON_USE_TYPE_SLOTS
@@ -53569,14 +53555,6 @@ static PyObject* __Pyx_PyInt_AddObjC(PyObject *op1, PyObject *op2, CYTHON_UNUSED
 /* None */
 static CYTHON_INLINE void __Pyx_RaiseUnboundLocalError(const char *varname) {
     PyErr_Format(PyExc_UnboundLocalError, "local variable '%s' referenced before assignment", varname);
-}
-
-/* None */
-static CYTHON_INLINE long __Pyx_div_long(long a, long b) {
-    long q = a / b;
-    long r = a - q*b;
-    q -= ((r != 0) & ((r ^ b) < 0));
-    return q;
 }
 
 /* ImportFrom */

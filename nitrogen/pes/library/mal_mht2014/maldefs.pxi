@@ -1,3 +1,6 @@
+#cython: boundscheck=False, wraparound=False, nonecheck=False, cdivision=True, language_level=3
+# 
+#
 """
 Malonaldehyde PES parameter definitions
 """
