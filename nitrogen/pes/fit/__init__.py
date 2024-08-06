@@ -1284,6 +1284,10 @@ class ExpPIP(nitrogen.dfun.DFun):
     A Cython implementation of a simple PIP w.r.t 
     Morse-scaled internuclear distances.
     
+    See Also
+    --------
+    fitSimplePIP : linear least squares PIP fitting
+    
     """
     
     def __init__(self, a, natoms, coeff, terms,
