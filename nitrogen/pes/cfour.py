@@ -189,7 +189,7 @@ class CFOUR(dfun.DFun):
                     file.write("\nPRINT=1")
                     file.write("\nVIB=ANALYTIC")
                 
-                file.write(")\n")
+                file.write(")\n\n")
                 
             # Save current word dir 
             current_wd = os.getcwd()
