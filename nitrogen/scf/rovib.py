@@ -486,7 +486,9 @@ def rovib_MP2(Hvib, Crot, Crv, mp2_max, target = None, excitation_fun = None, pr
     ##################################
     
 def rovib_MP2_multi(Hvib, Crot, Crv, mp2_max, targets, 
-                    excitation_fun = None, printlevel = 1):
+                    excitation_fun = None, printlevel = 1, first_order_only = False,
+                    return_partitioned_heff = False):
+        
     """
     Multi-state second-order rotational effective Hamiltonian.
 
@@ -505,6 +507,11 @@ def rovib_MP2_multi(Hvib, Crot, Crv, mp2_max, targets,
     excitation_fun : function, optional
         The configuration excitation function. If None, then the sum
         of configuration indices is used. See :func:`~nitrogen.scf.config_table`.
+    first_order_only : bool, optional
+        Only include contributions up to first order. The default is False.
+    return_partitioned_h2 : bool, optional
+        If True, return individual vib/rv/rot contributions to the effective
+        `h2` operators. The default is False. 
         
     Returns
     -------
@@ -518,6 +525,15 @@ def rovib_MP2_multi(Hvib, Crot, Crv, mp2_max, targets,
         The MP2 cubic rotational coefficients.
     h4 : (nt,nt,3,3,3,3) ndarray
         The MP2 quartic rotational coefficients.
+    
+    (If `returned_partitioned_h2` == True:)
+    h2rot : (nt,nt,3,3) ndarray
+        The first-order rotational contributions to `h2`.
+    h2vibrot : (nt,nt,3,3) ndarray
+        The second-order pure vib -- pure rot contributions to `h2`.
+    h2rvrv : (nt,nt,3,3) ndarray
+        The second-order Coriolis contributions to `h2`.
+
     
     
     Notes
@@ -601,6 +617,11 @@ def rovib_MP2_multi(Hvib, Crot, Crv, mp2_max, targets,
     h3 = np.zeros((nt, nt, 3, 3, 3))        # Cubic " "
     h4 = np.zeros((nt, nt, 3, 3, 3, 3))     # Quartic " " 
     #
+    # Partitioned results
+    h2rot = np.zeros_like(h2)
+    h2vibrot = np.zeros_like(h2)
+    h2rvrv = np.zeros_like(h2) 
+    #
     # 
     #
     ##########################################
@@ -683,107 +704,122 @@ def rovib_MP2_multi(Hvib, Crot, Crv, mp2_max, targets,
             # [iJa, iJb]_+
             h2[:,:,a,b] += Cr0[a][b]
             h2[:,:,b,a] += Cr0[a][b]
+            
+            # (partitioned)
+            h2rot[:,:,a,b] += Cr0[a][b]
+            h2rot[:,:,b,a] += Cr0[a][b]
     #
-    ##################################################
-    #
-    # 2nd order:
-    #
-    # The first-order Hamiltonian is H' = H1 + Crv ... + Crot ...
-    #
-    # The 2nd order contribution to 
-    # target block <v1|...|v2>
-    #
-    #    1/2 * sum{i} ( Delta[v1,i] - Delta[i,v2] ) * (H')v1,i * (H')i,v2
-    #
-    # Note that Delta is anti-symmetric.
-    #
-    def calcVibBlock1(A0i,Bi0):
-        # Calculate the 2nd-order block for a single first-order term, A
+    if not first_order_only:
+        ##################################################
         #
-        block =  +0.5 * ( (Delta0i * A0i) @ Bi0 )
-        block += -0.5 * ( A0i @ (Deltai0 * Bi0) )
-        return block 
+        # 2nd order:
+        #
+        # The first-order Hamiltonian is H' = H1 + Crv ... + Crot ...
+        #
+        # The 2nd order contribution to 
+        # target block <v1|...|v2>
+        #
+        #    1/2 * sum{i} ( Delta[v1,i] - Delta[i,v2] ) * (H')v1,i * (H')i,v2
+        #
+        # Note that Delta is anti-symmetric.
+        #
+        def calcVibBlock1(A0i,Bi0):
+            # Calculate the 2nd-order block for a single first-order term, A
+            #
+            block =  +0.5 * ( (Delta0i * A0i) @ Bi0 )
+            block += -0.5 * ( A0i @ (Deltai0 * Bi0) )
+            return block 
+            
+        def calcVibBlock2(A0i,Ai0,B0i,Bi0):
+            # Calculate the 2nd-order block 
+            # for a pair of first-order Hamiltonian terms, A and B 
+            #
+            # This function is symmetric w.r.t A <--> B 
+            #
+            block =  +0.5 * ( (Delta0i * A0i) @ Bi0 )
+            block += +0.5 * ( (Delta0i * B0i) @ Ai0 )
+            block += -0.5 * ( A0i @ (Deltai0 * Bi0) )
+            block += -0.5 * ( B0i @ (Deltai0 * Ai0) )
+            return block 
         
-    def calcVibBlock2(A0i,Ai0,B0i,Bi0):
-        # Calculate the 2nd-order block 
-        # for a pair of first-order Hamiltonian terms, A and B 
+        # 
+        # (i) vib - vib (i.e. pure vibrational MP2)
         #
-        # This function is symmetric w.r.t A <--> B 
+        h0 += calcVibBlock1(Hv_0i, Hv_i0) 
         #
-        block =  +0.5 * ( (Delta0i * A0i) @ Bi0 )
-        block += +0.5 * ( (Delta0i * B0i) @ Ai0 )
-        block += -0.5 * ( A0i @ (Deltai0 * Bi0) )
-        block += -0.5 * ( B0i @ (Deltai0 * Ai0) )
-        return block 
-    
-    # 
-    # (i) vib - vib (i.e. pure vibrational MP2)
-    #
-    h0 += calcVibBlock1(Hv_0i, Hv_i0) 
-    #
-    # (ii) vib - rv 
-    for a in range(3):
-        h1[:,:,a] += calcVibBlock2(Hv_0i, Hv_i0, Crv_0i[a], Crv_i0[a])
-    #
-    # (iii) vib - rot 
-    for a in range(3):
-        for b in range(3):
-            h2ab = calcVibBlock2(Hv_0i, Hv_i0, Cr_0i[a][b], Cr_i0[a][b])
-            h2[:,:,a,b] += h2ab 
-            h2[:,:,b,a] += h2ab  # Anti-commutator 
-    #
-    # (iv) rv - rv 
-    for a in range(3):
-        for b in range(3):
-            h2[:,:,a,b] += calcVibBlock1(Crv_0i[a], Crv_i0[b]) 
-    #
-    # (v) rv - rot 
-    for a in range(3):
-        for b in range(3):
-            for c in range(3):
-                #
-                # iJa ... [iJb, iJc]_+ 
-                h3abc = calcVibBlock1(Crv_0i[a], Cr_i0[b][c])
-                h3[:,:,a,b,c] += h3abc 
-                h3[:,:,a,c,b] += h3abc 
+        # (ii) vib - rv 
+        for a in range(3):
+            h1[:,:,a] += calcVibBlock2(Hv_0i, Hv_i0, Crv_0i[a], Crv_i0[a])
+        #
+        # (iii) vib - rot 
+        for a in range(3):
+            for b in range(3):
+                h2ab = calcVibBlock2(Hv_0i, Hv_i0, Cr_0i[a][b], Cr_i0[a][b])
+                h2[:,:,a,b] += h2ab 
+                h2[:,:,b,a] += h2ab  # Anti-commutator 
                 
-                # 
-                # [iJb, iJc]_+ ... iJa 
-                # 
-                # h3abc = calcVibBlock1(Cr_0i[b][c], Crv_i0[a]) 
-                # This is the negative of previous (because Crv is anti-symmetric
-                # and Cr is symmetric)
-                #
-                h3[:,:,b,c,a] -= h3abc 
-                h3[:,:,c,b,a] -= h3abc 
-    #
-    # (vi) rot - rot 
-    for a in range(3):
-        for b in range(3):
-            for c in range(3):
-                for d in range(3):
+                # (partitioned)
+                h2vibrot[:,:,a,b] += h2ab 
+                h2vibrot[:,:,b,a] += h2ab 
+                
+        #
+        # (iv) rv - rv 
+        for a in range(3):
+            for b in range(3):
+                h2ab = calcVibBlock1(Crv_0i[a], Crv_i0[b]) 
+                h2[:,:,a,b] += h2ab
+                
+                # (partitioned)
+                h2rvrv[:,:,a,b] += h2ab
+        #
+        # (v) rv - rot 
+        for a in range(3):
+            for b in range(3):
+                for c in range(3):
                     #
-                    # (These loops can be simplified further to 
-                    #  take advantage of a/b and c/d symmetry, but
-                    #  I will ignore for now.)
-                    #
-                    #
-                    # [iJa, iJb]_+ ... [iJc,iJd]_+
-                    #
-                    h4abcd = calcVibBlock1(Cr_0i[a][b], Cr_i0[c][d])
+                    # iJa ... [iJb, iJc]_+ 
+                    h3abc = calcVibBlock1(Crv_0i[a], Cr_i0[b][c])
+                    h3[:,:,a,b,c] += h3abc 
+                    h3[:,:,a,c,b] += h3abc 
                     
-                    h4[:,:,a,b,c,d] += h4abcd 
-                    h4[:,:,b,a,c,d] += h4abcd 
-                    h4[:,:,a,b,d,c] += h4abcd 
-                    h4[:,:,b,a,d,c] += h4abcd 
-                    
-    # 
-    #
-    ##################################################
+                    # 
+                    # [iJb, iJc]_+ ... iJa 
+                    # 
+                    # h3abc = calcVibBlock1(Cr_0i[b][c], Crv_i0[a]) 
+                    # This is the negative of previous (because Crv is anti-symmetric
+                    # and Cr is symmetric)
+                    #
+                    h3[:,:,b,c,a] -= h3abc 
+                    h3[:,:,c,b,a] -= h3abc 
+        #
+        # (vi) rot - rot 
+        for a in range(3):
+            for b in range(3):
+                for c in range(3):
+                    for d in range(3):
+                        #
+                        # (These loops can be simplified further to 
+                        #  take advantage of a/b and c/d symmetry, but
+                        #  I will ignore for now.)
+                        #
+                        #
+                        # [iJa, iJb]_+ ... [iJc,iJd]_+
+                        #
+                        h4abcd = calcVibBlock1(Cr_0i[a][b], Cr_i0[c][d])
+                        
+                        h4[:,:,a,b,c,d] += h4abcd 
+                        h4[:,:,b,a,c,d] += h4abcd 
+                        h4[:,:,a,b,d,c] += h4abcd 
+                        h4[:,:,b,a,d,c] += h4abcd 
+                        
+        # 
+        #
+        ##################################################
     
-    
-    
-    return h0, h1, h2, h3, h4 
+    if return_partitioned_heff:
+        return h0, h1, h2, h3, h4, h2rot, h2vibrot, h2rvrv
+    else:
+        return h0, h1, h2, h3, h4 
     #
     ##################################
     

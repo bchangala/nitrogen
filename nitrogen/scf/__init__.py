@@ -695,6 +695,13 @@ def simple_MP2(Hcfg, mp2_max, target = None, excitation_fun = None, printlevel =
     # 
     cfg_mp2 = cfg[~istarget] 
     cfg_target = cfg[istarget] 
+    if printlevel >= 1:
+        print("")
+        print("-----------------------")
+        print( " Simple MP2 energy")
+        print(f" Target = {cfg_target[0]}")
+        print(f" N(MP2) = {cfg_mp2.shape[0]}")
+        print("-----------------------")
     #
     # Calculate zeroth-order energies
     E0 = Hcfg.block(cfg_target, ket_configs = 'diagonal')[0]
@@ -703,12 +710,6 @@ def simple_MP2(Hcfg, mp2_max, target = None, excitation_fun = None, printlevel =
     Hi0 = Hcfg.block(cfg_mp2, ket_configs = cfg_target)[:,0] 
     #
     if printlevel >= 1:
-        print("")
-        print("-----------------------")
-        print( " Simple MP2 energy")
-        print(f" Target = {cfg_target[0]}")
-        print(f" N(MP2) = {cfg_mp2.shape[0]}")
-        print("-----------------------")
         print(f" E0 + E1 = {E0:10.4f}") # Zeroth + first-order energy
     #
     c1 = Hi0 / (E0 - Ei) # First-order amplitudes
