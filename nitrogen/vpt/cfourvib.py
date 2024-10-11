@@ -12,7 +12,7 @@ import nitrogen.constants
 import nitrogen.autodiff.forward as adf 
 
 
-def read_QUADRATURE(filename, use_bohr = False):
+def read_QUADRATURE(filename, use_bohr = False, is_linear = False):
     """
     Parse a CFOUR QUADRATURE file.
 
@@ -22,6 +22,9 @@ def read_QUADRATURE(filename, use_bohr = False):
         The QUADRATURE file path.
     use_bohr : bool, optional
         If True, return displacements and geometry in bohrs.
+        The default is False.
+    is_linear : bool, optional
+        If True, 3*N-5 normal modes will be parsed instead of 3*N-6.
         The default is False.
 
     Returns
@@ -55,7 +58,10 @@ def read_QUADRATURE(filename, use_bohr = False):
     # second and third occurences of '%'
     # minus 1.
     Natoms = pct_lines[2] - pct_lines[1] - 1
-    Nvib = 3*Natoms - 6 # the number of vibrational modes
+    if is_linear:
+        Nvib = 3*Natoms - 5
+    else:
+        Nvib = 3*Natoms - 6 # the number of vibrational modes
     
     # Collect the displacement vectors
     # and harmonic frequencies 
@@ -198,7 +204,7 @@ def read_cubic(filename, nvib = None, offset = 7):
     return F 
     
 def sample_QUADRATURE(filename, num_sample, use_bohr = False,
-                      rng_seed = None, stddev = 1.0):
+                      rng_seed = None, stddev = 1.0, is_linear = False):
     """
     Generate sample points using a CFOUR QUADRATURE file.
 
@@ -215,6 +221,8 @@ def sample_QUADRATURE(filename, num_sample, use_bohr = False,
         The RNG seed. 
     stddev : float, optional
         The standard deviation of the sampled dimensionless normal coordinates, :math:`q`.
+    is_linear: bool, optional
+        Set to True if linear (i.e. 3*N-5 normal modes in the QUADRATURE file). Default is False.
 
     Returns
     -------
@@ -237,7 +245,8 @@ def sample_QUADRATURE(filename, num_sample, use_bohr = False,
     """
 
     # Read the QUADRATURE file
-    freq, T, ref_geo = read_QUADRATURE(filename, use_bohr = use_bohr)
+    freq, T, ref_geo = read_QUADRATURE(filename, use_bohr = use_bohr,
+                                       is_linear = is_linear)
     
     nvib = T.shape[1] # The number of vibrational modes 
     
