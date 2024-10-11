@@ -37,7 +37,7 @@ class CFOUR(dfun.DFun):
     
     def __init__(self, atomic_symbols, params, 
                  work_dir = './scratch',
-                 cleanup = True, units = 'angstrom'):
+                 cleanup = True, units = 'angstrom', sections = []):
         
         """
         Create a new CFOUR interface.
@@ -56,7 +56,10 @@ class CFOUR(dfun.DFun):
             deleted after use. 
         units : {'angstrom', 'bohr'}, optional
             The Cartesian units.
-            
+        sections : list of str, optional
+            A list of additional keyword sections. Each section is a single string
+            with appropriate newline characters. "\n\n" is written to the ZMAT
+            file after each section.
             
         Notes
         -----
@@ -103,6 +106,7 @@ class CFOUR(dfun.DFun):
         self.atomic_symbols = atomic_symbols 
         self.work_dir = work_dir 
         self.cleanup = cleanup
+        self.sections = sections 
         
     
     def _f_cfour(self, X, deriv = 0, out = None, var = None):
@@ -190,6 +194,12 @@ class CFOUR(dfun.DFun):
                     file.write("\nVIB=ANALYTIC")
                 
                 file.write(")\n\n")
+                
+                # Now add additional sections 
+                for s in self.sections:
+                    file.write(s)
+                    file.write("\n\n")
+                    
                 
             # Save current word dir 
             current_wd = os.getcwd()
