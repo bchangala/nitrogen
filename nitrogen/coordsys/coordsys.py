@@ -1,6 +1,7 @@
 import numpy as np
 import nitrogen.dfun as dfun
 import nitrogen.autodiff.forward as adf
+import nitrogen.constants
 
 __all__ = ["CoordSys", "CoordTrans", "CompositeCoordTrans",
            "QTransCoordSys"]
@@ -557,6 +558,181 @@ class CoordSys(dfun.DFun):
             return QTransCoordSys(other, self)
         else:
             return super.__matmul__(other) 
+        
+    def Q2GUV(self, q, masses, deriv, var = None, hbar = None):
+        """
+        
+        Compute the kinetic energy operator coefficients in 
+        the pseudo-potential representation.
+        
+        Parameters
+        ----------
+        q : (nq,...) ndarray
+            The evaluation grid.
+        masses : array_like
+            The masses.
+        deriv : integer
+            The derivative order of `G`. The derivative order of `U` and `V`
+            will be one less.
+        var : array_like, optional
+            The active coordinates. If None (default), all are used.
+        hbar : float, optional
+            The value of :math:`\\hbar`. If None (default), standard
+            NITROGEN units will be used. 
+
+        Returns
+        -------
+        Gvib : (nd1, nvar, nvar, ...) 
+            The vibrational block of :math:`G` multplied by :math:`\\hbar^2 / 2`.
+        Grv : (nd1, 3, nvar, ...)
+            The rotational-vibrational block of :math:`G` multplied by :math:`\\hbar^2 / 2`.
+        Grot : (nd1, 3, 3, ...)
+            The rotational block of :math:`G` multplied by :math:`\\hbar^2 / 2`.
+        U : (nd2, nvar, ...)
+            The :math:`U_i` functions multplied by :math:`\\hbar^2 / 2`.
+        VT : (nd2, ...)
+            The :math:`V_T` pseudo-potential.
+
+        """
+        
+        dg = self.Q2g(q, masses = masses, deriv = deriv, vvar = var,
+                    mode = 'bodyframe')
+        
+        nd, nvar = dfun.ndnvar(deriv, var, self.nx)
+        
+        # dg ... (nd, gpacked, ...)
+        
+        base_shape = q.shape[1:] # The base_shape 
+        ng = nvar + 3  # The size of g, n x n
+        
+        #
+        # Unpack to full matrices. Keep matrix dimensions
+        # after derivative index 
+        #
+        dg_full = np.empty((nd,) + (ng,ng) + base_shape)
+        # dg is in packed storage. Lower triangle, row major (= upper triangle, column major)
+        idx = 0
+        for i in range(ng):
+            for j in range(i+1):
+                np.copyto(dg_full[:,i,j], dg[:,idx])
+                if i != j:
+                    np.copyto(dg_full[:,j,i], dg[:,idx])
+                idx += 1 
+        # 
+        # dg_full is complete.
+        #
+        # Compute the inverse G.
+        # 
+        
+        # Use the more efficient `product_table` routines
+        # from adf.
+        #
+        # The index table and product table for g and G 
+        idxtab = adf.idxtab(deriv, nvar)
+        dpt = adf.calc_product_table(deriv, nvar) 
+        
+        # Calculate the tables for deriv - 1 
+        if deriv > 0:
+            # U and VT will be calculated 
+            idxtab_UV = adf.idxtab(deriv-1, nvar)
+            dpt_UV = adf.calc_product_table(deriv-1, nvar) 
+            nd_UV = idxtab_UV.shape[0]
+        
+        # 
+        # Compute the rovibrational inverse metric 
+        #
+        dg_swap = np.moveaxis(dg_full, [1,2], [-2,-1])
+        dG_full = np.empty_like(dg_swap)
+        temp = np.empty_like(dg_swap[0])
+        
+        adf.linalg._inv_ad_table(dg_swap, dG_full, temp, dpt)
+        
+        dG_full = np.moveaxis(dG_full, [-2,-1], [1,2])
+        
+        #
+        # dG_full contains the inverse metric 
+        #
+        # (nd, ng, ng, ...)
+        #
+        if hbar is None:
+                hbar = nitrogen.constants.hbar 
+        
+        def trAB(dA,dB,out,dpt):
+            # Tr[A @ B]
+            # trace of matrix product of two matrices
+            # the matrix axes are axis 1,2
+            #
+            m,n = dA.shape[1:3] 
+            # A : m x n matrix 
+            # B : n x m matrix 
+            
+            out.fill(0)
+            for i in range(m):
+                for j in range(n):
+                    adf._mul_ad_table(out, dA[:,i,j], dB[:,j,i], dpt, reduce = True)
+            return         
+        
+        if deriv > 0:
+            # Extract the single derivatives of g to compute 
+            # gtilde 
+            gi = [adf.reduceOrder(dg_full, i, deriv, nvar, idxtab) for i in range(nvar)]
+            # 
+            # Compute gtilde_i = (d_i |g|) / |g| = Tr[G @ d_i g]
+            #
+            
+            
+            gtilde = [] 
+            for i in range(nvar):
+                out = np.empty_like(dg_full, shape = (nd_UV,) + base_shape)
+                trAB(dG_full, gi[i], out, dpt_UV)
+                gtilde.append(out)
+            
+            # Calculate the final derivative values
+            
+            # Gamma = -0.5 * dg/g
+            Gammatilde = [-0.5 * e for e in gtilde]
+            
+            U = []
+            for i in range(nvar):
+                #
+                # Calculate hbar**2/2 * Ui 
+                Ui = 0.0 * Gammatilde[0] 
+                
+                for j in range(nvar):
+                    # Ui +=  Gammatilde[j] * Gvib[i][j]
+                    adf._mul_ad_table(Ui, Gammatilde[j], dG_full[:,i,j], dpt_UV, reduce = True)
+                    
+                Ui *= (hbar**2 / 4.0)
+                U.append(Ui)
+                
+            U = np.stack(U, axis = 1) # Stack along axis = 1
+            
+            # 3) Scalar term (VT) 
+            #
+            VT = 0.0 * Gammatilde[0] 
+            temp = 0.0 * VT 
+            
+            for i in range(nvar):
+                for j in range(i+1):
+                    
+                    factor = hbar**2 / 8.0 
+                    if i != j:
+                        factor *= 2.0 
+                    adf._mul_ad_table(temp, Gammatilde[i], Gammatilde[j], dpt_UV)
+                    temp *= factor 
+                    adf._mul_ad_table(VT, temp, dG_full[:,i,j], dpt_UV, reduce = True)
+                    #  VT += factor * Gammatilde[i] * Gammatilde[j] * Gvib[i][j]
+        else:
+            U = None 
+            VT = None 
+            
+        dG_full *= (hbar**2 / 2.0 )
+        
+        Gvib = dG_full[:, :nvar,:nvar]  # (vib,vib)
+        Grv = dG_full[:, nvar:,:nvar]   # (rot,vib)
+        Grot = dG_full[:, nvar:,nvar:]  # (rot,rot)
+
+        return Gvib, Grv, Grot, U, VT  
     
 class CoordTrans(dfun.DFun):
     """
