@@ -8,8 +8,37 @@ import numpy as np
 import nitrogen 
 import nitrogen.autodiff.forward as adf 
 
-from .exppip import evalexppip 
+from .exppip import evalexppip, evalexppipterms
 
+def _lexical_max(idx1, idx2):
+    # Find the lexical maximum of two multi-indices
+    #
+    # Rules
+    # -----
+    # 1) First, sort by sum (i.e. total degree)
+    # 2) If the degree is equal, then sort by first index
+    # 3) If the first index is equal, then sort by second, etc.
+    #
+    if len(idx1) != len(idx2):
+        raise ValueError("Indices must be of equal length")
+    
+    if sum(idx1) > sum(idx2):
+        return idx1 
+    elif sum(idx1) < sum(idx2):
+        return idx2 
+    
+    # degrees are equal
+    for i in range(len(idx1)):
+        if idx1[i] > idx2[i]:
+            return idx1 
+        elif idx1[i] < idx2[i]:
+            return idx2 
+        # else, continue
+    
+    # If we exit the for the loop, then
+    # the indices are equal. Just 
+    # return idx1 
+    return idx1 
 
 def fitSimplePIP(X,F,P,yfun,degree,Xscale):
     """
@@ -81,38 +110,6 @@ def fitSimplePIP(X,F,P,yfun,degree,Xscale):
     pows = adf.idxtab(degree, ny) 
     nt = pows.shape[0] # The number of monomial terms 
     
-    # Define a function which returns the lexical maximum
-    # of two lists of powers 
-    def lexical_max(idx1, idx2):
-        # Find the lexical maximum of two indices
-        #
-        # Rules
-        # -----
-        # 1) First, sort by sum (i.e. total degree)
-        # 2) If the degree is equal, then sort by first index
-        # 3) If the first index is equal, then sort by second, etc.
-        #
-        if len(idx1) != len(idx2):
-            raise ValueError("Indices must be of equal length")
-        
-        if sum(idx1) > sum(idx2):
-            return idx1 
-        elif sum(idx1) < sum(idx2):
-            return idx2 
-        
-        # degrees are equal
-        for i in range(len(idx1)):
-            if idx1[i] > idx2[i]:
-                return idx1 
-            elif idx1[i] < idx2[i]:
-                return idx2 
-            # else, continue
-        
-        # If we exit the for the loop, then
-        # the indices are equal. Just 
-        # return idx1 
-        return idx1 
-    
     # We now figure out the symmetric projection of the 
     # list of monomials
     # 
@@ -140,7 +137,7 @@ def fitSimplePIP(X,F,P,yfun,degree,Xscale):
             #  However, the total set of images is the same either way,
             #  so the final lexical maximum is unchanged!)
             #
-            max_idx = lexical_max(max_idx, perm_pi) 
+            max_idx = _lexical_max(max_idx, perm_pi) 
         
         # max_idx serves as a unique label for
         # the invariant sum
@@ -905,38 +902,6 @@ def fitSimplePIPDipole(X,D,P,Vij, yfun,vfun, degree,Xscale):
     pows = adf.idxtab(degree, ny) 
     nt = pows.shape[0] # The number of monomial terms 
     
-    # Define a function which returns the lexical maximum
-    # of two lists of powers 
-    def lexical_max(idx1, idx2):
-        # Find the lexical maximum of two indices
-        #
-        # Rules
-        # -----
-        # 1) First, sort by sum (i.e. total degree)
-        # 2) If the degree is equal, then sort by first index
-        # 3) If the first index is equal, then sort by second, etc.
-        #
-        if len(idx1) != len(idx2):
-            raise ValueError("Indices must be of equal length")
-        
-        if sum(idx1) > sum(idx2):
-            return idx1 
-        elif sum(idx1) < sum(idx2):
-            return idx2 
-        
-        # degrees are equal
-        for i in range(len(idx1)):
-            if idx1[i] > idx2[i]:
-                return idx1 
-            elif idx1[i] < idx2[i]:
-                return idx2 
-            # else, continue
-        
-        # If we exit the for the loop, then
-        # the indices are equal. Just 
-        # return idx1 
-        return idx1 
-    
     #
     # We now figure out the symmetric projection of the 
     # products of y-monomials with bond basis vectors
@@ -1018,7 +983,7 @@ def fitSimplePIPDipole(X,D,P,Vij, yfun,vfun, degree,Xscale):
                     rep_sign = perm_sign 
                 elif perm_k == rep_k:
                     # Sort by monomial now
-                    if np.all(lexical_max(rep_idx, perm_pi) == perm_pi):
+                    if np.all(_lexical_max(rep_idx, perm_pi) == perm_pi):
                         # The image is lexically greater 
                         # update 
                         rep_idx = perm_pi 
@@ -1304,7 +1269,7 @@ class ExpPIP(nitrogen.dfun.DFun):
         coeff : (nt,) ndarray
             The expansion coefficients
         terms : (nt,ny) ndarray
-            The expansion terms, where `ny` = `natoms`(`natoms`-1)/2 
+            The (unsorted) expansion terms, where `ny` = `natoms`(`natoms`-1)/2 
             
         Notes
         -----
@@ -1329,6 +1294,8 @@ class ExpPIP(nitrogen.dfun.DFun):
         super().__init__(self._ffun, 1, input_fun.nx, 
                          input_fun.maxderiv, None)
         
+        if len(coeff) != len(terms):
+            raise ValueError("The numbers of coefficients and terms are not equal.")
         
         self.input_fun = input_fun 
         self.ny = ny # The number of intermediate variables 
@@ -1361,7 +1328,7 @@ class ExpPIP(nitrogen.dfun.DFun):
             #
             f = np.empty_like(Y, shape = (nder, self.nf, Y.shape[2]) )
         else:
-            f = np.reshape(out, shape = (nder, self.f, Y.shape[2]))
+            f = np.reshape(out, shape = (nder, self.nf, Y.shape[2]))
         
         # Calculate the product table 
         table = adf.calc_product_table(deriv, nvar) 
@@ -1377,3 +1344,394 @@ class ExpPIP(nitrogen.dfun.DFun):
         # (`out` should still reference same data)
     
         return F
+
+class ExpPIPTerms(nitrogen.dfun.DFun):
+    """
+    
+    Term-by-term of ExpPIP
+    
+    See Also
+    --------
+    ExpPIP
+    
+    """
+    
+    def __init__(self, a, natoms, terms,
+                 input_fun = None):
+        """
+        Create a ExpPIP object
+        
+        Parameters
+        ----------
+        a : float
+            The Morse parameter
+        natoms : integer
+            The number of atoms 
+        terms : (nt,ny) ndarray
+            The (unsorted) expansion terms, where `ny` = `natoms`(`natoms`-1)/2 
+            
+        Notes
+        -----
+        `terms` will be cast to np.int32 
+
+        """
+        
+        #
+        # `fun` provides a forward diff. evaluation for a 
+        # nf <-- ny function.
+        #
+        # input_fun is a DFun for ny <-- nx 
+        #
+        # if input_fun is None, then it should just
+        # be identity, ny = nx <-- nx 
+        #
+        ny = 3*natoms
+        if input_fun is None:
+            input_fun = nitrogen.dfun.IdentityDFun(ny)
+        
+        nt = len(terms)
+        
+        # nf = nt = number of terms
+        super().__init__(self._ffun, nt, input_fun.nx, 
+                         input_fun.maxderiv, None)
+        
+        
+        self.input_fun = input_fun 
+        self.ny = ny # The number of intermediate variables 
+    
+        self.a = a 
+        self.natoms = natoms 
+        self.maxmon = np.max(terms) # The maximum power of a single variable
+        self.terms = np.array(terms).astype(np.int32)
+        
+        return 
+    
+    def _ffun(self, X, deriv = 0, out = None, var = None):
+        
+        # Evaluate the input function 
+        Y = self.input_fun.f(X, deriv = deriv, var = var) # (nd, ny, ...) 
+        
+        nder,nvar = nitrogen.dfun.ndnvar(deriv, var, self.nx)
+        
+        nder = Y.shape[0] 
+        base_shape = Y.shape[2:]
+
+        # Reshape base shape to one dimension
+        Y = np.reshape(Y, (nder, self.ny, -1))
+        
+        
+        if out is None: 
+            #
+            # Create intermediate output, with 1D base shape
+            #
+            f = np.empty_like(Y, shape = (nder, self.nf, Y.shape[2]) )
+        else:
+            f = np.reshape(out, shape = (nder, self.nf, Y.shape[2]))
+        
+        # Calculate the product table 
+        table = adf.calc_product_table(deriv, nvar) 
+        
+        # Call the forward function 
+        # self.fun(Y, f, deriv, table)
+        evalexppipterms(Y, f, deriv, table, 
+                        self.a, self.natoms, self.maxmon,
+                        self.terms)
+    
+        # Reshape output 
+        F = np.reshape(f, (nder,self.nf) + base_shape)
+        # (`out` should still reference same data)
+    
+        return F
+    
+def ny2natoms(ny):
+    """
+    Calculate the number of atoms given the number of internuclear functions
+
+    Parameters
+    ----------
+    ny : integer
+        The number of internuclear functions
+
+    Returns
+    -------
+    integer
+        The number of atoms 
+
+    """
+    return ( round( np.sqrt(8 * ny + 1) ) + 1 ) // 2 
+    
+def trimNBody(idx_list,n):
+    """
+    Trim a list of monomial terms of internuclear functions
+    to those involving `n` or few atoms,
+
+    Parameters
+    ----------
+    idx_list : (nt,ny) array_like
+        The list of monomial powers
+    n : integer
+        The maximum number of simultaneous bodies.
+        
+    Returns
+    -------
+    trimmed_list : (ns,ny) array_like
+        The trimmed list 
+
+    """
+    
+    idx_list = np.array(idx_list)
+    nt,ny = idx_list.shape
+    
+    natoms = ny2natoms(ny) 
+    
+    trimmed_list = [] 
+    
+    for i in range(nt):
+        # For each term, count the number of bodies 
+        nbodies = count_idx_bodies(idx_list[i], natoms)
+        if nbodies <= n : 
+            trimmed_list.append(idx_list[i])
+    
+    return np.array(trimmed_list) 
+    
+    
+def count_idx_bodies(idx, natoms):
+    """
+    Count the number of atoms involved in a single monomial
+    
+    Parameters
+    ----------
+    idx : (ny,) array_like
+        The single monomial powers
+    natoms : integer
+        The total number of atoms 
+        
+    Returns
+    -------
+    integer
+        The number of atoms involved.
+        
+    Notes
+    -----
+    
+    The :math:`y_{ij}` internuclear functions are ordered 
+    :math:`y_{12}, y_{13}, \\ldots, y_{1n}, y_{23}, \\ldots, y_{n-1,n}`,
+    where :math:`n` = `natoms`.
+    # 
+    """
+
+    
+    bodies = [] 
+    yidx = 0 
+    for i in range(natoms):
+        for j in range(i+1, natoms):
+            
+            # y_ij
+            if idx[yidx] > 0:
+                # Atoms i and j are involved 
+                bodies = bodies + [i,j]
+            
+            yidx += 1
+            
+    
+    nbodies = len(np.unique(bodies))  # Count the number of unique bodies 
+    
+    return nbodies 
+    
+
+def fitNBodyExpPIP(X,F,P,degree,a,n,Xscale):
+    """
+    Fit an exponential-permutationally invariant polynomial 
+    with n-body constraints.
+
+    Parameters
+    ----------
+    X : (3*n,N) ndarray
+        The Cartesian coordinates of `n` particles at `N` sampling points.
+    F : (nd,N) ndarray
+        The derivative array of the function values. If
+        only the value is fitted, for example, `nd` is 1.
+    P : list
+        The permutation elements. Each element of `P` is a
+        permutation of ``[0,1,2,...,n-1]``. 
+    degree : integer
+        The polynomial degree.
+    a : float
+        The Morse-exponential scale parameter, :math:`y = \\exp(-r/a)`.
+    n : integer
+        The maximum number of atoms per term.
+    Xscale : float
+        The Cartesian length scale. Its powers will be used to scale
+        derivatives to the value units.
+
+    Returns
+    -------
+    p : ndarray
+        The expansion coefficients.
+    terms : ndarray
+        The expansion terms.
+    res : ndarray
+        The scaled residuals.
+    
+    
+    See Also
+    --------
+    fitSimplePIP
+
+    """
+    
+    
+    #####################################
+    # Exponential--PIP fitting with
+    # n-body constraints
+    #
+    natoms = X.shape[0] // 3 # the number of atoms 
+    ny = (natoms*(natoms-1)) // 2 # The number of internuclear y coordinates
+    
+    #
+    # The `y` variables are the n*(n-1)//2 functions
+    # of the internuclear distances. 
+    # Here, y = exp(-r/a)
+    #
+    
+    # Calculate the y-index permutations from the 
+    # atomic permutations
+    Py = atom2yperm(P)
+    
+    # Create a list of y-powers for each term 
+    pows = adf.idxtab(degree, ny) 
+    npre = pows.shape[0] # The number of terms before trimming 
+    
+    # Trim the list of y-powers based on n-body count 
+    pows = trimNBody(pows, n)
+    
+    nt = pows.shape[0] # The number of monomial terms 
+    
+    # We now figure out the symmetric projection of the 
+    # list of monomials
+    # 
+    # For each monomial, find the lexical maximum of its invariant projection
+    # This is the "representative monomial" or "representative index"
+    #
+    
+    # unique_term_pos will keep track of which 
+    # representative monomial each monomial projects to 
+    #
+    unique_term_pos = np.zeros((nt,), dtype = np.uint32)
+    for i in range(nt):
+        # For each monomial
+        pi = pows[i,:] # The monomial's power index
+        
+        max_idx = pi 
+        # Find the lexical maximum of
+        # all of its permutations 
+        for py in Py: 
+            perm_pi = pi[py] # The permuted monomial
+            # (Note, I think pi[py] is actual the inverse permutation
+            #  w.r.t to how I have defined the y permutation operators.
+            #  However, the total set of images is the same either way,
+            #  so the final lexical maximum is unchanged!)
+            #
+            max_idx = _lexical_max(max_idx, perm_pi) 
+        
+        # max_idx serves as a unique label for
+        # the invariant sum
+        unique_term_pos[i] = np.nonzero(np.all(pows == max_idx, axis = 1))[0][0]
+        # adf.idxpos(max_idx, nck)
+
+    # Get the sorted list of unique, representative monomials
+    rep_terms = np.sort(np.unique(unique_term_pos))
+    nr = len(rep_terms) # unique terms after projection 
+    
+    print(f"There are {ny:d} pair-coordinates.")
+    print(f"For degree = {degree:d}, there are {npre:d} monomials.")
+    print(f"After n-body trimming, there are {nt:d} monomials.")
+    print(f"After projection, there are {nr:d} invariant terms.")
+    print("")
+    print("Calculating least-squares matrix...", end = "")
+    
+    # `rep_terms` will serve as the order of the columns of the 
+    # least-squares array. Figure out which column each
+    # monomial maps to
+    monomial_map = np.searchsorted(rep_terms, unique_term_pos)
+    
+    # Create the least-squares array
+    # Initialize to zero 
+    
+    data_nd = F.shape[0] # The number of Cartesian derivatives supplied by caller
+    npoints = F.shape[1] # The number of geometries 
+    data_deg = nitrogen.dfun.infer_deriv(data_nd, 3*natoms) # The derivative order
+    # of the data
+    
+    C = np.zeros((data_nd,npoints,nr))
+    
+    
+    # Calculate the value/derivatives of each monomial term of the 
+    # surface expansion w.r.t. X coordinates
+    # Z_of_y = nitrogen.dfun.PowerExpansionTerms(degree, np.zeros((ny,)))
+    # Z_of_X = yfun ** Z_of_y 
+    
+    Z_of_X = ExpPIPTerms(a, natoms, pows) 
+    ymonomials = Z_of_X.f(X, deriv = data_deg)  # shape (data_nd, nt, npoints)
+    
+    # Accumulate each monomial into the correct
+    # final fitting term
+    for r in range(nt):
+        # Add this monomial to the appropriate column of C
+        C[:,:,monomial_map[r]] += ymonomials[:,r,:]
+    
+    # Multiply by appropriate length scale
+    # passed as Xscale 
+    #
+    Fcopy = np.copy(F) # A copy of F, which we can modify 
+    
+    for deg in range(1,data_deg+1):
+        start = nitrogen.dfun.nderiv(deg-1, 3*natoms)
+        stop = nitrogen.dfun.nderiv(deg, 3*natoms)
+        
+        C[start:stop] *= Xscale**deg 
+        Fcopy[start:stop] *= Xscale**deg
+
+    # Now reshape C 
+    C = C.reshape((data_nd*npoints, nr))
+    # and the fit data 
+    b = Fcopy.reshape((data_nd*npoints,))
+    print("done")
+    
+    print("Calculating least-squares solution...", end = "")
+    # Now solve the linear least-squares problem
+    p,_,_,_ = np.linalg.lstsq(C, b, rcond=None)
+    res = b - C @ p
+    #        
+    print("done")
+    print("")
+    #
+    # Convert the fitted parameters to the 
+    # full list of individual monomials
+    pfull = np.zeros((nt,))
+    for r in range(nt):
+        pfull[r] = p[monomial_map[r]]
+    
+    
+    ########################
+    # Results        
+    rmse = np.sqrt(np.average(res**2)) # Total scaled RMS residual
+    print("--------------------------------------")
+    print(f"Total scaled rmse = {rmse:.3f}")
+    print("--------------------------------------")
+    # Partition RMS error by derivative order 
+    res = res.reshape((data_nd,npoints))
+    
+    start = 0
+    for deg in range(data_deg+1):
+        stop = nitrogen.dfun.nderiv(deg, 3*natoms)
+        rmse_deg = np.sqrt(np.average(res[start:stop]**2))
+        print(f"Degree {deg:d} rmse     = {rmse_deg:.3f}")
+        start = stop
+    print("--------------------------------------")
+    print("")
+    
+    # Return coefficients, term list, and residuals
+    
+    return pfull, pows, res
+    

@@ -1872,6 +1872,7 @@ static const char __pyx_k_reduce_cython[] = "__reduce_cython__";
 static const char __pyx_k_View_MemoryView[] = "View.MemoryView";
 static const char __pyx_k_allocate_buffer[] = "allocate_buffer";
 static const char __pyx_k_dtype_is_object[] = "dtype_is_object";
+static const char __pyx_k_evalexppipterms[] = "evalexppipterms";
 static const char __pyx_k_pyx_PickleError[] = "__pyx_PickleError";
 static const char __pyx_k_setstate_cython[] = "__setstate_cython__";
 static const char __pyx_k_pyx_unpickle_Enum[] = "__pyx_unpickle_Enum";
@@ -1949,6 +1950,7 @@ static PyObject *__pyx_n_s_encode;
 static PyObject *__pyx_n_s_enumerate;
 static PyObject *__pyx_n_s_error;
 static PyObject *__pyx_n_s_evalexppip;
+static PyObject *__pyx_n_s_evalexppipterms;
 static PyObject *__pyx_n_s_flags;
 static PyObject *__pyx_n_s_format;
 static PyObject *__pyx_n_s_fortran;
@@ -2029,6 +2031,7 @@ static PyObject *__pyx_kp_s_unable_to_allocate_shape_and_str;
 static PyObject *__pyx_n_s_unpack;
 static PyObject *__pyx_n_s_update;
 static PyObject *__pyx_pf_8nitrogen_3pes_3fit_6exppip_evalexppip(CYTHON_UNUSED PyObject *__pyx_self, __Pyx_memviewslice __pyx_v_dX, __Pyx_memviewslice __pyx_v_dV, int __pyx_v_order, __Pyx_memviewslice __pyx_v_table, double __pyx_v_a, int __pyx_v_natoms, int __pyx_v_maxmon, __Pyx_memviewslice __pyx_v_coeff, __Pyx_memviewslice __pyx_v_terms); /* proto */
+static PyObject *__pyx_pf_8nitrogen_3pes_3fit_6exppip_2evalexppipterms(CYTHON_UNUSED PyObject *__pyx_self, __Pyx_memviewslice __pyx_v_dX, __Pyx_memviewslice __pyx_v_dV, int __pyx_v_order, __Pyx_memviewslice __pyx_v_table, double __pyx_v_a, int __pyx_v_natoms, int __pyx_v_maxmon, __Pyx_memviewslice __pyx_v_terms); /* proto */
 static int __pyx_array___pyx_pf_15View_dot_MemoryView_5array___cinit__(struct __pyx_array_obj *__pyx_v_self, PyObject *__pyx_v_shape, Py_ssize_t __pyx_v_itemsize, PyObject *__pyx_v_format, PyObject *__pyx_v_mode, int __pyx_v_allocate_buffer); /* proto */
 static int __pyx_array___pyx_pf_15View_dot_MemoryView_5array_2__getbuffer__(struct __pyx_array_obj *__pyx_v_self, Py_buffer *__pyx_v_info, int __pyx_v_flags); /* proto */
 static void __pyx_array___pyx_pf_15View_dot_MemoryView_5array_4__dealloc__(struct __pyx_array_obj *__pyx_v_self); /* proto */
@@ -2099,13 +2102,15 @@ static PyObject *__pyx_tuple__17;
 static PyObject *__pyx_tuple__18;
 static PyObject *__pyx_tuple__19;
 static PyObject *__pyx_tuple__21;
-static PyObject *__pyx_tuple__22;
 static PyObject *__pyx_tuple__23;
 static PyObject *__pyx_tuple__24;
 static PyObject *__pyx_tuple__25;
 static PyObject *__pyx_tuple__26;
+static PyObject *__pyx_tuple__27;
+static PyObject *__pyx_tuple__28;
 static PyObject *__pyx_codeobj__20;
-static PyObject *__pyx_codeobj__27;
+static PyObject *__pyx_codeobj__22;
+static PyObject *__pyx_codeobj__29;
 /* Late includes */
 
 /* "nitrogen/pes/fit/cython/exppip.pyx":16
@@ -2887,7 +2892,7 @@ static PyObject *__pyx_pf_8nitrogen_3pes_3fit_6exppip_evalexppip(CYTHON_UNUSED P
  * 
  *     return             # <<<<<<<<<<<<<<
  * 
- * 
+ * def evalexppipterms(double [:,:,:] dX, double [:,:,:] dV, int order, int [:,:] table,
  */
   __Pyx_XDECREF(__pyx_r);
   __pyx_r = Py_None; __Pyx_INCREF(Py_None);
@@ -2913,7 +2918,766 @@ static PyObject *__pyx_pf_8nitrogen_3pes_3fit_6exppip_evalexppip(CYTHON_UNUSED P
   return __pyx_r;
 }
 
-/* "nitrogen/pes/fit/cython/exppip.pyx":173
+/* "nitrogen/pes/fit/cython/exppip.pyx":172
+ *     return
+ * 
+ * def evalexppipterms(double [:,:,:] dX, double [:,:,:] dV, int order, int [:,:] table,             # <<<<<<<<<<<<<<
+ *                     double a, int natoms, int maxmon, int [:,:] terms):
+ * 
+ */
+
+/* Python wrapper */
+static PyObject *__pyx_pw_8nitrogen_3pes_3fit_6exppip_3evalexppipterms(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
+static char __pyx_doc_8nitrogen_3pes_3fit_6exppip_2evalexppipterms[] = "\n    Evaluate individual terms of the exp-pip expansion.\n\n    Parameters\n    ----------\n    double [nd,3*N,n] dX\n        The 3*N Cartesian coordinates at `n` geometries\n        \n    double [nd,nt,n] dV\n        The energy output for each term.\n        \n    int order \n        Derivative order \n        \n    int [3,tablesize] table\n        Product table \n        \n    double a \n        The Morse parameter\n    \n    int natoms\n        The number of atoms \n    \n    int maxmon\n        The maximum monomial power \n        \n    int [nt,ny] terms\n        The expansion term powers. `ny` = `natoms`(`natoms`-1)/2 is the number of\n        atomic pairs. \n        \n    ";
+static PyMethodDef __pyx_mdef_8nitrogen_3pes_3fit_6exppip_3evalexppipterms = {"evalexppipterms", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_8nitrogen_3pes_3fit_6exppip_3evalexppipterms, METH_VARARGS|METH_KEYWORDS, __pyx_doc_8nitrogen_3pes_3fit_6exppip_2evalexppipterms};
+static PyObject *__pyx_pw_8nitrogen_3pes_3fit_6exppip_3evalexppipterms(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
+  __Pyx_memviewslice __pyx_v_dX = { 0, 0, { 0 }, { 0 }, { 0 } };
+  __Pyx_memviewslice __pyx_v_dV = { 0, 0, { 0 }, { 0 }, { 0 } };
+  int __pyx_v_order;
+  __Pyx_memviewslice __pyx_v_table = { 0, 0, { 0 }, { 0 }, { 0 } };
+  double __pyx_v_a;
+  int __pyx_v_natoms;
+  int __pyx_v_maxmon;
+  __Pyx_memviewslice __pyx_v_terms = { 0, 0, { 0 }, { 0 }, { 0 } };
+  int __pyx_lineno = 0;
+  const char *__pyx_filename = NULL;
+  int __pyx_clineno = 0;
+  PyObject *__pyx_r = 0;
+  __Pyx_RefNannyDeclarations
+  __Pyx_RefNannySetupContext("evalexppipterms (wrapper)", 0);
+  {
+    static PyObject **__pyx_pyargnames[] = {&__pyx_n_s_dX,&__pyx_n_s_dV,&__pyx_n_s_order,&__pyx_n_s_table,&__pyx_n_s_a,&__pyx_n_s_natoms,&__pyx_n_s_maxmon,&__pyx_n_s_terms,0};
+    PyObject* values[8] = {0,0,0,0,0,0,0,0};
+    if (unlikely(__pyx_kwds)) {
+      Py_ssize_t kw_args;
+      const Py_ssize_t pos_args = PyTuple_GET_SIZE(__pyx_args);
+      switch (pos_args) {
+        case  8: values[7] = PyTuple_GET_ITEM(__pyx_args, 7);
+        CYTHON_FALLTHROUGH;
+        case  7: values[6] = PyTuple_GET_ITEM(__pyx_args, 6);
+        CYTHON_FALLTHROUGH;
+        case  6: values[5] = PyTuple_GET_ITEM(__pyx_args, 5);
+        CYTHON_FALLTHROUGH;
+        case  5: values[4] = PyTuple_GET_ITEM(__pyx_args, 4);
+        CYTHON_FALLTHROUGH;
+        case  4: values[3] = PyTuple_GET_ITEM(__pyx_args, 3);
+        CYTHON_FALLTHROUGH;
+        case  3: values[2] = PyTuple_GET_ITEM(__pyx_args, 2);
+        CYTHON_FALLTHROUGH;
+        case  2: values[1] = PyTuple_GET_ITEM(__pyx_args, 1);
+        CYTHON_FALLTHROUGH;
+        case  1: values[0] = PyTuple_GET_ITEM(__pyx_args, 0);
+        CYTHON_FALLTHROUGH;
+        case  0: break;
+        default: goto __pyx_L5_argtuple_error;
+      }
+      kw_args = PyDict_Size(__pyx_kwds);
+      switch (pos_args) {
+        case  0:
+        if (likely((values[0] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_dX)) != 0)) kw_args--;
+        else goto __pyx_L5_argtuple_error;
+        CYTHON_FALLTHROUGH;
+        case  1:
+        if (likely((values[1] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_dV)) != 0)) kw_args--;
+        else {
+          __Pyx_RaiseArgtupleInvalid("evalexppipterms", 1, 8, 8, 1); __PYX_ERR(0, 172, __pyx_L3_error)
+        }
+        CYTHON_FALLTHROUGH;
+        case  2:
+        if (likely((values[2] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_order)) != 0)) kw_args--;
+        else {
+          __Pyx_RaiseArgtupleInvalid("evalexppipterms", 1, 8, 8, 2); __PYX_ERR(0, 172, __pyx_L3_error)
+        }
+        CYTHON_FALLTHROUGH;
+        case  3:
+        if (likely((values[3] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_table)) != 0)) kw_args--;
+        else {
+          __Pyx_RaiseArgtupleInvalid("evalexppipterms", 1, 8, 8, 3); __PYX_ERR(0, 172, __pyx_L3_error)
+        }
+        CYTHON_FALLTHROUGH;
+        case  4:
+        if (likely((values[4] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_a)) != 0)) kw_args--;
+        else {
+          __Pyx_RaiseArgtupleInvalid("evalexppipterms", 1, 8, 8, 4); __PYX_ERR(0, 172, __pyx_L3_error)
+        }
+        CYTHON_FALLTHROUGH;
+        case  5:
+        if (likely((values[5] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_natoms)) != 0)) kw_args--;
+        else {
+          __Pyx_RaiseArgtupleInvalid("evalexppipterms", 1, 8, 8, 5); __PYX_ERR(0, 172, __pyx_L3_error)
+        }
+        CYTHON_FALLTHROUGH;
+        case  6:
+        if (likely((values[6] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_maxmon)) != 0)) kw_args--;
+        else {
+          __Pyx_RaiseArgtupleInvalid("evalexppipterms", 1, 8, 8, 6); __PYX_ERR(0, 172, __pyx_L3_error)
+        }
+        CYTHON_FALLTHROUGH;
+        case  7:
+        if (likely((values[7] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_terms)) != 0)) kw_args--;
+        else {
+          __Pyx_RaiseArgtupleInvalid("evalexppipterms", 1, 8, 8, 7); __PYX_ERR(0, 172, __pyx_L3_error)
+        }
+      }
+      if (unlikely(kw_args > 0)) {
+        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "evalexppipterms") < 0)) __PYX_ERR(0, 172, __pyx_L3_error)
+      }
+    } else if (PyTuple_GET_SIZE(__pyx_args) != 8) {
+      goto __pyx_L5_argtuple_error;
+    } else {
+      values[0] = PyTuple_GET_ITEM(__pyx_args, 0);
+      values[1] = PyTuple_GET_ITEM(__pyx_args, 1);
+      values[2] = PyTuple_GET_ITEM(__pyx_args, 2);
+      values[3] = PyTuple_GET_ITEM(__pyx_args, 3);
+      values[4] = PyTuple_GET_ITEM(__pyx_args, 4);
+      values[5] = PyTuple_GET_ITEM(__pyx_args, 5);
+      values[6] = PyTuple_GET_ITEM(__pyx_args, 6);
+      values[7] = PyTuple_GET_ITEM(__pyx_args, 7);
+    }
+    __pyx_v_dX = __Pyx_PyObject_to_MemoryviewSlice_dsdsds_double(values[0], PyBUF_WRITABLE); if (unlikely(!__pyx_v_dX.memview)) __PYX_ERR(0, 172, __pyx_L3_error)
+    __pyx_v_dV = __Pyx_PyObject_to_MemoryviewSlice_dsdsds_double(values[1], PyBUF_WRITABLE); if (unlikely(!__pyx_v_dV.memview)) __PYX_ERR(0, 172, __pyx_L3_error)
+    __pyx_v_order = __Pyx_PyInt_As_int(values[2]); if (unlikely((__pyx_v_order == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 172, __pyx_L3_error)
+    __pyx_v_table = __Pyx_PyObject_to_MemoryviewSlice_dsds_int(values[3], PyBUF_WRITABLE); if (unlikely(!__pyx_v_table.memview)) __PYX_ERR(0, 172, __pyx_L3_error)
+    __pyx_v_a = __pyx_PyFloat_AsDouble(values[4]); if (unlikely((__pyx_v_a == (double)-1) && PyErr_Occurred())) __PYX_ERR(0, 173, __pyx_L3_error)
+    __pyx_v_natoms = __Pyx_PyInt_As_int(values[5]); if (unlikely((__pyx_v_natoms == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 173, __pyx_L3_error)
+    __pyx_v_maxmon = __Pyx_PyInt_As_int(values[6]); if (unlikely((__pyx_v_maxmon == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 173, __pyx_L3_error)
+    __pyx_v_terms = __Pyx_PyObject_to_MemoryviewSlice_dsds_int(values[7], PyBUF_WRITABLE); if (unlikely(!__pyx_v_terms.memview)) __PYX_ERR(0, 173, __pyx_L3_error)
+  }
+  goto __pyx_L4_argument_unpacking_done;
+  __pyx_L5_argtuple_error:;
+  __Pyx_RaiseArgtupleInvalid("evalexppipterms", 1, 8, 8, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(0, 172, __pyx_L3_error)
+  __pyx_L3_error:;
+  __Pyx_AddTraceback("nitrogen.pes.fit.exppip.evalexppipterms", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_RefNannyFinishContext();
+  return NULL;
+  __pyx_L4_argument_unpacking_done:;
+  __pyx_r = __pyx_pf_8nitrogen_3pes_3fit_6exppip_2evalexppipterms(__pyx_self, __pyx_v_dX, __pyx_v_dV, __pyx_v_order, __pyx_v_table, __pyx_v_a, __pyx_v_natoms, __pyx_v_maxmon, __pyx_v_terms);
+
+  /* function exit code */
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+static PyObject *__pyx_pf_8nitrogen_3pes_3fit_6exppip_2evalexppipterms(CYTHON_UNUSED PyObject *__pyx_self, __Pyx_memviewslice __pyx_v_dX, __Pyx_memviewslice __pyx_v_dV, int __pyx_v_order, __Pyx_memviewslice __pyx_v_table, double __pyx_v_a, int __pyx_v_natoms, int __pyx_v_maxmon, __Pyx_memviewslice __pyx_v_terms) {
+  size_t __pyx_v_i;
+  size_t __pyx_v_j;
+  size_t __pyx_v_k;
+  size_t __pyx_v_m;
+  size_t __pyx_v_nd;
+  size_t __pyx_v_n;
+  int __pyx_v_N;
+  int __pyx_v_ny;
+  double **__pyx_v_dx;
+  double **__pyx_v_dy;
+  double **__pyx_v_dyn;
+  size_t __pyx_v_tablesize;
+  size_t *__pyx_v_idxZ;
+  size_t *__pyx_v_idxX;
+  size_t *__pyx_v_idxY;
+  __pyx_t_8nitrogen_8autodiff_4cyad_9cyad_core_adtab __pyx_v_tab;
+  size_t __pyx_v_tempsize;
+  double **__pyx_v_temp;
+  double *__pyx_v_Ftemp;
+  double *__pyx_v_tA;
+  double *__pyx_v_tB;
+  double *__pyx_v_prod1;
+  double *__pyx_v_prod2;
+  double *__pyx_v_tempprod;
+  int __pyx_v_p;
+  size_t __pyx_v_nt;
+  PyObject *__pyx_r = NULL;
+  __Pyx_RefNannyDeclarations
+  __pyx_t_8nitrogen_8autodiff_4cyad_9cyad_core_adtab __pyx_t_1;
+  size_t __pyx_t_2;
+  size_t __pyx_t_3;
+  size_t __pyx_t_4;
+  Py_ssize_t __pyx_t_5;
+  size_t __pyx_t_6;
+  long __pyx_t_7;
+  long __pyx_t_8;
+  size_t __pyx_t_9;
+  size_t __pyx_t_10;
+  size_t __pyx_t_11;
+  size_t __pyx_t_12;
+  size_t __pyx_t_13;
+  size_t __pyx_t_14;
+  int __pyx_t_15;
+  int __pyx_t_16;
+  int __pyx_t_17;
+  size_t __pyx_t_18;
+  size_t __pyx_t_19;
+  __Pyx_RefNannySetupContext("evalexppipterms", 0);
+
+  /* "nitrogen/pes/fit/cython/exppip.pyx":209
+ *     cdef:
+ *         size_t i,j,k,m
+ *         size_t nd = dX.shape[0] # the number of derivatives             # <<<<<<<<<<<<<<
+ *         size_t n = dX.shape[2]  # the number of evaluation points
+ * 
+ */
+  __pyx_v_nd = (__pyx_v_dX.shape[0]);
+
+  /* "nitrogen/pes/fit/cython/exppip.pyx":210
+ *         size_t i,j,k,m
+ *         size_t nd = dX.shape[0] # the number of derivatives
+ *         size_t n = dX.shape[2]  # the number of evaluation points             # <<<<<<<<<<<<<<
+ * 
+ *         int N = natoms          # the number of atoms
+ */
+  __pyx_v_n = (__pyx_v_dX.shape[2]);
+
+  /* "nitrogen/pes/fit/cython/exppip.pyx":212
+ *         size_t n = dX.shape[2]  # the number of evaluation points
+ * 
+ *         int N = natoms          # the number of atoms             # <<<<<<<<<<<<<<
+ *         int ny = (natoms*(natoms-1)) // 2 # the number of atomic pairs
+ * 
+ */
+  __pyx_v_N = __pyx_v_natoms;
+
+  /* "nitrogen/pes/fit/cython/exppip.pyx":213
+ * 
+ *         int N = natoms          # the number of atoms
+ *         int ny = (natoms*(natoms-1)) // 2 # the number of atomic pairs             # <<<<<<<<<<<<<<
+ * 
+ * 
+ */
+  __pyx_v_ny = ((__pyx_v_natoms * (__pyx_v_natoms - 1)) / 2);
+
+  /* "nitrogen/pes/fit/cython/exppip.pyx":216
+ * 
+ * 
+ *         double **dx = cyad.malloc2d(3*N, nd)   # Cartesian geometries             # <<<<<<<<<<<<<<
+ *         double **dy = cyad.malloc2d(ny, nd)    # Pair distance functions
+ *         double **dyn = cyad.malloc2d(ny*(maxmon+1), nd) # Powers of y
+ */
+  __pyx_v_dx = __pyx_f_8nitrogen_8autodiff_4cyad_9cyad_core_malloc2d((3 * __pyx_v_N), __pyx_v_nd);
+
+  /* "nitrogen/pes/fit/cython/exppip.pyx":217
+ * 
+ *         double **dx = cyad.malloc2d(3*N, nd)   # Cartesian geometries
+ *         double **dy = cyad.malloc2d(ny, nd)    # Pair distance functions             # <<<<<<<<<<<<<<
+ *         double **dyn = cyad.malloc2d(ny*(maxmon+1), nd) # Powers of y
+ * 
+ */
+  __pyx_v_dy = __pyx_f_8nitrogen_8autodiff_4cyad_9cyad_core_malloc2d(__pyx_v_ny, __pyx_v_nd);
+
+  /* "nitrogen/pes/fit/cython/exppip.pyx":218
+ *         double **dx = cyad.malloc2d(3*N, nd)   # Cartesian geometries
+ *         double **dy = cyad.malloc2d(ny, nd)    # Pair distance functions
+ *         double **dyn = cyad.malloc2d(ny*(maxmon+1), nd) # Powers of y             # <<<<<<<<<<<<<<
+ * 
+ *         size_t tablesize = table.shape[1]
+ */
+  __pyx_v_dyn = __pyx_f_8nitrogen_8autodiff_4cyad_9cyad_core_malloc2d((__pyx_v_ny * (__pyx_v_maxmon + 1)), __pyx_v_nd);
+
+  /* "nitrogen/pes/fit/cython/exppip.pyx":220
+ *         double **dyn = cyad.malloc2d(ny*(maxmon+1), nd) # Powers of y
+ * 
+ *         size_t tablesize = table.shape[1]             # <<<<<<<<<<<<<<
+ *         size_t *idxZ = <size_t *>malloc(tablesize * sizeof(size_t))
+ *         size_t *idxX = <size_t *>malloc(tablesize * sizeof(size_t))
+ */
+  __pyx_v_tablesize = (__pyx_v_table.shape[1]);
+
+  /* "nitrogen/pes/fit/cython/exppip.pyx":221
+ * 
+ *         size_t tablesize = table.shape[1]
+ *         size_t *idxZ = <size_t *>malloc(tablesize * sizeof(size_t))             # <<<<<<<<<<<<<<
+ *         size_t *idxX = <size_t *>malloc(tablesize * sizeof(size_t))
+ *         size_t *idxY = <size_t *>malloc(tablesize * sizeof(size_t))
+ */
+  __pyx_v_idxZ = ((size_t *)malloc((__pyx_v_tablesize * (sizeof(size_t)))));
+
+  /* "nitrogen/pes/fit/cython/exppip.pyx":222
+ *         size_t tablesize = table.shape[1]
+ *         size_t *idxZ = <size_t *>malloc(tablesize * sizeof(size_t))
+ *         size_t *idxX = <size_t *>malloc(tablesize * sizeof(size_t))             # <<<<<<<<<<<<<<
+ *         size_t *idxY = <size_t *>malloc(tablesize * sizeof(size_t))
+ * 
+ */
+  __pyx_v_idxX = ((size_t *)malloc((__pyx_v_tablesize * (sizeof(size_t)))));
+
+  /* "nitrogen/pes/fit/cython/exppip.pyx":223
+ *         size_t *idxZ = <size_t *>malloc(tablesize * sizeof(size_t))
+ *         size_t *idxX = <size_t *>malloc(tablesize * sizeof(size_t))
+ *         size_t *idxY = <size_t *>malloc(tablesize * sizeof(size_t))             # <<<<<<<<<<<<<<
+ * 
+ *         cdef cyad.adtab tab = cyad.adtab(order, nd, tablesize, idxZ, idxX, idxY)
+ */
+  __pyx_v_idxY = ((size_t *)malloc((__pyx_v_tablesize * (sizeof(size_t)))));
+
+  /* "nitrogen/pes/fit/cython/exppip.pyx":225
+ *         size_t *idxY = <size_t *>malloc(tablesize * sizeof(size_t))
+ * 
+ *         cdef cyad.adtab tab = cyad.adtab(order, nd, tablesize, idxZ, idxX, idxY)             # <<<<<<<<<<<<<<
+ * 
+ *         size_t tempsize = 9
+ */
+  __pyx_t_1.k = __pyx_v_order;
+  __pyx_t_1.nd = __pyx_v_nd;
+  __pyx_t_1.table_size = __pyx_v_tablesize;
+  __pyx_t_1.idxZ = __pyx_v_idxZ;
+  __pyx_t_1.idxX = __pyx_v_idxX;
+  __pyx_t_1.idxY = __pyx_v_idxY;
+  __pyx_v_tab = __pyx_t_1;
+
+  /* "nitrogen/pes/fit/cython/exppip.pyx":227
+ *         cdef cyad.adtab tab = cyad.adtab(order, nd, tablesize, idxZ, idxX, idxY)
+ * 
+ *         size_t tempsize = 9             # <<<<<<<<<<<<<<
+ *         double **temp = cyad.malloc2d(tempsize, nd) # workspace
+ *         double *Ftemp = cyad.malloc1d(order + 1)    # workspace
+ */
+  __pyx_v_tempsize = 9;
+
+  /* "nitrogen/pes/fit/cython/exppip.pyx":228
+ * 
+ *         size_t tempsize = 9
+ *         double **temp = cyad.malloc2d(tempsize, nd) # workspace             # <<<<<<<<<<<<<<
+ *         double *Ftemp = cyad.malloc1d(order + 1)    # workspace
+ * 
+ */
+  __pyx_v_temp = __pyx_f_8nitrogen_8autodiff_4cyad_9cyad_core_malloc2d(__pyx_v_tempsize, __pyx_v_nd);
+
+  /* "nitrogen/pes/fit/cython/exppip.pyx":229
+ *         size_t tempsize = 9
+ *         double **temp = cyad.malloc2d(tempsize, nd) # workspace
+ *         double *Ftemp = cyad.malloc1d(order + 1)    # workspace             # <<<<<<<<<<<<<<
+ * 
+ *         double *tA = cyad.malloc1d(nd)
+ */
+  __pyx_v_Ftemp = __pyx_f_8nitrogen_8autodiff_4cyad_9cyad_core_malloc1d((__pyx_v_order + 1));
+
+  /* "nitrogen/pes/fit/cython/exppip.pyx":231
+ *         double *Ftemp = cyad.malloc1d(order + 1)    # workspace
+ * 
+ *         double *tA = cyad.malloc1d(nd)             # <<<<<<<<<<<<<<
+ *         double *tB = cyad.malloc1d(nd)
+ *         double *prod1
+ */
+  __pyx_v_tA = __pyx_f_8nitrogen_8autodiff_4cyad_9cyad_core_malloc1d(__pyx_v_nd);
+
+  /* "nitrogen/pes/fit/cython/exppip.pyx":232
+ * 
+ *         double *tA = cyad.malloc1d(nd)
+ *         double *tB = cyad.malloc1d(nd)             # <<<<<<<<<<<<<<
+ *         double *prod1
+ *         double *prod2
+ */
+  __pyx_v_tB = __pyx_f_8nitrogen_8autodiff_4cyad_9cyad_core_malloc1d(__pyx_v_nd);
+
+  /* "nitrogen/pes/fit/cython/exppip.pyx":239
+ *         int p
+ * 
+ *         size_t nt = terms.shape[0]             # <<<<<<<<<<<<<<
+ *         # terms.shape[1] should equal `ny`
+ * 
+ */
+  __pyx_v_nt = (__pyx_v_terms.shape[0]);
+
+  /* "nitrogen/pes/fit/cython/exppip.pyx":243
+ * 
+ *     # prepare table
+ *     for i in range(tablesize):             # <<<<<<<<<<<<<<
+ *         idxZ[i] = table[0,i]
+ *         idxX[i] = table[1,i]
+ */
+  __pyx_t_2 = __pyx_v_tablesize;
+  __pyx_t_3 = __pyx_t_2;
+  for (__pyx_t_4 = 0; __pyx_t_4 < __pyx_t_3; __pyx_t_4+=1) {
+    __pyx_v_i = __pyx_t_4;
+
+    /* "nitrogen/pes/fit/cython/exppip.pyx":244
+ *     # prepare table
+ *     for i in range(tablesize):
+ *         idxZ[i] = table[0,i]             # <<<<<<<<<<<<<<
+ *         idxX[i] = table[1,i]
+ *         idxY[i] = table[2,i]
+ */
+    __pyx_t_5 = 0;
+    __pyx_t_6 = __pyx_v_i;
+    (__pyx_v_idxZ[__pyx_v_i]) = (*((int *) ( /* dim=1 */ (( /* dim=0 */ (__pyx_v_table.data + __pyx_t_5 * __pyx_v_table.strides[0]) ) + __pyx_t_6 * __pyx_v_table.strides[1]) )));
+
+    /* "nitrogen/pes/fit/cython/exppip.pyx":245
+ *     for i in range(tablesize):
+ *         idxZ[i] = table[0,i]
+ *         idxX[i] = table[1,i]             # <<<<<<<<<<<<<<
+ *         idxY[i] = table[2,i]
+ * 
+ */
+    __pyx_t_5 = 1;
+    __pyx_t_6 = __pyx_v_i;
+    (__pyx_v_idxX[__pyx_v_i]) = (*((int *) ( /* dim=1 */ (( /* dim=0 */ (__pyx_v_table.data + __pyx_t_5 * __pyx_v_table.strides[0]) ) + __pyx_t_6 * __pyx_v_table.strides[1]) )));
+
+    /* "nitrogen/pes/fit/cython/exppip.pyx":246
+ *         idxZ[i] = table[0,i]
+ *         idxX[i] = table[1,i]
+ *         idxY[i] = table[2,i]             # <<<<<<<<<<<<<<
+ * 
+ * 
+ */
+    __pyx_t_5 = 2;
+    __pyx_t_6 = __pyx_v_i;
+    (__pyx_v_idxY[__pyx_v_i]) = (*((int *) ( /* dim=1 */ (( /* dim=0 */ (__pyx_v_table.data + __pyx_t_5 * __pyx_v_table.strides[0]) ) + __pyx_t_6 * __pyx_v_table.strides[1]) )));
+  }
+
+  /* "nitrogen/pes/fit/cython/exppip.pyx":249
+ * 
+ * 
+ *     for i in range(n):             # <<<<<<<<<<<<<<
+ *         # For each geometry
+ * 
+ */
+  __pyx_t_2 = __pyx_v_n;
+  __pyx_t_3 = __pyx_t_2;
+  for (__pyx_t_4 = 0; __pyx_t_4 < __pyx_t_3; __pyx_t_4+=1) {
+    __pyx_v_i = __pyx_t_4;
+
+    /* "nitrogen/pes/fit/cython/exppip.pyx":253
+ * 
+ *         # Get the inputs
+ *         for j in range(3*N):             # <<<<<<<<<<<<<<
+ *             for k in range(nd):
+ *                 dx[j][k] = dX[k,j,i]
+ */
+    __pyx_t_7 = (3 * __pyx_v_N);
+    __pyx_t_8 = __pyx_t_7;
+    for (__pyx_t_6 = 0; __pyx_t_6 < __pyx_t_8; __pyx_t_6+=1) {
+      __pyx_v_j = __pyx_t_6;
+
+      /* "nitrogen/pes/fit/cython/exppip.pyx":254
+ *         # Get the inputs
+ *         for j in range(3*N):
+ *             for k in range(nd):             # <<<<<<<<<<<<<<
+ *                 dx[j][k] = dX[k,j,i]
+ * 
+ */
+      __pyx_t_9 = __pyx_v_nd;
+      __pyx_t_10 = __pyx_t_9;
+      for (__pyx_t_11 = 0; __pyx_t_11 < __pyx_t_10; __pyx_t_11+=1) {
+        __pyx_v_k = __pyx_t_11;
+
+        /* "nitrogen/pes/fit/cython/exppip.pyx":255
+ *         for j in range(3*N):
+ *             for k in range(nd):
+ *                 dx[j][k] = dX[k,j,i]             # <<<<<<<<<<<<<<
+ * 
+ *         #
+ */
+        __pyx_t_12 = __pyx_v_k;
+        __pyx_t_13 = __pyx_v_j;
+        __pyx_t_14 = __pyx_v_i;
+        ((__pyx_v_dx[__pyx_v_j])[__pyx_v_k]) = (*((double *) ( /* dim=2 */ (( /* dim=1 */ (( /* dim=0 */ (__pyx_v_dX.data + __pyx_t_12 * __pyx_v_dX.strides[0]) ) + __pyx_t_13 * __pyx_v_dX.strides[1]) ) + __pyx_t_14 * __pyx_v_dX.strides[2]) )));
+      }
+    }
+
+    /* "nitrogen/pes/fit/cython/exppip.pyx":260
+ *         # Calculate y variables
+ *         #
+ *         calc_y(dx, dy, N, a, Ftemp, temp, &tab)             # <<<<<<<<<<<<<<
+ * 
+ *         # Calculate their powers
+ */
+    __pyx_f_8nitrogen_3pes_3fit_6exppip_calc_y(__pyx_v_dx, __pyx_v_dy, __pyx_v_N, __pyx_v_a, __pyx_v_Ftemp, __pyx_v_temp, (&__pyx_v_tab));
+
+    /* "nitrogen/pes/fit/cython/exppip.pyx":263
+ * 
+ *         # Calculate their powers
+ *         calc_yn(dy, dyn, ny, maxmon, &tab)             # <<<<<<<<<<<<<<
+ * 
+ *         # Calculate expansion
+ */
+    __pyx_f_8nitrogen_3pes_3fit_6exppip_calc_yn(__pyx_v_dy, __pyx_v_dyn, __pyx_v_ny, __pyx_v_maxmon, (&__pyx_v_tab));
+
+    /* "nitrogen/pes/fit/cython/exppip.pyx":277
+ * 
+ *         # Loop through terms
+ *         for j in range(nt):             # <<<<<<<<<<<<<<
+ * 
+ *             # Initialize `prod` to unity
+ */
+    __pyx_t_6 = __pyx_v_nt;
+    __pyx_t_9 = __pyx_t_6;
+    for (__pyx_t_10 = 0; __pyx_t_10 < __pyx_t_9; __pyx_t_10+=1) {
+      __pyx_v_j = __pyx_t_10;
+
+      /* "nitrogen/pes/fit/cython/exppip.pyx":280
+ * 
+ *             # Initialize `prod` to unity
+ *             prod1 = tA             # <<<<<<<<<<<<<<
+ *             prod2 = tB
+ * 
+ */
+      __pyx_v_prod1 = __pyx_v_tA;
+
+      /* "nitrogen/pes/fit/cython/exppip.pyx":281
+ *             # Initialize `prod` to unity
+ *             prod1 = tA
+ *             prod2 = tB             # <<<<<<<<<<<<<<
+ * 
+ *             prod1[0] = 1.0
+ */
+      __pyx_v_prod2 = __pyx_v_tB;
+
+      /* "nitrogen/pes/fit/cython/exppip.pyx":283
+ *             prod2 = tB
+ * 
+ *             prod1[0] = 1.0             # <<<<<<<<<<<<<<
+ *             for k in range(1,nd):
+ *                 prod1[k] = 0.0
+ */
+      (__pyx_v_prod1[0]) = 1.0;
+
+      /* "nitrogen/pes/fit/cython/exppip.pyx":284
+ * 
+ *             prod1[0] = 1.0
+ *             for k in range(1,nd):             # <<<<<<<<<<<<<<
+ *                 prod1[k] = 0.0
+ * 
+ */
+      __pyx_t_11 = __pyx_v_nd;
+      __pyx_t_14 = __pyx_t_11;
+      for (__pyx_t_13 = 1; __pyx_t_13 < __pyx_t_14; __pyx_t_13+=1) {
+        __pyx_v_k = __pyx_t_13;
+
+        /* "nitrogen/pes/fit/cython/exppip.pyx":285
+ *             prod1[0] = 1.0
+ *             for k in range(1,nd):
+ *                 prod1[k] = 0.0             # <<<<<<<<<<<<<<
+ * 
+ *             # Compute product
+ */
+        (__pyx_v_prod1[__pyx_v_k]) = 0.0;
+      }
+
+      /* "nitrogen/pes/fit/cython/exppip.pyx":288
+ * 
+ *             # Compute product
+ *             for m in range(ny):             # <<<<<<<<<<<<<<
+ *                 #
+ *                 # If the power of y[m] is greater than 0,
+ */
+      __pyx_t_15 = __pyx_v_ny;
+      __pyx_t_16 = __pyx_t_15;
+      for (__pyx_t_11 = 0; __pyx_t_11 < __pyx_t_16; __pyx_t_11+=1) {
+        __pyx_v_m = __pyx_t_11;
+
+        /* "nitrogen/pes/fit/cython/exppip.pyx":293
+ *                 # compute the product.
+ *                 #
+ *                 p = terms[j,m]             # <<<<<<<<<<<<<<
+ * 
+ *                 if p > 0 :
+ */
+        __pyx_t_14 = __pyx_v_j;
+        __pyx_t_13 = __pyx_v_m;
+        __pyx_v_p = (*((int *) ( /* dim=1 */ (( /* dim=0 */ (__pyx_v_terms.data + __pyx_t_14 * __pyx_v_terms.strides[0]) ) + __pyx_t_13 * __pyx_v_terms.strides[1]) )));
+
+        /* "nitrogen/pes/fit/cython/exppip.pyx":295
+ *                 p = terms[j,m]
+ * 
+ *                 if p > 0 :             # <<<<<<<<<<<<<<
+ *                     # prod2 <-- prod1 * y[m]**p
+ *                     cyad.mul(prod2, prod1, dyn[m*(maxmon+1) + p], &tab)
+ */
+        __pyx_t_17 = ((__pyx_v_p > 0) != 0);
+        if (__pyx_t_17) {
+
+          /* "nitrogen/pes/fit/cython/exppip.pyx":297
+ *                 if p > 0 :
+ *                     # prod2 <-- prod1 * y[m]**p
+ *                     cyad.mul(prod2, prod1, dyn[m*(maxmon+1) + p], &tab)             # <<<<<<<<<<<<<<
+ *                     # swap prod2 and prod1 pointers
+ *                     tempprod = prod1
+ */
+          __pyx_f_8nitrogen_8autodiff_4cyad_9cyad_core_mul(__pyx_v_prod2, __pyx_v_prod1, (__pyx_v_dyn[((__pyx_v_m * (__pyx_v_maxmon + 1)) + __pyx_v_p)]), (&__pyx_v_tab));
+
+          /* "nitrogen/pes/fit/cython/exppip.pyx":299
+ *                     cyad.mul(prod2, prod1, dyn[m*(maxmon+1) + p], &tab)
+ *                     # swap prod2 and prod1 pointers
+ *                     tempprod = prod1             # <<<<<<<<<<<<<<
+ *                     prod1 = prod2
+ *                     prod2 = tempprod
+ */
+          __pyx_v_tempprod = __pyx_v_prod1;
+
+          /* "nitrogen/pes/fit/cython/exppip.pyx":300
+ *                     # swap prod2 and prod1 pointers
+ *                     tempprod = prod1
+ *                     prod1 = prod2             # <<<<<<<<<<<<<<
+ *                     prod2 = tempprod
+ *                     #
+ */
+          __pyx_v_prod1 = __pyx_v_prod2;
+
+          /* "nitrogen/pes/fit/cython/exppip.pyx":301
+ *                     tempprod = prod1
+ *                     prod1 = prod2
+ *                     prod2 = tempprod             # <<<<<<<<<<<<<<
+ *                     #
+ *                     # prod1 now points to the current product
+ */
+          __pyx_v_prod2 = __pyx_v_tempprod;
+
+          /* "nitrogen/pes/fit/cython/exppip.pyx":295
+ *                 p = terms[j,m]
+ * 
+ *                 if p > 0 :             # <<<<<<<<<<<<<<
+ *                     # prod2 <-- prod1 * y[m]**p
+ *                     cyad.mul(prod2, prod1, dyn[m*(maxmon+1) + p], &tab)
+ */
+        }
+      }
+
+      /* "nitrogen/pes/fit/cython/exppip.pyx":310
+ * 
+ *             # Assign term to output
+ *             for k in range(nd):             # <<<<<<<<<<<<<<
+ *                 dV[k,j,i] = prod1[k]
+ * 
+ */
+      __pyx_t_11 = __pyx_v_nd;
+      __pyx_t_13 = __pyx_t_11;
+      for (__pyx_t_14 = 0; __pyx_t_14 < __pyx_t_13; __pyx_t_14+=1) {
+        __pyx_v_k = __pyx_t_14;
+
+        /* "nitrogen/pes/fit/cython/exppip.pyx":311
+ *             # Assign term to output
+ *             for k in range(nd):
+ *                 dV[k,j,i] = prod1[k]             # <<<<<<<<<<<<<<
+ * 
+ * 
+ */
+        __pyx_t_12 = __pyx_v_k;
+        __pyx_t_18 = __pyx_v_j;
+        __pyx_t_19 = __pyx_v_i;
+        *((double *) ( /* dim=2 */ (( /* dim=1 */ (( /* dim=0 */ (__pyx_v_dV.data + __pyx_t_12 * __pyx_v_dV.strides[0]) ) + __pyx_t_18 * __pyx_v_dV.strides[1]) ) + __pyx_t_19 * __pyx_v_dV.strides[2]) )) = (__pyx_v_prod1[__pyx_v_k]);
+      }
+    }
+  }
+
+  /* "nitrogen/pes/fit/cython/exppip.pyx":314
+ * 
+ * 
+ *     cyad.free2d(dx, 3*N)             # <<<<<<<<<<<<<<
+ *     cyad.free2d(dy, ny)
+ *     cyad.free2d(dyn, ny*(maxmon+1))
+ */
+  __pyx_f_8nitrogen_8autodiff_4cyad_9cyad_core_free2d(__pyx_v_dx, (3 * __pyx_v_N));
+
+  /* "nitrogen/pes/fit/cython/exppip.pyx":315
+ * 
+ *     cyad.free2d(dx, 3*N)
+ *     cyad.free2d(dy, ny)             # <<<<<<<<<<<<<<
+ *     cyad.free2d(dyn, ny*(maxmon+1))
+ *     free(idxZ)
+ */
+  __pyx_f_8nitrogen_8autodiff_4cyad_9cyad_core_free2d(__pyx_v_dy, __pyx_v_ny);
+
+  /* "nitrogen/pes/fit/cython/exppip.pyx":316
+ *     cyad.free2d(dx, 3*N)
+ *     cyad.free2d(dy, ny)
+ *     cyad.free2d(dyn, ny*(maxmon+1))             # <<<<<<<<<<<<<<
+ *     free(idxZ)
+ *     free(idxY)
+ */
+  __pyx_f_8nitrogen_8autodiff_4cyad_9cyad_core_free2d(__pyx_v_dyn, (__pyx_v_ny * (__pyx_v_maxmon + 1)));
+
+  /* "nitrogen/pes/fit/cython/exppip.pyx":317
+ *     cyad.free2d(dy, ny)
+ *     cyad.free2d(dyn, ny*(maxmon+1))
+ *     free(idxZ)             # <<<<<<<<<<<<<<
+ *     free(idxY)
+ *     free(idxX)
+ */
+  free(__pyx_v_idxZ);
+
+  /* "nitrogen/pes/fit/cython/exppip.pyx":318
+ *     cyad.free2d(dyn, ny*(maxmon+1))
+ *     free(idxZ)
+ *     free(idxY)             # <<<<<<<<<<<<<<
+ *     free(idxX)
+ *     cyad.free1d(tA)
+ */
+  free(__pyx_v_idxY);
+
+  /* "nitrogen/pes/fit/cython/exppip.pyx":319
+ *     free(idxZ)
+ *     free(idxY)
+ *     free(idxX)             # <<<<<<<<<<<<<<
+ *     cyad.free1d(tA)
+ *     cyad.free1d(tB)
+ */
+  free(__pyx_v_idxX);
+
+  /* "nitrogen/pes/fit/cython/exppip.pyx":320
+ *     free(idxY)
+ *     free(idxX)
+ *     cyad.free1d(tA)             # <<<<<<<<<<<<<<
+ *     cyad.free1d(tB)
+ *     cyad.free2d(temp, tempsize)
+ */
+  __pyx_f_8nitrogen_8autodiff_4cyad_9cyad_core_free1d(__pyx_v_tA);
+
+  /* "nitrogen/pes/fit/cython/exppip.pyx":321
+ *     free(idxX)
+ *     cyad.free1d(tA)
+ *     cyad.free1d(tB)             # <<<<<<<<<<<<<<
+ *     cyad.free2d(temp, tempsize)
+ *     cyad.free1d(Ftemp)
+ */
+  __pyx_f_8nitrogen_8autodiff_4cyad_9cyad_core_free1d(__pyx_v_tB);
+
+  /* "nitrogen/pes/fit/cython/exppip.pyx":322
+ *     cyad.free1d(tA)
+ *     cyad.free1d(tB)
+ *     cyad.free2d(temp, tempsize)             # <<<<<<<<<<<<<<
+ *     cyad.free1d(Ftemp)
+ * 
+ */
+  __pyx_f_8nitrogen_8autodiff_4cyad_9cyad_core_free2d(__pyx_v_temp, __pyx_v_tempsize);
+
+  /* "nitrogen/pes/fit/cython/exppip.pyx":323
+ *     cyad.free1d(tB)
+ *     cyad.free2d(temp, tempsize)
+ *     cyad.free1d(Ftemp)             # <<<<<<<<<<<<<<
+ * 
+ *     return
+ */
+  __pyx_f_8nitrogen_8autodiff_4cyad_9cyad_core_free1d(__pyx_v_Ftemp);
+
+  /* "nitrogen/pes/fit/cython/exppip.pyx":325
+ *     cyad.free1d(Ftemp)
+ * 
+ *     return             # <<<<<<<<<<<<<<
+ * 
+ * 
+ */
+  __Pyx_XDECREF(__pyx_r);
+  __pyx_r = Py_None; __Pyx_INCREF(Py_None);
+  goto __pyx_L0;
+
+  /* "nitrogen/pes/fit/cython/exppip.pyx":172
+ *     return
+ * 
+ * def evalexppipterms(double [:,:,:] dX, double [:,:,:] dV, int order, int [:,:] table,             # <<<<<<<<<<<<<<
+ *                     double a, int natoms, int maxmon, int [:,:] terms):
+ * 
+ */
+
+  /* function exit code */
+  __pyx_L0:;
+  __PYX_XDEC_MEMVIEW(&__pyx_v_dX, 1);
+  __PYX_XDEC_MEMVIEW(&__pyx_v_dV, 1);
+  __PYX_XDEC_MEMVIEW(&__pyx_v_table, 1);
+  __PYX_XDEC_MEMVIEW(&__pyx_v_terms, 1);
+  __Pyx_XGIVEREF(__pyx_r);
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+/* "nitrogen/pes/fit/cython/exppip.pyx":328
  * 
  * 
  * cdef void calc_y(double **dx, double **dy, int natoms, double a,             # <<<<<<<<<<<<<<
@@ -2935,7 +3699,7 @@ static void __pyx_f_8nitrogen_3pes_3fit_6exppip_calc_y(double **__pyx_v_dx, doub
   int __pyx_t_6;
   __Pyx_RefNannySetupContext("calc_y", 0);
 
-  /* "nitrogen/pes/fit/cython/exppip.pyx":190
+  /* "nitrogen/pes/fit/cython/exppip.pyx":345
  *     #
  *     cdef int i,j,idx
  *     cdef double mia = -1.0 / a             # <<<<<<<<<<<<<<
@@ -2944,7 +3708,7 @@ static void __pyx_f_8nitrogen_3pes_3fit_6exppip_calc_y(double **__pyx_v_dx, doub
  */
   __pyx_v_mia = (-1.0 / __pyx_v_a);
 
-  /* "nitrogen/pes/fit/cython/exppip.pyx":192
+  /* "nitrogen/pes/fit/cython/exppip.pyx":347
  *     cdef double mia = -1.0 / a
  * 
  *     idx = 0             # <<<<<<<<<<<<<<
@@ -2953,7 +3717,7 @@ static void __pyx_f_8nitrogen_3pes_3fit_6exppip_calc_y(double **__pyx_v_dx, doub
  */
   __pyx_v_idx = 0;
 
-  /* "nitrogen/pes/fit/cython/exppip.pyx":193
+  /* "nitrogen/pes/fit/cython/exppip.pyx":348
  * 
  *     idx = 0
  *     for i in range(natoms):             # <<<<<<<<<<<<<<
@@ -2965,7 +3729,7 @@ static void __pyx_f_8nitrogen_3pes_3fit_6exppip_calc_y(double **__pyx_v_dx, doub
   for (__pyx_t_3 = 0; __pyx_t_3 < __pyx_t_2; __pyx_t_3+=1) {
     __pyx_v_i = __pyx_t_3;
 
-    /* "nitrogen/pes/fit/cython/exppip.pyx":194
+    /* "nitrogen/pes/fit/cython/exppip.pyx":349
  *     idx = 0
  *     for i in range(natoms):
  *         for j in range(i+1, natoms):             # <<<<<<<<<<<<<<
@@ -2977,7 +3741,7 @@ static void __pyx_f_8nitrogen_3pes_3fit_6exppip_calc_y(double **__pyx_v_dx, doub
     for (__pyx_t_6 = (__pyx_v_i + 1); __pyx_t_6 < __pyx_t_5; __pyx_t_6+=1) {
       __pyx_v_j = __pyx_t_6;
 
-      /* "nitrogen/pes/fit/cython/exppip.pyx":196
+      /* "nitrogen/pes/fit/cython/exppip.pyx":351
  *         for j in range(i+1, natoms):
  * 
  *             cyad.sub(temp[0], dx[3*i+0], dx[3*j+0], t) # delta x             # <<<<<<<<<<<<<<
@@ -2986,7 +3750,7 @@ static void __pyx_f_8nitrogen_3pes_3fit_6exppip_calc_y(double **__pyx_v_dx, doub
  */
       __pyx_f_8nitrogen_8autodiff_4cyad_9cyad_core_sub((__pyx_v_temp[0]), (__pyx_v_dx[((3 * __pyx_v_i) + 0)]), (__pyx_v_dx[((3 * __pyx_v_j) + 0)]), __pyx_v_t);
 
-      /* "nitrogen/pes/fit/cython/exppip.pyx":197
+      /* "nitrogen/pes/fit/cython/exppip.pyx":352
  * 
  *             cyad.sub(temp[0], dx[3*i+0], dx[3*j+0], t) # delta x
  *             cyad.sub(temp[1], dx[3*i+1], dx[3*j+1], t) # delta y             # <<<<<<<<<<<<<<
@@ -2995,7 +3759,7 @@ static void __pyx_f_8nitrogen_3pes_3fit_6exppip_calc_y(double **__pyx_v_dx, doub
  */
       __pyx_f_8nitrogen_8autodiff_4cyad_9cyad_core_sub((__pyx_v_temp[1]), (__pyx_v_dx[((3 * __pyx_v_i) + 1)]), (__pyx_v_dx[((3 * __pyx_v_j) + 1)]), __pyx_v_t);
 
-      /* "nitrogen/pes/fit/cython/exppip.pyx":198
+      /* "nitrogen/pes/fit/cython/exppip.pyx":353
  *             cyad.sub(temp[0], dx[3*i+0], dx[3*j+0], t) # delta x
  *             cyad.sub(temp[1], dx[3*i+1], dx[3*j+1], t) # delta y
  *             cyad.sub(temp[2], dx[3*i+2], dx[3*j+2], t) # delta z             # <<<<<<<<<<<<<<
@@ -3004,7 +3768,7 @@ static void __pyx_f_8nitrogen_3pes_3fit_6exppip_calc_y(double **__pyx_v_dx, doub
  */
       __pyx_f_8nitrogen_8autodiff_4cyad_9cyad_core_sub((__pyx_v_temp[2]), (__pyx_v_dx[((3 * __pyx_v_i) + 2)]), (__pyx_v_dx[((3 * __pyx_v_j) + 2)]), __pyx_v_t);
 
-      /* "nitrogen/pes/fit/cython/exppip.pyx":200
+      /* "nitrogen/pes/fit/cython/exppip.pyx":355
  *             cyad.sub(temp[2], dx[3*i+2], dx[3*j+2], t) # delta z
  * 
  *             cyad.mul(temp[3], temp[0], temp[0], t) # dx * dx             # <<<<<<<<<<<<<<
@@ -3013,7 +3777,7 @@ static void __pyx_f_8nitrogen_3pes_3fit_6exppip_calc_y(double **__pyx_v_dx, doub
  */
       __pyx_f_8nitrogen_8autodiff_4cyad_9cyad_core_mul((__pyx_v_temp[3]), (__pyx_v_temp[0]), (__pyx_v_temp[0]), __pyx_v_t);
 
-      /* "nitrogen/pes/fit/cython/exppip.pyx":201
+      /* "nitrogen/pes/fit/cython/exppip.pyx":356
  * 
  *             cyad.mul(temp[3], temp[0], temp[0], t) # dx * dx
  *             cyad.mulacc(temp[3], temp[1], temp[1], t) # dy * dy             # <<<<<<<<<<<<<<
@@ -3022,7 +3786,7 @@ static void __pyx_f_8nitrogen_3pes_3fit_6exppip_calc_y(double **__pyx_v_dx, doub
  */
       __pyx_f_8nitrogen_8autodiff_4cyad_9cyad_core_mulacc((__pyx_v_temp[3]), (__pyx_v_temp[1]), (__pyx_v_temp[1]), __pyx_v_t);
 
-      /* "nitrogen/pes/fit/cython/exppip.pyx":202
+      /* "nitrogen/pes/fit/cython/exppip.pyx":357
  *             cyad.mul(temp[3], temp[0], temp[0], t) # dx * dx
  *             cyad.mulacc(temp[3], temp[1], temp[1], t) # dy * dy
  *             cyad.mulacc(temp[3], temp[2], temp[2], t) # dz * dz             # <<<<<<<<<<<<<<
@@ -3031,7 +3795,7 @@ static void __pyx_f_8nitrogen_3pes_3fit_6exppip_calc_y(double **__pyx_v_dx, doub
  */
       __pyx_f_8nitrogen_8autodiff_4cyad_9cyad_core_mulacc((__pyx_v_temp[3]), (__pyx_v_temp[2]), (__pyx_v_temp[2]), __pyx_v_t);
 
-      /* "nitrogen/pes/fit/cython/exppip.pyx":207
+      /* "nitrogen/pes/fit/cython/exppip.pyx":362
  *             # temp[3] holds r**2
  *             # temp[0] <-- sqrt[r**2]
  *             cyad.sqrt(temp[0], temp[3], F, temp + 4,  t)             # <<<<<<<<<<<<<<
@@ -3040,7 +3804,7 @@ static void __pyx_f_8nitrogen_3pes_3fit_6exppip_calc_y(double **__pyx_v_dx, doub
  */
       __pyx_f_8nitrogen_8autodiff_4cyad_9cyad_core_sqrt((__pyx_v_temp[0]), (__pyx_v_temp[3]), __pyx_v_F, (__pyx_v_temp + 4), __pyx_v_t);
 
-      /* "nitrogen/pes/fit/cython/exppip.pyx":210
+      /* "nitrogen/pes/fit/cython/exppip.pyx":365
  * 
  *             # temp[1] <--  -r/a
  *             cyad.smul(temp[1], mia, temp[0], t)             # <<<<<<<<<<<<<<
@@ -3049,7 +3813,7 @@ static void __pyx_f_8nitrogen_3pes_3fit_6exppip_calc_y(double **__pyx_v_dx, doub
  */
       __pyx_f_8nitrogen_8autodiff_4cyad_9cyad_core_smul((__pyx_v_temp[1]), __pyx_v_mia, (__pyx_v_temp[0]), __pyx_v_t);
 
-      /* "nitrogen/pes/fit/cython/exppip.pyx":213
+      /* "nitrogen/pes/fit/cython/exppip.pyx":368
  * 
  *             # dy[idx] <-- exp(-r/a)
  *             cyad.exp(dy[idx], temp[1], F, temp + 4, t)             # <<<<<<<<<<<<<<
@@ -3058,7 +3822,7 @@ static void __pyx_f_8nitrogen_3pes_3fit_6exppip_calc_y(double **__pyx_v_dx, doub
  */
       __pyx_f_8nitrogen_8autodiff_4cyad_9cyad_core_exp((__pyx_v_dy[__pyx_v_idx]), (__pyx_v_temp[1]), __pyx_v_F, (__pyx_v_temp + 4), __pyx_v_t);
 
-      /* "nitrogen/pes/fit/cython/exppip.pyx":215
+      /* "nitrogen/pes/fit/cython/exppip.pyx":370
  *             cyad.exp(dy[idx], temp[1], F, temp + 4, t)
  * 
  *             idx += 1             # <<<<<<<<<<<<<<
@@ -3069,7 +3833,7 @@ static void __pyx_f_8nitrogen_3pes_3fit_6exppip_calc_y(double **__pyx_v_dx, doub
     }
   }
 
-  /* "nitrogen/pes/fit/cython/exppip.pyx":217
+  /* "nitrogen/pes/fit/cython/exppip.pyx":372
  *             idx += 1
  * 
  *     return             # <<<<<<<<<<<<<<
@@ -3078,7 +3842,7 @@ static void __pyx_f_8nitrogen_3pes_3fit_6exppip_calc_y(double **__pyx_v_dx, doub
  */
   goto __pyx_L0;
 
-  /* "nitrogen/pes/fit/cython/exppip.pyx":173
+  /* "nitrogen/pes/fit/cython/exppip.pyx":328
  * 
  * 
  * cdef void calc_y(double **dx, double **dy, int natoms, double a,             # <<<<<<<<<<<<<<
@@ -3091,7 +3855,7 @@ static void __pyx_f_8nitrogen_3pes_3fit_6exppip_calc_y(double **__pyx_v_dx, doub
   __Pyx_RefNannyFinishContext();
 }
 
-/* "nitrogen/pes/fit/cython/exppip.pyx":219
+/* "nitrogen/pes/fit/cython/exppip.pyx":374
  *     return
  * 
  * cdef void calc_yn(double **dy, double **dyn, int ny, int maxmon, cyad.adtab *t):             # <<<<<<<<<<<<<<
@@ -3118,7 +3882,7 @@ static void __pyx_f_8nitrogen_3pes_3fit_6exppip_calc_yn(double **__pyx_v_dy, dou
   int __pyx_t_11;
   __Pyx_RefNannySetupContext("calc_yn", 0);
 
-  /* "nitrogen/pes/fit/cython/exppip.pyx":233
+  /* "nitrogen/pes/fit/cython/exppip.pyx":388
  *     #
  *     cdef size_t i,m,k
  *     cdef size_t nd = t.nd # The number of derivatives             # <<<<<<<<<<<<<<
@@ -3128,7 +3892,7 @@ static void __pyx_f_8nitrogen_3pes_3fit_6exppip_calc_yn(double **__pyx_v_dy, dou
   __pyx_t_1 = __pyx_v_t->nd;
   __pyx_v_nd = __pyx_t_1;
 
-  /* "nitrogen/pes/fit/cython/exppip.pyx":236
+  /* "nitrogen/pes/fit/cython/exppip.pyx":391
  * 
  *     # Initialize to zero
  *     for i in range(ny * (maxmon+1)):             # <<<<<<<<<<<<<<
@@ -3140,7 +3904,7 @@ static void __pyx_f_8nitrogen_3pes_3fit_6exppip_calc_yn(double **__pyx_v_dy, dou
   for (__pyx_t_1 = 0; __pyx_t_1 < __pyx_t_3; __pyx_t_1+=1) {
     __pyx_v_i = __pyx_t_1;
 
-    /* "nitrogen/pes/fit/cython/exppip.pyx":237
+    /* "nitrogen/pes/fit/cython/exppip.pyx":392
  *     # Initialize to zero
  *     for i in range(ny * (maxmon+1)):
  *         for k in range(nd):             # <<<<<<<<<<<<<<
@@ -3152,7 +3916,7 @@ static void __pyx_f_8nitrogen_3pes_3fit_6exppip_calc_yn(double **__pyx_v_dy, dou
     for (__pyx_t_6 = 0; __pyx_t_6 < __pyx_t_5; __pyx_t_6+=1) {
       __pyx_v_k = __pyx_t_6;
 
-      /* "nitrogen/pes/fit/cython/exppip.pyx":238
+      /* "nitrogen/pes/fit/cython/exppip.pyx":393
  *     for i in range(ny * (maxmon+1)):
  *         for k in range(nd):
  *             dyn[i][k] = 0.0             # <<<<<<<<<<<<<<
@@ -3163,7 +3927,7 @@ static void __pyx_f_8nitrogen_3pes_3fit_6exppip_calc_yn(double **__pyx_v_dy, dou
     }
   }
 
-  /* "nitrogen/pes/fit/cython/exppip.pyx":241
+  /* "nitrogen/pes/fit/cython/exppip.pyx":396
  * 
  *     # Calculate powers of y
  *     for i in range(ny):             # <<<<<<<<<<<<<<
@@ -3175,7 +3939,7 @@ static void __pyx_f_8nitrogen_3pes_3fit_6exppip_calc_yn(double **__pyx_v_dy, dou
   for (__pyx_t_1 = 0; __pyx_t_1 < __pyx_t_8; __pyx_t_1+=1) {
     __pyx_v_i = __pyx_t_1;
 
-    /* "nitrogen/pes/fit/cython/exppip.pyx":248
+    /* "nitrogen/pes/fit/cython/exppip.pyx":403
  *         # The 0**th power is just unity
  *         #
  *         dyn[i*(maxmon+1) + 0][0] = 1.0             # <<<<<<<<<<<<<<
@@ -3184,7 +3948,7 @@ static void __pyx_f_8nitrogen_3pes_3fit_6exppip_calc_yn(double **__pyx_v_dy, dou
  */
     ((__pyx_v_dyn[((__pyx_v_i * (__pyx_v_maxmon + 1)) + 0)])[0]) = 1.0;
 
-    /* "nitrogen/pes/fit/cython/exppip.pyx":251
+    /* "nitrogen/pes/fit/cython/exppip.pyx":406
  * 
  *         # The 1**st power is just y[i]
  *         if maxmon >= 1:             # <<<<<<<<<<<<<<
@@ -3194,7 +3958,7 @@ static void __pyx_f_8nitrogen_3pes_3fit_6exppip_calc_yn(double **__pyx_v_dy, dou
     __pyx_t_9 = ((__pyx_v_maxmon >= 1) != 0);
     if (__pyx_t_9) {
 
-      /* "nitrogen/pes/fit/cython/exppip.pyx":252
+      /* "nitrogen/pes/fit/cython/exppip.pyx":407
  *         # The 1**st power is just y[i]
  *         if maxmon >= 1:
  *             for k in range(nd):             # <<<<<<<<<<<<<<
@@ -3206,7 +3970,7 @@ static void __pyx_f_8nitrogen_3pes_3fit_6exppip_calc_yn(double **__pyx_v_dy, dou
       for (__pyx_t_6 = 0; __pyx_t_6 < __pyx_t_5; __pyx_t_6+=1) {
         __pyx_v_k = __pyx_t_6;
 
-        /* "nitrogen/pes/fit/cython/exppip.pyx":253
+        /* "nitrogen/pes/fit/cython/exppip.pyx":408
  *         if maxmon >= 1:
  *             for k in range(nd):
  *                 dyn[i*(maxmon+1) + 1][k] = dy[i][k]             # <<<<<<<<<<<<<<
@@ -3216,7 +3980,7 @@ static void __pyx_f_8nitrogen_3pes_3fit_6exppip_calc_yn(double **__pyx_v_dy, dou
         ((__pyx_v_dyn[((__pyx_v_i * (__pyx_v_maxmon + 1)) + 1)])[__pyx_v_k]) = ((__pyx_v_dy[__pyx_v_i])[__pyx_v_k]);
       }
 
-      /* "nitrogen/pes/fit/cython/exppip.pyx":251
+      /* "nitrogen/pes/fit/cython/exppip.pyx":406
  * 
  *         # The 1**st power is just y[i]
  *         if maxmon >= 1:             # <<<<<<<<<<<<<<
@@ -3225,7 +3989,7 @@ static void __pyx_f_8nitrogen_3pes_3fit_6exppip_calc_yn(double **__pyx_v_dy, dou
  */
     }
 
-    /* "nitrogen/pes/fit/cython/exppip.pyx":256
+    /* "nitrogen/pes/fit/cython/exppip.pyx":411
  * 
  *         # Higher powers are calculated as y[i]**(m-1) * y[i]
  *         for m in range(1, maxmon):             # <<<<<<<<<<<<<<
@@ -3237,7 +4001,7 @@ static void __pyx_f_8nitrogen_3pes_3fit_6exppip_calc_yn(double **__pyx_v_dy, dou
     for (__pyx_t_4 = 1; __pyx_t_4 < __pyx_t_11; __pyx_t_4+=1) {
       __pyx_v_m = __pyx_t_4;
 
-      /* "nitrogen/pes/fit/cython/exppip.pyx":260
+      /* "nitrogen/pes/fit/cython/exppip.pyx":415
  *             # y[i]**(m+1) = y[i]**(m) * y[i]
  *             #
  *             cyad.mul(dyn[i*(maxmon+1) + m + 1],             # <<<<<<<<<<<<<<
@@ -3248,14 +4012,14 @@ static void __pyx_f_8nitrogen_3pes_3fit_6exppip_calc_yn(double **__pyx_v_dy, dou
     }
   }
 
-  /* "nitrogen/pes/fit/cython/exppip.pyx":266
+  /* "nitrogen/pes/fit/cython/exppip.pyx":421
  * 
  * 
  *     return             # <<<<<<<<<<<<<<
  */
   goto __pyx_L0;
 
-  /* "nitrogen/pes/fit/cython/exppip.pyx":219
+  /* "nitrogen/pes/fit/cython/exppip.pyx":374
  *     return
  * 
  * cdef void calc_yn(double **dy, double **dyn, int ny, int maxmon, cyad.adtab *t):             # <<<<<<<<<<<<<<
@@ -17093,6 +17857,7 @@ static __Pyx_StringTabEntry __pyx_string_tab[] = {
   {&__pyx_n_s_enumerate, __pyx_k_enumerate, sizeof(__pyx_k_enumerate), 0, 0, 1, 1},
   {&__pyx_n_s_error, __pyx_k_error, sizeof(__pyx_k_error), 0, 0, 1, 1},
   {&__pyx_n_s_evalexppip, __pyx_k_evalexppip, sizeof(__pyx_k_evalexppip), 0, 0, 1, 1},
+  {&__pyx_n_s_evalexppipterms, __pyx_k_evalexppipterms, sizeof(__pyx_k_evalexppipterms), 0, 0, 1, 1},
   {&__pyx_n_s_flags, __pyx_k_flags, sizeof(__pyx_k_flags), 0, 0, 1, 1},
   {&__pyx_n_s_format, __pyx_k_format, sizeof(__pyx_k_format), 0, 0, 1, 1},
   {&__pyx_n_s_fortran, __pyx_k_fortran, sizeof(__pyx_k_fortran), 0, 0, 1, 1},
@@ -17396,6 +18161,18 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
   __Pyx_GIVEREF(__pyx_tuple__19);
   __pyx_codeobj__20 = (PyObject*)__Pyx_PyCode_New(9, 0, 35, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__19, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_nitrogen_pes_fit_cython_exppip_p, __pyx_n_s_evalexppip, 16, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__20)) __PYX_ERR(0, 16, __pyx_L1_error)
 
+  /* "nitrogen/pes/fit/cython/exppip.pyx":172
+ *     return
+ * 
+ * def evalexppipterms(double [:,:,:] dX, double [:,:,:] dV, int order, int [:,:] table,             # <<<<<<<<<<<<<<
+ *                     double a, int natoms, int maxmon, int [:,:] terms):
+ * 
+ */
+  __pyx_tuple__21 = PyTuple_Pack(34, __pyx_n_s_dX, __pyx_n_s_dV, __pyx_n_s_order, __pyx_n_s_table, __pyx_n_s_a, __pyx_n_s_natoms, __pyx_n_s_maxmon, __pyx_n_s_terms, __pyx_n_s_i, __pyx_n_s_j, __pyx_n_s_k, __pyx_n_s_m, __pyx_n_s_nd, __pyx_n_s_n, __pyx_n_s_N, __pyx_n_s_ny, __pyx_n_s_dx, __pyx_n_s_dy, __pyx_n_s_dyn, __pyx_n_s_tablesize, __pyx_n_s_idxZ, __pyx_n_s_idxX, __pyx_n_s_idxY, __pyx_n_s_tab, __pyx_n_s_tempsize, __pyx_n_s_temp, __pyx_n_s_Ftemp, __pyx_n_s_tA, __pyx_n_s_tB, __pyx_n_s_prod1, __pyx_n_s_prod2, __pyx_n_s_tempprod, __pyx_n_s_p, __pyx_n_s_nt); if (unlikely(!__pyx_tuple__21)) __PYX_ERR(0, 172, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_tuple__21);
+  __Pyx_GIVEREF(__pyx_tuple__21);
+  __pyx_codeobj__22 = (PyObject*)__Pyx_PyCode_New(8, 0, 34, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__21, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_nitrogen_pes_fit_cython_exppip_p, __pyx_n_s_evalexppipterms, 172, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__22)) __PYX_ERR(0, 172, __pyx_L1_error)
+
   /* "View.MemoryView":286
  *         return self.name
  * 
@@ -17403,9 +18180,9 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
  * cdef strided = Enum("<strided and direct>") # default
  * cdef indirect = Enum("<strided and indirect>")
  */
-  __pyx_tuple__21 = PyTuple_Pack(1, __pyx_kp_s_strided_and_direct_or_indirect); if (unlikely(!__pyx_tuple__21)) __PYX_ERR(1, 286, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_tuple__21);
-  __Pyx_GIVEREF(__pyx_tuple__21);
+  __pyx_tuple__23 = PyTuple_Pack(1, __pyx_kp_s_strided_and_direct_or_indirect); if (unlikely(!__pyx_tuple__23)) __PYX_ERR(1, 286, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_tuple__23);
+  __Pyx_GIVEREF(__pyx_tuple__23);
 
   /* "View.MemoryView":287
  * 
@@ -17414,9 +18191,9 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
  * cdef indirect = Enum("<strided and indirect>")
  * 
  */
-  __pyx_tuple__22 = PyTuple_Pack(1, __pyx_kp_s_strided_and_direct); if (unlikely(!__pyx_tuple__22)) __PYX_ERR(1, 287, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_tuple__22);
-  __Pyx_GIVEREF(__pyx_tuple__22);
+  __pyx_tuple__24 = PyTuple_Pack(1, __pyx_kp_s_strided_and_direct); if (unlikely(!__pyx_tuple__24)) __PYX_ERR(1, 287, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_tuple__24);
+  __Pyx_GIVEREF(__pyx_tuple__24);
 
   /* "View.MemoryView":288
  * cdef generic = Enum("<strided and direct or indirect>")
@@ -17425,9 +18202,9 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
  * 
  * 
  */
-  __pyx_tuple__23 = PyTuple_Pack(1, __pyx_kp_s_strided_and_indirect); if (unlikely(!__pyx_tuple__23)) __PYX_ERR(1, 288, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_tuple__23);
-  __Pyx_GIVEREF(__pyx_tuple__23);
+  __pyx_tuple__25 = PyTuple_Pack(1, __pyx_kp_s_strided_and_indirect); if (unlikely(!__pyx_tuple__25)) __PYX_ERR(1, 288, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_tuple__25);
+  __Pyx_GIVEREF(__pyx_tuple__25);
 
   /* "View.MemoryView":291
  * 
@@ -17436,9 +18213,9 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
  * cdef indirect_contiguous = Enum("<contiguous and indirect>")
  * 
  */
-  __pyx_tuple__24 = PyTuple_Pack(1, __pyx_kp_s_contiguous_and_direct); if (unlikely(!__pyx_tuple__24)) __PYX_ERR(1, 291, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_tuple__24);
-  __Pyx_GIVEREF(__pyx_tuple__24);
+  __pyx_tuple__26 = PyTuple_Pack(1, __pyx_kp_s_contiguous_and_direct); if (unlikely(!__pyx_tuple__26)) __PYX_ERR(1, 291, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_tuple__26);
+  __Pyx_GIVEREF(__pyx_tuple__26);
 
   /* "View.MemoryView":292
  * 
@@ -17447,19 +18224,19 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
  * 
  * 
  */
-  __pyx_tuple__25 = PyTuple_Pack(1, __pyx_kp_s_contiguous_and_indirect); if (unlikely(!__pyx_tuple__25)) __PYX_ERR(1, 292, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_tuple__25);
-  __Pyx_GIVEREF(__pyx_tuple__25);
+  __pyx_tuple__27 = PyTuple_Pack(1, __pyx_kp_s_contiguous_and_indirect); if (unlikely(!__pyx_tuple__27)) __PYX_ERR(1, 292, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_tuple__27);
+  __Pyx_GIVEREF(__pyx_tuple__27);
 
   /* "(tree fragment)":1
  * def __pyx_unpickle_Enum(__pyx_type, long __pyx_checksum, __pyx_state):             # <<<<<<<<<<<<<<
  *     cdef object __pyx_PickleError
  *     cdef object __pyx_result
  */
-  __pyx_tuple__26 = PyTuple_Pack(5, __pyx_n_s_pyx_type, __pyx_n_s_pyx_checksum, __pyx_n_s_pyx_state, __pyx_n_s_pyx_PickleError, __pyx_n_s_pyx_result); if (unlikely(!__pyx_tuple__26)) __PYX_ERR(1, 1, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_tuple__26);
-  __Pyx_GIVEREF(__pyx_tuple__26);
-  __pyx_codeobj__27 = (PyObject*)__Pyx_PyCode_New(3, 0, 5, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__26, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_stringsource, __pyx_n_s_pyx_unpickle_Enum, 1, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__27)) __PYX_ERR(1, 1, __pyx_L1_error)
+  __pyx_tuple__28 = PyTuple_Pack(5, __pyx_n_s_pyx_type, __pyx_n_s_pyx_checksum, __pyx_n_s_pyx_state, __pyx_n_s_pyx_PickleError, __pyx_n_s_pyx_result); if (unlikely(!__pyx_tuple__28)) __PYX_ERR(1, 1, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_tuple__28);
+  __Pyx_GIVEREF(__pyx_tuple__28);
+  __pyx_codeobj__29 = (PyObject*)__Pyx_PyCode_New(3, 0, 5, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__28, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_stringsource, __pyx_n_s_pyx_unpickle_Enum, 1, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__29)) __PYX_ERR(1, 1, __pyx_L1_error)
   __Pyx_RefNannyFinishContext();
   return 0;
   __pyx_L1_error:;
@@ -17840,6 +18617,18 @@ if (!__Pyx_RefNanny) {
   if (PyDict_SetItem(__pyx_d, __pyx_n_s_evalexppip, __pyx_t_1) < 0) __PYX_ERR(0, 16, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
+  /* "nitrogen/pes/fit/cython/exppip.pyx":172
+ *     return
+ * 
+ * def evalexppipterms(double [:,:,:] dX, double [:,:,:] dV, int order, int [:,:] table,             # <<<<<<<<<<<<<<
+ *                     double a, int natoms, int maxmon, int [:,:] terms):
+ * 
+ */
+  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_8nitrogen_3pes_3fit_6exppip_3evalexppipterms, NULL, __pyx_n_s_nitrogen_pes_fit_exppip); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 172, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  if (PyDict_SetItem(__pyx_d, __pyx_n_s_evalexppipterms, __pyx_t_1) < 0) __PYX_ERR(0, 172, __pyx_L1_error)
+  __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
+
   /* "nitrogen/pes/fit/cython/exppip.pyx":1
  * #cython: boundscheck=False, wraparound=False, nonecheck=False, cdivision=True, language_level=3             # <<<<<<<<<<<<<<
  * #
@@ -17870,7 +18659,7 @@ if (!__Pyx_RefNanny) {
  * cdef strided = Enum("<strided and direct>") # default
  * cdef indirect = Enum("<strided and indirect>")
  */
-  __pyx_t_1 = __Pyx_PyObject_Call(((PyObject *)__pyx_MemviewEnum_type), __pyx_tuple__21, NULL); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 286, __pyx_L1_error)
+  __pyx_t_1 = __Pyx_PyObject_Call(((PyObject *)__pyx_MemviewEnum_type), __pyx_tuple__23, NULL); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 286, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   __Pyx_XGOTREF(generic);
   __Pyx_DECREF_SET(generic, __pyx_t_1);
@@ -17884,7 +18673,7 @@ if (!__Pyx_RefNanny) {
  * cdef indirect = Enum("<strided and indirect>")
  * 
  */
-  __pyx_t_1 = __Pyx_PyObject_Call(((PyObject *)__pyx_MemviewEnum_type), __pyx_tuple__22, NULL); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 287, __pyx_L1_error)
+  __pyx_t_1 = __Pyx_PyObject_Call(((PyObject *)__pyx_MemviewEnum_type), __pyx_tuple__24, NULL); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 287, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   __Pyx_XGOTREF(strided);
   __Pyx_DECREF_SET(strided, __pyx_t_1);
@@ -17898,7 +18687,7 @@ if (!__Pyx_RefNanny) {
  * 
  * 
  */
-  __pyx_t_1 = __Pyx_PyObject_Call(((PyObject *)__pyx_MemviewEnum_type), __pyx_tuple__23, NULL); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 288, __pyx_L1_error)
+  __pyx_t_1 = __Pyx_PyObject_Call(((PyObject *)__pyx_MemviewEnum_type), __pyx_tuple__25, NULL); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 288, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   __Pyx_XGOTREF(indirect);
   __Pyx_DECREF_SET(indirect, __pyx_t_1);
@@ -17912,7 +18701,7 @@ if (!__Pyx_RefNanny) {
  * cdef indirect_contiguous = Enum("<contiguous and indirect>")
  * 
  */
-  __pyx_t_1 = __Pyx_PyObject_Call(((PyObject *)__pyx_MemviewEnum_type), __pyx_tuple__24, NULL); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 291, __pyx_L1_error)
+  __pyx_t_1 = __Pyx_PyObject_Call(((PyObject *)__pyx_MemviewEnum_type), __pyx_tuple__26, NULL); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 291, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   __Pyx_XGOTREF(contiguous);
   __Pyx_DECREF_SET(contiguous, __pyx_t_1);
@@ -17926,7 +18715,7 @@ if (!__Pyx_RefNanny) {
  * 
  * 
  */
-  __pyx_t_1 = __Pyx_PyObject_Call(((PyObject *)__pyx_MemviewEnum_type), __pyx_tuple__25, NULL); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 292, __pyx_L1_error)
+  __pyx_t_1 = __Pyx_PyObject_Call(((PyObject *)__pyx_MemviewEnum_type), __pyx_tuple__27, NULL); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 292, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   __Pyx_XGOTREF(indirect_contiguous);
   __Pyx_DECREF_SET(indirect_contiguous, __pyx_t_1);

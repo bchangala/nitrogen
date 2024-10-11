@@ -169,6 +169,161 @@ def evalexppip(double [:,:,:] dX, double [:,:,:] dV, int order, int [:,:] table,
     
     return 
 
+def evalexppipterms(double [:,:,:] dX, double [:,:,:] dV, int order, int [:,:] table,
+                    double a, int natoms, int maxmon, int [:,:] terms):
+
+    """
+    Evaluate individual terms of the exp-pip expansion.
+
+    Parameters
+    ----------
+    double [nd,3*N,n] dX
+        The 3*N Cartesian coordinates at `n` geometries
+        
+    double [nd,nt,n] dV
+        The energy output for each term.
+        
+    int order 
+        Derivative order 
+        
+    int [3,tablesize] table
+        Product table 
+        
+    double a 
+        The Morse parameter
+    
+    int natoms
+        The number of atoms 
+    
+    int maxmon
+        The maximum monomial power 
+        
+    int [nt,ny] terms
+        The expansion term powers. `ny` = `natoms`(`natoms`-1)/2 is the number of
+        atomic pairs. 
+        
+    """
+    
+    cdef:
+        size_t i,j,k,m
+        size_t nd = dX.shape[0] # the number of derivatives
+        size_t n = dX.shape[2]  # the number of evaluation points
+        
+        int N = natoms          # the number of atoms 
+        int ny = (natoms*(natoms-1)) // 2 # the number of atomic pairs 
+
+        
+        double **dx = cyad.malloc2d(3*N, nd)   # Cartesian geometries 
+        double **dy = cyad.malloc2d(ny, nd)    # Pair distance functions
+        double **dyn = cyad.malloc2d(ny*(maxmon+1), nd) # Powers of y 
+        
+        size_t tablesize = table.shape[1] 
+        size_t *idxZ = <size_t *>malloc(tablesize * sizeof(size_t))
+        size_t *idxX = <size_t *>malloc(tablesize * sizeof(size_t))
+        size_t *idxY = <size_t *>malloc(tablesize * sizeof(size_t))
+        
+        cdef cyad.adtab tab = cyad.adtab(order, nd, tablesize, idxZ, idxX, idxY)
+        
+        size_t tempsize = 9
+        double **temp = cyad.malloc2d(tempsize, nd) # workspace 
+        double *Ftemp = cyad.malloc1d(order + 1)    # workspace 
+        
+        double *tA = cyad.malloc1d(nd)
+        double *tB = cyad.malloc1d(nd)
+        double *prod1 
+        double *prod2 
+        double *tempprod 
+        
+        int p 
+        
+        size_t nt = terms.shape[0] 
+        # terms.shape[1] should equal `ny`
+
+    # prepare table 
+    for i in range(tablesize):
+        idxZ[i] = table[0,i]
+        idxX[i] = table[1,i]
+        idxY[i] = table[2,i]
+    
+    
+    for i in range(n):
+        # For each geometry 
+        
+        # Get the inputs
+        for j in range(3*N):
+            for k in range(nd):
+                dx[j][k] = dX[k,j,i] 
+        
+        #
+        # Calculate y variables
+        #
+        calc_y(dx, dy, N, a, Ftemp, temp, &tab) 
+        
+        # Calculate their powers
+        calc_yn(dy, dyn, ny, maxmon, &tab)
+        
+        # Calculate expansion 
+        #
+        #
+        # Initialize derivative array 
+        # for k in range(nd):
+        #     for j in range(nt):
+        #         dV[k,j,i] = 0.0 
+        # (No initialization needed b/c terms
+        #  will be assigned.)
+        #
+            
+        # Loop through terms 
+        for j in range(nt): 
+            
+            # Initialize `prod` to unity
+            prod1 = tA 
+            prod2 = tB 
+            
+            prod1[0] = 1.0 
+            for k in range(1,nd):
+                prod1[k] = 0.0
+                
+            # Compute product 
+            for m in range(ny):
+                #
+                # If the power of y[m] is greater than 0,
+                # compute the product.
+                #
+                p = terms[j,m]
+                
+                if p > 0 :
+                    # prod2 <-- prod1 * y[m]**p 
+                    cyad.mul(prod2, prod1, dyn[m*(maxmon+1) + p], &tab)
+                    # swap prod2 and prod1 pointers 
+                    tempprod = prod1 
+                    prod1 = prod2
+                    prod2 = tempprod 
+                    #
+                    # prod1 now points to the current product
+                    # prod2 points to the other temp space 
+                    
+            
+            # prod1 contains the term
+            
+            # Assign term to output
+            for k in range(nd):
+                dV[k,j,i] = prod1[k] 
+            
+        
+    cyad.free2d(dx, 3*N)
+    cyad.free2d(dy, ny) 
+    cyad.free2d(dyn, ny*(maxmon+1))
+    free(idxZ)
+    free(idxY)
+    free(idxX)
+    cyad.free1d(tA) 
+    cyad.free1d(tB) 
+    cyad.free2d(temp, tempsize)
+    cyad.free1d(Ftemp) 
+    
+    return
+
 
 cdef void calc_y(double **dx, double **dy, int natoms, double a, 
                  double *F, double **temp, cyad.adtab *t):
