@@ -20,6 +20,8 @@ from .td_core import *  # Import the core namespace
 
 from . import cfourvib # CFOUR interface routines and parsers
 
+from . import distho 
+
 __all__ = ['calc_rectilinear_modes']
 __all__ += ho_core.__all__
 __all__ += td_core.__all__
@@ -459,6 +461,8 @@ def calc_harmCD(Be,tau):
         Bp[a] = Be[a] + 0.25 * (3*tau[b,c,b,c] - 2*tau[c,a,c,a] - 2*tau[a,b,a,b])
     
     
+    
+    
     # 
     # Calculate the Kivelson-Wilson parameters first.
     # Note axis 0,1,2 = a,b,c = z,x,y (i.e. I^r)
@@ -472,6 +476,7 @@ def calc_harmCD(Be,tau):
     R6 = (1/64) * (t[1,1] + t[2,2] - 2*t[1,2])
     deltaJ = (-1/16) * (t[1,1] - t[2,2])
     
+    
     # Calculate the asymmetry parameter
     # in terms of the effective *orthorhombic* rotational
     # constants, i.e., Bp
@@ -484,6 +489,7 @@ def calc_harmCD(Be,tau):
     # First, A-reduced (I^r)
     #
     # Quartic CD parameters
+    # (G&C Table 8.14)
     #
     DeltaJ = DJ - 2*R6 
     DeltaJK = DJK + 12*R6 
@@ -540,12 +546,133 @@ def calc_harmCD(Be,tau):
               "d1":d1,
               "d2":d2}
     
+    # Use generic code for IIIr
+    # (This was written after Ir above and I decided to change
+    #  as little code as possible.)
+    #
+    BAIIIr, CDAIIIr, BSIIIr, CDSIIIr = _calcASred(Bp[0], Bp[1], Bp[2],
+                                                  t[0,0], t[1,1], t[2,2],
+                                                  t[0,1], t[1,2], t[0,2])
+    # BAIIIr and BSIIIr are returnzed in z,x,y order.
+    # Rearrange to a,b,c = x,y,z
+    BAIIIr = BAIIIr[[1,2,0]]
+    BSIIIr = BSIIIr[[1,2,0]]
     
-    B0 = {"Be":Be, "Bp":Bp, "BA":BA, "BS":BS}
-    CD = {"KW":CD_KW, "AIr":CD_AIr, "SIr":CD_SIr}
+    B0 = {"Be":Be, "Bp":Bp, "BA":BA, "BS":BS, "BAIIIr":BAIIIr, "BSIIIr":BSIIIr}
+    CD = {"KW":CD_KW, "AIr":CD_AIr, "SIr":CD_SIr, "AIIIr":CDAIIIr, "SIIIr":CDSIIIr}
     
     return B0, CD 
     
+def _calcASred(Xp,Yp,Zp,tXX,tYY,tZZ,tXY,tYZ,tXZ):
+    """
+    Parameters
+    ----------
+    Xp,Yp,Zp: float
+        The rotational constants.
+    tXX,tYY,tZZ,tXY,tYZ,tXZ : float
+        The partially reduced quartic CD coefficients.
+        
+    Returns
+    -------
+    BA : (3,) ndarray
+        The rotational constants in the A reduction (z,x,y)
+    CDA : (5,) ndarray
+        The CD constants in the A reduction (DeltaJ, DeltaK, DeltaJK, delJ, delK)
+    BS : (3,) ndarray
+        The rotational constants in the S reduction (z,x,y)
+    CDS : (5,) ndarray
+        The CD constants in the S reduction (DJ, DK, DJK, d1, d2)
+        
+    Notes
+    -----
+    In the left-handed representations, the :math:`\\delta_J`, 
+    :math:`\\delta_K`, and :math:`d_1` parameters change sign, but 
+    :math:`d_2` is unchanged.
+    """
+    
+    # 
+    # Calculate the Kivelson-Wilson parameters first.
+    # For I^r 0,1,2 = a,b,c = z,x,y (i.e. I^r)
+    # 
+    # See Gordy and Cook, Table 8.7
+    #
+    DJ = (-1/32) * (3*tXX + 3*tYY + 2*tXY)
+    DK = DJ - 0.25 * (tZZ - tXZ - tYZ)
+    DJK = -DJ - DK - 0.25 * tZZ
+    R5 = (-1/32) * (tXX - tYY - 2*tXZ + 2*tYZ) # anti sym w.r.t. X <--> Y
+    R6 = (1/64) * (tXX + tYY - 2*tXY)
+    deltaJ = (-1/16) * (tXX - tYY) # anti-sym
+    
+    
+    # Calculate the asymmetry parameter
+    # in terms of the effective *orthorhombic* rotational
+    # constants, i.e., Bp
+    # Bp[0] = Zp
+    # Bp[1] = Xp
+    # Bp[2] = Yp, for I^r, etc
+    #
+    
+    sigma = (2 * Zp - Xp - Yp) / (Xp - Yp) # anti-sym
+    
+    #
+    # We now calculate the standard reduced Hamiltonians
+    #
+    # First, A-reduced (I^r)
+    #
+    # Quartic CD parameters
+    # (G&C Table 8.14)
+    #
+    DeltaJ = DJ - 2*R6 
+    DeltaJK = DJK + 12*R6 
+    DeltaK = DK - 10*R6 
+    # deltaJ = deltaJ # anti-sym
+    deltaK = -2*R5 - 4*sigma*R6  # anti-sym
+    
+    # Effective rotational constants
+    # (0,1,2 = a,b,c = z,x,y for I^r)
+    # 
+    # G&C Eqs. 8.101-8.103. 
+    # Note, the "Bx" constants in G&C are the effective
+    # orthorhombic rotational constants, i.e. Bp
+    #
+    BxA = Xp + 8*R6 * (-sigma - 1)
+    ByA = Yp + 8*R6 * (+sigma - 1)
+    BzA = Zp + 16*R6 
+    BA = np.array([BzA, BxA, ByA])
+    
+    CDA = {"DeltaJ":DeltaJ,
+              "DeltaK":DeltaK,
+              "DeltaJK":DeltaJK,
+              "deltaJ":deltaJ,
+              "deltaK":deltaK}
+    
+    # Now calculate S-reduced, I^r parameters
+    # (use conversions from Table 4 of Watson 1977
+    #  or G&C Eq 8.107)
+    #
+    DJ_S = DJ + R5/sigma 
+    DK_S = DK + 5*R5/sigma 
+    DJK_S = DJK - 6*R5/sigma 
+    d1 = -deltaJ  # anti-sym
+    d2 = R6 + R5/(2*sigma) # this is sym w.r.t. x<-->y !
+    
+    # The effective S-reduced constants
+    # (G&C Eq. 8.114 - 8.116)
+    #
+    BxS = Xp - 4*R6 + 2*R5*(1/sigma + 2)
+    ByS = Yp - 4*R6 + 2*R5*(1/sigma - 2)
+    BzS = Zp + 6*R6 - 5*R5/sigma 
+    
+    BS = np.array([BzS, BxS, ByS])
+    
+    
+    CDS = {"DJ":DJ_S,
+              "DK":DK_S,
+              "DJK":DJK_S,
+              "d1":d1,
+              "d2":d2}
+
+    return BA, CDA, BS, CDS 
     
 def analyzeCD(Xe,omega,Lvib,mass, printing = True):
     """
@@ -628,6 +755,7 @@ def printCD(Be,B0,CD):
             print(" " + abc[i] + "' - " + abc[i] + "e" ,end = ""); printval(B0["Bp"][i]-Be[i])
         print("")
         
+        print("          ------------- (Ir) -------------")
         for i in range(3):
             print("   " + abc[i] + "(A) ",end = ""); printval(B0["BA"][i])
         print("")
@@ -641,6 +769,22 @@ def printCD(Be,B0,CD):
         for i in range(3):
             print(" " + abc[i] + "(S)-" + abc[i] + "e" ,end = ""); printval(B0["BS"][i]-Be[i])
         print("")
+        
+        print("          ------------ (IIIr) ------------")
+        for i in range(3):
+            print("   " + abc[i] + "(A) ",end = ""); printval(B0["BAIIIr"][i])
+        print("")
+        for i in range(3):
+            print(" " + abc[i] + "(A)-" + abc[i] + "e" ,end = ""); printval(B0["BAIIIr"][i]-Be[i])
+        print("")
+        
+        for i in range(3):
+            print("   " + abc[i] + "(S) ",end = ""); printval(B0["BSIIIr"][i])
+        print("")
+        for i in range(3):
+            print(" " + abc[i] + "(S)-" + abc[i] + "e" ,end = ""); printval(B0["BSIIIr"][i]-Be[i])
+        print("")
+        
         print(f"   sigma ............ {sigma:.6f}         ")
         print("")
         print("  ---------------------------------------  ")
@@ -660,6 +804,18 @@ def printCD(Be,B0,CD):
         print("  ---------------------------------------  ")
         for p in CD["SIr"]:
             print(f" {p:>7s}", end = ""); printval(CD["SIr"][p])
+        print("")
+        print("  ---------------------------------------  ")
+        print("          A-reduced (IIIr) parameters      ")
+        print("  ---------------------------------------  ")
+        for p in CD["AIIIr"]:
+            print(f" {p:>7s}", end = ""); printval(CD["AIIIr"][p])
+        print("")
+        print("  ---------------------------------------  ")
+        print("          S-reduced (IIIr) parameters      ")
+        print("  ---------------------------------------  ")
+        for p in CD["SIIIr"]:
+            print(f" {p:>7s}", end = ""); printval(CD["SIIIr"][p])
         print("")
         print("==========================================")
 
