@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 
 def calcPathAction(qpath, V, cs, masses, band_action = 1000.0,
                     kinetic_energy = 0.0, deriv = 0,
-                    Vmin = 0):
+                    Vmin = 0, ignore_g_deriv = False):
     """
     Calculate the path action and its derivatives.
 
@@ -35,6 +35,9 @@ def calcPathAction(qpath, V, cs, masses, band_action = 1000.0,
         The derivative order to calculate. The default is 0.
     Vmin : float, optional
         The minimum energy to subtract. The default is 0.
+    ignore_g_deriv : bool, optional
+        If True, derivatives of the metric tensor are ignored. 
+        The default is False.
 
     Returns
     -------
@@ -102,6 +105,9 @@ def calcPathAction(qpath, V, cs, masses, band_action = 1000.0,
     
     Note that the minimum energy of `V` will be subtracted before computing the
     action and associated derivatives.
+    
+    This implementation ignores the kinetic pseudo-potential contribution, which may
+    become significant if the path approaches singular points of the metric tensor.
 
     
     """
@@ -146,10 +152,20 @@ def calcPathAction(qpath, V, cs, masses, band_action = 1000.0,
     V -= Vmin # Remove minimum energy 
     
     # Calculate the metric tensor and its derivatives 
-    dg = cs.Q2g(qpath, masses = masses, deriv = deriv) # (nd, npacked, N)
-    dG,_ = nitrogen.dfun.sym2invdet(dg, deriv, nq)
-    dgvib,_ = nitrogen.dfun.sym2invdet(dG[:, :(nq*(nq+1))//2],
-                                     deriv, nq) # (nd, npacked, N)
+    if not ignore_g_deriv:
+        dg = cs.Q2g(qpath, masses = masses, deriv = deriv) # (nd, npacked, N)
+        dG,_ = nitrogen.dfun.sym2invdet(dg, deriv, nq)
+        dgvib,_ = nitrogen.dfun.sym2invdet(dG[:, :(nq*(nq+1))//2],
+                                         deriv, nq) # (nd, npacked, N)
+    else:
+        # Calculate only the value and set derivatives to zero 
+        dg_val = dg = cs.Q2g(qpath, masses = masses, deriv = 0) # (nd = 1, npacked, N)
+        dG_val,_ = nitrogen.dfun.sym2invdet(dg_val, 0, nq)
+        dgvib_val,_ = nitrogen.dfun.sym2invdet(dG_val[:, :(nq*(nq+1))//2],
+                                         0, nq) # (nd, npacked, N)
+        nd = nitrogen.dfun.nderiv(deriv, nq)
+        dgvib = np.zeros_like(dgvib_val, shape = (nd,) + dgvib_val.shape[1:] )
+        np.copyto(dgvib[0], dgvib_val[0])
     
     
     if deriv >= 0:    

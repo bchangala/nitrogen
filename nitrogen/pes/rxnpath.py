@@ -1140,6 +1140,138 @@ class InverseMetric(nitrogen.dfun.DFun):
         else:
             raise ValueError(f'Unrecognized mode = {str(self.mode):s}')
             
+class InverseInertia(nitrogen.dfun.DFun):
+    """
+    An inverse effective inertia tensor.
+    
+    
+    The derivatives of the lower triangle in packed storage of the 
+    inverse effective inertia tensor is calculated.
+    
+    mode = 'bodyframe' is assumed.
+
+    """
+    
+    def __init__(self, cs, masses = None):
+        """
+
+        Parameters
+        ----------
+        cs : CoordSys
+            The coordinate system.
+        masses : array_like, optional
+            The masses. If None, unit masses are assumed.
+        
+        """
+        
+        nQ = cs.nQ 
+        nf = 6 # The rotational block in packed format
+        
+        maxderiv = (None if cs.maxderiv is None else cs.maxderiv - 1)
+        
+        super().__init__(self._Grfun, nf = nf, nx = nQ,
+                         maxderiv = maxderiv, zlevel = None)
+        
+        self.nQ = nQ 
+        self.cs = cs 
+        self.masses = masses 
+        
+        return 
+        
+        
+    def _Grfun(self, Q, deriv = 0, out = None, var = None):
+        
+        
+        # This only support derivatives with all variables
+        #
+        if var is not None:
+            raise NotImplementedError("InverseInertia does not support partial `var` currently.")
+        nvar = Q.shape[0]
+        
+        # Calculate derivatives of the metric tensor, g
+        # g is in packed storage
+        rvar = 'xyz'
+            
+        g = self.cs.Q2g(Q, masses = self.masses, deriv = deriv, mode = 'bodyframe', rvar = rvar)
+        
+        #
+        # Calculate derivatives of the inverse metric, G.
+        #
+        G,_ = nitrogen.dfun.sym2invdet(g, deriv, nvar)
+        
+        # return just the rotational block 
+        nQ = self.nQ 
+        Gr = G[:, [-(2*nQ+6), -(nQ+5), -(nQ+4), -3, -2, -1]]
+        
+        return Gr
+
+class CoriolisBlock(nitrogen.dfun.DFun):
+    """
+    The rovibrational (Coriolis) block of the inverse metric.
+    
+    mode = 'bodyframe' is assumed.
+
+    """
+    
+    def __init__(self, cs, masses = None):
+        """
+
+        Parameters
+        ----------
+        cs : CoordSys
+            The coordinate system.
+        masses : array_like, optional
+            The masses. If None, unit masses are assumed.
+        
+        """
+        
+        nQ = cs.nQ 
+        nf = 3 * nQ # The rovibrational block in row major
+        
+        maxderiv = (None if cs.maxderiv is None else cs.maxderiv - 1)
+        
+        super().__init__(self._Grvfun, nf = nf, nx = nQ,
+                         maxderiv = maxderiv, zlevel = None)
+        
+        self.nQ = nQ 
+        self.cs = cs 
+        self.masses = masses 
+        
+        return 
+        
+        
+    def _Grvfun(self, Q, deriv = 0, out = None, var = None):
+        
+        
+        # This only support derivatives with all variables
+        #
+        if var is not None:
+            raise NotImplementedError("Coriolis does not support partial `var` currently.")
+        nvar = Q.shape[0]
+        
+        # Calculate derivatives of the metric tensor, g
+        # g is in packed storage
+        rvar = 'xyz'
+            
+        g = self.cs.Q2g(Q, masses = self.masses, deriv = deriv, mode = 'bodyframe', rvar = rvar)
+        
+        #
+        # Calculate derivatives of the inverse metric, G.
+        #
+        G,_ = nitrogen.dfun.sym2invdet(g, deriv, nvar)
+        
+        # return just the rovibrational block 
+        nQ = self.nQ 
+        nvv = (nQ * (nQ+1)) // 2  # The size of the packed vib-vib block 
+        
+        Gxv = G[:, nvv:(nvv+nQ)]
+        Gyv = G[:, (nvv+nQ+1):(nvv+2*nQ+1)]
+        Gzv = G[:, (nvv+2*nQ+3):(nvv+3*nQ+3)]
+        
+        Grv = np.concatenate([Gxv, Gyv, Gzv], axis = 1)
+        
+        return Grv
+            
 def symfull_axis(A, axis = 0):
     """
     Expand packed matrix to full symmetric matrix.
@@ -1646,7 +1778,8 @@ def covariant_hessian(q,V,G):
     
     return f,H
 
-def pathvib_nonstationary(q, V, G, hbar = None):
+def pathvib_nonstationary(q, V, G, hbar = None,
+                          fproj = None):
     """
     Calculate reaction path normal modes
     using the orthogonally projected covariant Hessian.
@@ -1662,6 +1795,9 @@ def pathvib_nonstationary(q, V, G, hbar = None):
     hbar : float, optional
         The value of :math:`\\hbar`. If None, the default
         NITROGEN units will be used. 
+    fproj : (nq,...) array_like, optional
+        The projection vector at each point. If None (default),
+        the gradient will be used.
 
     Returns
     -------
@@ -1703,6 +1839,9 @@ def pathvib_nonstationary(q, V, G, hbar = None):
     #
     # where f is the local gradient
     #
+    if fproj is not None:
+        f = fproj.copy() 
+        # else, just use the local gradient, `f`.
     # The normal gradient `f` is f_j with a lowered index
     # Calculate F = f^i, with an upper index
     F = np.einsum('ij...,j...->i...', G0, f) 
