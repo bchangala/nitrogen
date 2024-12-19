@@ -2,7 +2,7 @@
 """
 symmetry.py
 
-Symmetry operations
+Symmetry operations as sparse linear operators.
 
 """
 

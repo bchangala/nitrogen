@@ -23,6 +23,7 @@ from . import scf
 from . import special
 from . import math 
 from . import vpt 
+from . import symmetry 
 
 
 import numpy as np 
