@@ -13,5 +13,5 @@ The original C code (ver. 1.x) is available [here](https://www.colorado.edu/nitr
 
 Permanent DOIs are available for citing stable releases:
 
-v.2.1.2 [![DOI](https://zenodo.org/badge/295796633.svg)](https://zenodo.org/badge/latestdoi/295796633)
-
+v2.1.2 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.7342277.svg)](https://doi.org/10.5281/zenodo.7342277)
+v2.2.1 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.14885792.svg)](https://doi.org/10.5281/zenodo.14885792)
