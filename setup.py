@@ -85,8 +85,16 @@ with open("README.md", "r") as fh:
 	long_description = fh.read()
     
 on_rtd = os.environ.get('READTHEDOCS') == 'True' # Check whether we are on Read the Docs
-install_requires = ['numpy>=1.19', 'scipy>=1.4.1', 'matplotlib>=3.1,<3.3', 'scikit-image',
-                  'setuptools>=49',"wheel","Cython>=0.29.21"]
+install_requires = [
+    'numpy>=1.20.0', 
+    'scipy>=1.4.1', 
+    'matplotlib>=3.1,<3.3', 
+    'scikit-image',
+    'setuptools>=49',
+    "wheel",
+    "Cython>=0.29.21"
+    ]
+
 if not on_rtd:
     # py3nj requires fortran compilation; cannot be built on read-the-docs
     install_requires += ['py3nj']

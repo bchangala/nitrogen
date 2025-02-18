@@ -55,6 +55,7 @@ import numpy as np
 import matplotlib.pyplot as plt 
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib import cm
+import matplotlib 
 from skimage.measure import marching_cubes
 from scipy import interpolate
     
@@ -226,7 +227,7 @@ def plot(dvrs, fun, labels = None,
         Coordinate labels (including fixed).
     ls : str, optional
         1-D line spec.
-    mode2d: {'surface', 'contour'}, optional
+    mode2d: {'surface', 'contour', 'contourf'}, optional
         2-D plot style. 
     isovalue : scalar or array_like
         Isosurface value(s) for 3-D plot. If None (default), a 
@@ -285,14 +286,27 @@ def plot(dvrs, fun, labels = None,
         if mode2d == 'surface':
             
             ax = fig.add_subplot(111, projection='3d')
+            rng = np.max(abs(Z))
+            norm = matplotlib.colors.Normalize(vmin=-rng,vmax=rng)
             ax.plot_surface(X, Y, Z,
                            cmap = cm.coolwarm,
                            linewidth = 0,
                            rcount = Z.shape[0],
-                           ccount = Z.shape[1])
+                           ccount = Z.shape[1],
+                           norm=norm)
         elif mode2d == 'contour':
             
-            plt.contour(X, Y, Z, levels = 50) 
+            rng = np.max(abs(Z))
+            norm = matplotlib.colors.Normalize(vmin=-rng,vmax=rng)
+            plt.contour(X, Y, Z, levels = 50,
+                        norm=norm, cmap = cm.coolwarm) 
+            ax = plt.gca() 
+        elif mode2d == 'contourf':
+            
+            rng = np.max(abs(Z))
+            norm = matplotlib.colors.Normalize(vmin=-rng,vmax=rng)
+            plt.contourf(X, Y, Z, levels = 50,
+                        norm=norm, cmap = cm.coolwarm) 
             ax = plt.gca() 
             
         else:

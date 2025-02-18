@@ -9,5 +9,5 @@ scikit-image
 setuptools>=49
 wheel
 Cython>=0.29.21
-py3nj
+py3nj==0.1.2   # Changed 12/29/2024
 sphinx==4.2.0
