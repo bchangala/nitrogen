@@ -11,5 +11,5 @@ scikit-image
 setuptools>=49
 wheel
 Cython>=0.29.21
-#py3nj # no fortran compiler on RTD
+#py3nj==0.1.2 # no fortran compiler on RTD
 sphinx==4.2.0

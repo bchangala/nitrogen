@@ -97,7 +97,7 @@ install_requires = [
 
 if not on_rtd:
     # py3nj requires fortran compilation; cannot be built on read-the-docs
-    install_requires += ['py3nj']
+    install_requires += ['py3nj==0.1.2']
 	
 setuptools.setup(
 	name = "nitrogen",

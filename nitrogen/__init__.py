@@ -7,7 +7,7 @@ calculations and rovibronic spectroscopy.
 
 """
 
-__version__ = '2.2.dev0'
+__version__ = '2.2'
 
 # Import sub-packages and modules into namespace
 from . import autodiff
