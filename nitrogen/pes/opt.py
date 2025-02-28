@@ -61,7 +61,7 @@ def opt_newton(F, x0, alpha = 1.0, tol = 1e-6, disp = False,
     conv = False 
     
     if disp:
-        print("Step   Value       |grad|         ")
+        print("Step   Value       |grad|")
         print("-----------------------------")
     for i in range(maxiter):
         #
@@ -173,7 +173,7 @@ def opt_bfgs(F, x0, Hinit = None, alpha = 1.0, tol = 1e-6, disp = False,
     conv = False     
 
     if disp:
-        print("Step   Value       |grad|         ")
+        print("Step   Value       |grad|")
         print("-----------------------------")
         
     
