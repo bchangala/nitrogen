@@ -925,7 +925,7 @@ class EckartCoordSys(CoordSys):
     """
     
     An Eckart frame coordinate system. This method
-    uses the quaternion-based algorithm of [Kras2014]_.
+    uses the quaternion-based algorithm of [Kras2014soew]_.
     
     
     Attributes
@@ -944,7 +944,7 @@ class EckartCoordSys(CoordSys):
     
     References
     ----------
-    .. [Kras2014] S. Krasnoshchekov, E. Isayeva, and N. Stepanov,
+    .. [Kras2014soew] S. Krasnoshchekov, E. Isayeva, and N. Stepanov,
        "Determination of the Eckart molecule-fixed frame by use of the
        apparatus of quaternion algebra," J. Chem. Phys., 140, 154104 (2014).
        https://doi.org/10.1063/1.4870936
@@ -1180,7 +1180,7 @@ class MovingEckartCoordSys(CoordSys):
     """
     
     A mpving-frame Eckart coordinate system. This method
-    uses the quaternion-based algorithm of [Kras2014]_.
+    uses the quaternion-based algorithm of [Kras2014itdp]_.
     
     
     Attributes
@@ -1198,7 +1198,7 @@ class MovingEckartCoordSys(CoordSys):
     
     References
     ----------
-    .. [Kras2014] S. Krasnoshchekov, E. Isayeva, and N. Stepanov,
+    .. [Kras2014itdp] S. Krasnoshchekov, E. Isayeva, and N. Stepanov,
        "Determination of the Eckart molecule-fixed frame by use of the
        apparatus of quaternion algebra," J. Chem. Phys., 140, 154104 (2014).
        https://doi.org/10.1063/1.4870936

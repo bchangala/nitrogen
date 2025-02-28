@@ -503,21 +503,19 @@ def constrainedPolynomial(x, df, x0 = None):
     df : (deriv+1, n) array_like
         The scaled derivative arrays of :math:`f(x)` at the matching positions
     x0 : scalar, optional
-        The expansion point of the polynomial. If None, 
-        `x0` is zero.
-    
+        The expansion point of the polynomial. If None, `x0` is zero.
+
     Returns
     -------
     c : (nc,) ndarray
         The power series coefficients for the matching polynomial, 
         ``c[0] + c[1]*(x-x0) + c[2]*(x-x0)**2 + ...``, where 
-        `nc` = `n`\ *(\ `deriv` +1).
+        `nc = n * (deriv + 1)`.
         
     Notes
     -----
     The `df` derivative array contains the **scaled** derivatives,
     ``df[n]`` = :math:`f^{(n)} = \partial_x^n f / n!`.
-    
     """
     
     x = np.array(x)
@@ -701,7 +699,7 @@ def clenshawcurtis(n, bounds = (-1,1)):
     n : integer
         The number of quadrature points.
     bounds : (2,) tuple, optional
-        The integration end-points. The default is ``(-1,1)''.
+        The integration end-points. The default is ``(-1,1)``.
         If the bounds are in reverse order, the weights will be 
         negative.
 
@@ -717,7 +715,7 @@ def clenshawcurtis(n, bounds = (-1,1)):
     
     The quadrature rule approximates the integral :math:`\\int_{-1}^{1} f(x) dx`.
     
-    See ``Fast Construction of the Fejer and Clenshaw--Curtis Quadrature Rules'',
+    See \`\`Fast Construction of the Fejer and Clenshaw--Curtis Quadrature Rules\'\',
     by Jörg Waldvogel, BIT Num. Math. 46, 195 (2006). doi: 10.1007/s10543-006-0045-4.
     """
     
