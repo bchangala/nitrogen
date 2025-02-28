@@ -9,4 +9,5 @@ Tutorials
    coordsys
    dvr
    ndbasis
+   geoopt
    
