@@ -723,7 +723,7 @@ def analyzeCD(Xe,omega,Lvib,mass, printing = True):
     # Print results 
     if printing:
         print("==========================================")
-        print(" Harmonic centrifugal distortion analysis ")
+        print(" Harmonic centrifugal distortion analysis")
         print("==========================================")
         print("")
         printCD(Be,B0,CD)
@@ -734,14 +734,14 @@ def printCD(Be,B0,CD):
     
         def printval(val, end = "\n"):
             # Print in cm^-1 and MHz 
-            print(f"{val:15.5E}   {val*29979.2458:15.5f}   ", end = end)
+            print(f"{val:15.5E}   {val*29979.2458:15.5f}", end = end)
             
         abc = ['A','B','C']
         Bp = B0["Bp"] # (the unreduced, effective orthorhombic parameters)
         sigma = (2*Bp[0] - Bp[1] - Bp[2])/(Bp[1]-Bp[2])  # asymmetry parameter 
         
         print("")
-        print("               cm^-1             MHz      ")
+        print("               cm^-1             MHz")
         print("          --------------    --------------")
         for i in range(3):
             print("   " + abc[i] + "e   ",end = ""); printval(Be[i])
@@ -785,35 +785,35 @@ def printCD(Be,B0,CD):
             print(" " + abc[i] + "(S)-" + abc[i] + "e" ,end = ""); printval(B0["BSIIIr"][i]-Be[i])
         print("")
         
-        print(f"   sigma ............ {sigma:.6f}         ")
+        print(f"   sigma ............ {sigma:.6f}")
         print("")
-        print("  ---------------------------------------  ")
-        print("         Kivelson-Wilson parameters        ")
-        print("  ---------------------------------------  ")
+        print("  ---------------------------------------")
+        print("         Kivelson-Wilson parameters")
+        print("  ---------------------------------------")
         for p in CD["KW"]:
             print(f" {p:>7s}", end = ""); printval(CD["KW"][p])
         print("")
-        print("  ---------------------------------------  ")
-        print("          A-reduced (Ir) parameters        ")
-        print("  ---------------------------------------  ")
+        print("  ---------------------------------------")
+        print("          A-reduced (Ir) parameters")
+        print("  ---------------------------------------")
         for p in CD["AIr"]:
             print(f" {p:>7s}", end = ""); printval(CD["AIr"][p])
         print("")
-        print("  ---------------------------------------  ")
-        print("          S-reduced (Ir) parameters        ")
-        print("  ---------------------------------------  ")
+        print("  ---------------------------------------")
+        print("          S-reduced (Ir) parameters")
+        print("  ---------------------------------------")
         for p in CD["SIr"]:
             print(f" {p:>7s}", end = ""); printval(CD["SIr"][p])
         print("")
-        print("  ---------------------------------------  ")
-        print("          A-reduced (IIIr) parameters      ")
-        print("  ---------------------------------------  ")
+        print("  ---------------------------------------")
+        print("          A-reduced (IIIr) parameters")
+        print("  ---------------------------------------")
         for p in CD["AIIIr"]:
             print(f" {p:>7s}", end = ""); printval(CD["AIIIr"][p])
         print("")
-        print("  ---------------------------------------  ")
-        print("          S-reduced (IIIr) parameters      ")
-        print("  ---------------------------------------  ")
+        print("  ---------------------------------------")
+        print("          S-reduced (IIIr) parameters")
+        print("  ---------------------------------------")
         for p in CD["SIIIr"]:
             print(f" {p:>7s}", end = ""); printval(CD["SIIIr"][p])
         print("")
