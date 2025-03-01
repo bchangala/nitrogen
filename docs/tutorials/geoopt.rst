@@ -5,6 +5,9 @@ In this example, we show how to optimize the
 minimum energy geometry and calculate the harmonic
 frequencies and normal modes of a polyatomic molecule.
 
+Geometry optimization
+---------------------
+
 We first need a potential energy surface (PES) to work with. 
 We will use one for H\ :sub:`2`\ O published by 
 Polyansky et al (J. Chem. Phys. 105, 6490, 1996), which is 
@@ -75,6 +78,9 @@ with an initial geometry of r(OH) = 1.0 Å and :math:`\theta`\ (HOH)
 tolerance, constraining one or more arguments to fixed values, supplying a pre-computed
 Hessian, etc. 
 
+Curvilinear vibrational analysis
+--------------------------------
+
 Now that we have optimized the equilibrium geometry, we can perform a 
 harmonic vibrational normal-mode analysis. We will first do this explicity using 
 our Z-matrix coordinate system using the standard curvilinear GF approach (see 
@@ -136,3 +142,172 @@ the harmonic frequencies.
     True
             
 Everything checks out.
+
+Rectilinear vibrational analysis
+--------------------------------
+
+The standard Watson Hamiltonian is based on rectilinear normal
+coordinates. These can be calculated using 
+:py:func:`nitrogen.vpt.calc_rectilinear_modes`, which first requires
+calculating the Hessian with respect to Cartesian displacements. To do that,
+we first evaluate the equilibrium Cartesian position using our curvilinear
+equilibrium geometry from above and rotate it to the principal axis system.
+
+
+..  doctest:: example-geoopt
+
+    >>> Xe = cs2.Q2X(qmin)[0] # Cartesian equilibrium geometry 
+    >>> Xe,_,_ = n2.angmom.X2PAS(Xe, masses) # Rotate to PAS
+    >>> hes = PES.hes(Xe)[0] # The Cartesian Hessian at Xe 
+    >>> omega_rect, T = n2.vpt.calc_rectilinear_modes(hes, masses)
+    >>> omega_rect
+    array([5.00232981e-03, 1.36059436e-05, 7.38904032e-06, 2.88647058e-05,
+           2.93979778e-03, 6.45802187e-03, 1.64958906e+03, 3.83038089e+03,
+           3.94096387e+03])
+           
+The harmonic frequencies in ``omega_rect`` include the 3 translational and 
+3 rotational modes, which equal zero. The vibrational frequencies equal
+the those calculated with the curvilinear GF method above.
+
+The normal-mode Cartesian displacement vectors are returned as the columns of 
+``T``.  By default, :py:func:`~nitrogen.vpt.calc_rectilinear_modes` normalizes
+the vibrational vectors to the same reduced dimensionless normal coordinates, 
+:math:`q`, as above. 
+To request the displacement vectors with respect to mass-weighted Cartesians,
+use the `norm` keyword. These are normalized to unity modulus.
+
+..  doctest:: example-geoopt
+
+    >>> omega_rect, L = n2.vpt.calc_rectilinear_modes(hes, masses, norm = 'mass-weighted')
+    >>> np.allclose(L.T @ L, np.eye(len(L))) # L is orthonormal
+    True
+    
+The mass-weighted displacement vectors can be used to calculate Coriolis
+coupling constants
+
+..  doctest:: example-geoopt
+
+    >>> Lvib = L[:,6:] # The vibrational vectors 
+    >>> zeta = n2.vpt.calc_coriolis_zetas(Lvib) 
+    >>> zeta # (mode i, mode j, axis k) 
+    array([[[ 0.00000000e+00,  0.00000000e+00,  0.00000000e+00],
+            [ 7.21324074e-17, -2.51543557e-17, -2.54098520e-10],
+            [-7.78383835e-17,  1.35562504e-16,  9.99931994e-01]],
+    <BLANKLINE>
+           [[-7.21324074e-17,  2.51543557e-17,  2.54098520e-10],
+            [ 0.00000000e+00,  0.00000000e+00,  0.00000000e+00],
+            [-9.08401587e-17, -1.21849559e-16,  1.16621858e-02]],
+    <BLANKLINE>
+           [[ 7.78383835e-17, -1.35562504e-16, -9.99931994e-01],
+            [ 9.08401587e-17,  1.21849559e-16, -1.16621858e-02],
+            [ 0.00000000e+00,  0.00000000e+00,  0.00000000e+00]]])
+            
+Harmonic centrifugal distortion constants can also be calculated
+
+..  doctest:: example-geoopt 
+    
+    >>> B0,CD = n2.vpt.analyzeCD(Xe, omega_rect[6:], Lvib, masses, printing = True)
+    ==========================================
+     Harmonic centrifugal distortion analysis 
+    ==========================================
+    <BLANKLINE>
+    <BLANKLINE>
+                   cm^-1             MHz      
+              --------------    --------------
+       Ae       2.73812E+01      820869.10098   
+       Be       1.45785E+01      437052.06382   
+       Ce       9.51334E+00      285202.71759   
+    <BLANKLINE>
+       A'       2.73832E+01      820927.74239   
+       B'       1.45804E+01      437110.70523   
+       C'       9.51040E+00      285114.75547   
+    <BLANKLINE>
+     A' - Ae    1.95607E-03          58.64141   
+     B' - Be    1.95607E-03          58.64141   
+     C' - Ce   -2.93410E-03         -87.96212   
+    <BLANKLINE>
+              ------------- (Ir) -------------
+       A(A)     2.73816E+01      820878.74053   
+       B(A)     1.45862E+01      437283.44557   
+       C(A)     9.50628E+00      284991.01699   
+    <BLANKLINE>
+     A(A)-Ae    3.21541E-04           9.63955   
+     B(A)-Be    7.71806E-03         231.38175   
+     C(A)-Ce   -7.06157E-03        -211.70060   
+    <BLANKLINE>
+       A(S)     2.73817E+01      820883.30410   
+       B(S)     1.45854E+01      437259.53118   
+       C(S)     9.50695E+00      285011.28053   
+    <BLANKLINE>
+     A(S)-Ae    4.73765E-04          14.20312   
+     B(S)-Be    6.92037E-03         207.46736   
+     C(S)-Ce   -6.38565E-03        -191.43706   
+    <BLANKLINE>
+              ------------ (IIIr) ------------
+       A(A)     2.73717E+01      820582.11772   
+       B(A)     1.46211E+01      438329.09419   
+       C(A)     9.48129E+00      284241.99118   
+    <BLANKLINE>
+     A(A)-Ae   -9.57273E-03        -286.98326   
+     B(A)-Be    4.25971E-02        1277.03036   
+     C(A)-Ce   -3.20464E-02        -960.72640   
+    <BLANKLINE>
+       A(S)     2.73974E+01      821351.94126   
+       B(S)     1.45755E+01      436963.44257   
+       C(S)     9.50614E+00      284986.77628   
+    <BLANKLINE>
+     A(S)-Ae    1.61058E-02         482.84029   
+     B(S)-Be   -2.95609E-03         -88.62125   
+     C(S)-Ce   -7.20303E-03        -215.94131   
+    <BLANKLINE>
+       sigma ............ 6.050359         
+    <BLANKLINE>
+      ---------------------------------------  
+             Kivelson-Wilson parameters        
+      ---------------------------------------  
+          DJ    9.59431E-04          28.76303   
+          DK    2.47000E-02         740.48861   
+         DJK   -3.75105E-03        -112.45370   
+          R5    1.05198E-03          31.53761   
+          R6   -1.02158E-04          -3.06262   
+    <BLANKLINE>
+      ---------------------------------------  
+              A-reduced (Ir) parameters        
+      ---------------------------------------  
+      DeltaJ    1.16375E-03          34.88826   
+      DeltaK    2.57216E-02         771.11477   
+     DeltaJK   -4.97695E-03        -149.20510   
+      deltaJ    4.64437E-04          13.92346   
+      deltaK    3.68404E-04          11.04448   
+    <BLANKLINE>
+      ---------------------------------------  
+              S-reduced (Ir) parameters        
+      ---------------------------------------  
+          DJ    1.13330E-03          33.97555   
+          DK    2.55694E-02         766.55120   
+         DJK   -4.79428E-03        -143.72882   
+          d1   -4.64437E-04         -13.92346   
+          d2   -1.52224E-05          -0.45636   
+    <BLANKLINE>
+      ---------------------------------------  
+              A-reduced (IIIr) parameters      
+      ---------------------------------------  
+      DeltaJ    1.20005E-02         359.76656   
+      DeltaK    2.57216E-02         771.11477   
+     DeltaJK   -3.74873E-02       -1123.84000   
+      deltaJ    4.95395E-03         148.51569   
+      deltaK   -1.78079E-02        -533.86879   
+    <BLANKLINE>
+      ---------------------------------------  
+              S-reduced (IIIr) parameters      
+      ---------------------------------------  
+          DJ    7.03185E-03         210.80954   
+          DK    8.78263E-04          26.32968   
+         DJK   -7.67524E-03        -230.09788   
+          d1   -4.95395E-03        -148.51569   
+          d2   -2.48434E-03         -74.47851   
+    <BLANKLINE>
+    ==========================================
+
+    
+
