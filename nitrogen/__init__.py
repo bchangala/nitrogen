@@ -7,11 +7,7 @@ calculations and rovibronic spectroscopy.
 
 """
 
-<<<<<<< HEAD
 __version__ = '2.3.dev0'
-=======
-__version__ = '2.2.3'
->>>>>>> 2.2.1_pxd_fix
 
 # Import sub-packages and modules into namespace
 from . import autodiff
