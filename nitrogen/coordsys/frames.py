@@ -920,7 +920,124 @@ def calcEckartC(X0, X, mass):
     C[...,3,2] = C34
     
     return C
+
+def _eckart_c2r(C):
+    """
+    Calculate Eckart rotation matrix from 
+    C matrix 
+    
+    Parameters
+    ----------
+    C : (...,4,4) ndarray
+        The C quaternion matrix.
+
+    Returns
+    -------
+    R : (...,3,3) ndarray
+        The rotation matrix.
+
+    """
+  
+    #
+    # Diagonalize C and get the derivatives
+    # of the eigenvector with the lowest eigenvalue
+    #
+    _,V = np.linalg.eigh(C)
+    v0 = V[...,:,0] # The lowest eigenvalue's eigenvector
+    
+    # Extract quaternion components 
+    q0 = v0[...,0]
+    q1 = v0[...,1]
+    q2 = v0[...,2]
+    q3 = v0[...,3]
+    
+    # Calculate rotation matrix 
+    
+    q00 = q0*q0
+    q11 = q1*q1
+    q22 = q2*q2
+    q33 = q3*q3
+    
+    q01 = q0*q1
+    q02 = q0*q2
+    q03 = q0*q3
+    q12 = q1*q2
+    q13 = q1*q3
+    q23 = q2*q3
+    
+    
+    R11 = q00 + q11 - q22 - q33 
+    R22 = q00 - q11 + q22 - q33 
+    R33 = q00 - q11 - q22 + q33 
+    
+    R12 = 2*(q12 + q03)
+    R13 = 2*(q13 - q02)
+    R21 = 2*(q12 - q03)
+    R23 = 2*(q23 + q01)
+    R31 = 2*(q13 + q02)
+    R32 = 2*(q23 - q01)
+    
+    R = np.array([
+        [R11,R12,R13],
+        [R21,R22,R23],
+        [R31,R32,R33]
+        ]) # (3,3,...)
+    R = np.moveaxis(R, [0,1], [-2, -1])
+    
+    return R
+
+def X2Eckart(X0, X, mass):
+    """
+    Calculate the Eckart frame configuration 
+    and corresponding rotation matrix.
+
+    Parameters
+    ----------
+    X0 : (N*3,) array_like
+        The reference geometry.
+    X : (N*3,...) array_like
+        The geometries for evaluating :math:`C`.
+    mass : (N,) array_like
+        The mass of each atom.
+
+    Returns
+    -------
+    Xeckart : (N*3,...) ndarray
+        The configuration rotated into the the Eckart (and center-of-mass) frame
+    R : (...,3,3) ndarray
+        The rotation matrices rotating vectors from the original frame to the 
+        Eckart frame.
+
+    """
+        
+    N = len(X0) // 3 # The number of atoms
+    
+    X = np.array(X).copy()
+    base_shape = X.shape[1:] 
+    
+    mass = np.array(mass)
+    
+    # Subtract the center-of-mass 
+    xcom = np.sum(X.reshape((N,3) + base_shape) * mass.reshape((N,1) + tuple([1]*len(base_shape))), axis = 0) / sum(mass)
+    # xcom has shape (3,...)
+    
+    for i in range(N):
+        for j in range(3):
+            X[3*i + j] -= xcom[j] 
+    # X is now the center-of-mass frame 
+    
+    C = calcEckartC(X0, X, mass) # Calculate the 4 x 4 matrix 
             
+    R = _eckart_c2r(C)  # Calculate the rotation matrix, (...,3,3)
+    
+    X = np.reshape(X, (N,3,) + base_shape ) # (N,3,...)
+    XT = X.T # ( ...,3,N)
+    Xeckart = (R @ XT).T # (N,3,...)
+    Xeckart = np.reshape(Xeckart, (N*3,) + base_shape)
+    
+    return Xeckart, R 
+    
+    
 class EckartCoordSys(CoordSys):
     """
     
