@@ -58,8 +58,10 @@ if use_cython:
     ext_modules += [
         Extension("nitrogen.cythontest", [ "nitrogen/cython/test.pyx" ]),
         Extension("nitrogen.basis.ndbasis_c", [ "nitrogen/basis/cython/ndbasis_c.pyx" ]),
-        Extension("nitrogen.autodiff.cyad.cyad_core", ["nitrogen/autodiff/cyad/cyad_core.pyx"]),
-        Extension("nitrogen.pes.library.mal_mht2014.malpes", ["nitrogen/pes/library/mal_mht2014/malpes.pyx"]),
+        Extension("nitrogen.autodiff.cyad.cyad_core", ["nitrogen/autodiff/cyad/cyad_core.pyx",
+                                                       "nitrogen/autodiff/cyad/cyad_core.pxd"]),
+        Extension("nitrogen.pes.library.mal_mht2014.malpes", ["nitrogen/pes/library/mal_mht2014/malpes.pyx",
+                                                              "nitrogen/pes/library/mal_mht2014/maldefs.pxi"]),
         Extension("nitrogen.pes.fit.exppip", ["nitrogen/pes/fit/cython/exppip.pyx"]),
     ]
     
