@@ -15,3 +15,4 @@ Permanent DOIs are available for citing stable releases:
 
 v2.1.2 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.7342277.svg)](https://doi.org/10.5281/zenodo.7342277)
 v2.2.1 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.14885792.svg)](https://doi.org/10.5281/zenodo.14885792)
+v2.2.3 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.15092614.svg)](https://doi.org/10.5281/zenodo.15092614)
