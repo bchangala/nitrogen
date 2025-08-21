@@ -198,7 +198,7 @@ def dircos_tensor(N1,k1,m1,N2,k2,m2):
 
     """
     
-    red = (-1) ** (k1 + k2 + N1 + N2 - 1) * np.sqrt( (2*N2 + 1) / (2*N1 + 1))
+    red = (-1) ** (k1 + k2 + N1 + N2 + 1) * np.sqrt( (2*N2 + 1) / (2*N1 + 1))
     
     lamQq = np.zeros((3,3))
     
