@@ -17,6 +17,7 @@ Contents
    :maxdepth: 2
    
    installation
+   citing
    tutorials/index
    api/index
 
