@@ -53,8 +53,41 @@ class GriddedBasis:
         self.wgtfun = wgtfun 
     
     def basis2grid(self, x, axis = 0):
+        """
+        Transform from the basis set representation to the grid representation.
+
+        Parameters
+        ----------
+        x : (...,nb,...) ndarray
+            An array in the basis representation.
+        axis : int, optional
+            The axis to be transformed. The default is 0.
+
+        Returns
+        -------
+        (...,ng,...) ndarray
+            The array transformed to the grid representation.
+
+        """
         return self._basis2grid(x, axis)
+    
     def grid2basis(self, x, axis = 0):
+        """
+        Transform from the grid representation to the basis set representatoin.
+
+        Parameters
+        ----------
+        x : (...,ng,...) ndarray
+            An array in the grid representation.
+        axis : int, optional
+            The axis to be transformed. The default is 0.
+
+        Returns
+        -------
+        (...,nb,...) ndarray
+            The array transformed to the basis set representation.
+
+        """
         return self._grid2basis(x, axis)
     def basis2grid_d(self, x, var, axis = 0):
         if var < 0 or var > self.nd:
@@ -64,6 +97,7 @@ class GriddedBasis:
         if var < 0 or var > self.nd:
             raise ValueError("var is out of range")
         return self._grid2basis_d(x, var,axis)
+    
     def d_grid(self, x, var, axis = 0):
         if var < 0 or var > self.nd:
             raise ValueError("var is out of range")
