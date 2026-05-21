@@ -36,7 +36,7 @@ pi = 3.14159265358979323846264338327950288419716939937510   # pi
 deg = pi / 180.0 # 1 degree in radians
 rad = 180.0 / pi # 1 radian in degrees 
 
-def X2xyz(X, elements, filename = "out.xyz", comment = None):
+def X2xyz(X, elements, filename = "out.xyz", comment = None, vibs = None):
     """
     Create an .xyz text file from an array of
     Cartesian positions.
@@ -52,6 +52,9 @@ def X2xyz(X, elements, filename = "out.xyz", comment = None):
     comment : str, optional
         A comment string for the .xyz file. If None,
         a default will be used.
+    vibs : (3*N,...) ndarray, optional
+        Vibrational displacements. The reference geometry is assumed to 
+            be X(...,0)
 
     Returns
     -------
@@ -89,6 +92,30 @@ def X2xyz(X, elements, filename = "out.xyz", comment = None):
                 z = Xp[j,2,i] # z
                 
                 file.write(f"{e:s}   {x:.15f} {y:.15f} {z:.15f} \n")
+                
+        # Write vibs, too?
+        if vibs is not None:
+            v = np.reshape(vibs, (N,3,-1))
+            nv = v.shape[2] 
+            for i in range(nv): # For each vibration 
+           
+                file.write(f"{N:d}\n") # number of atoms
+                file.write(f"Vibration {i+1:d}\n")
+                
+                for j in range(N): # For each atom
+                    e = elements[j] # element label
+                    x = Xp[j,0,0] # x
+                    y = Xp[j,1,0] # y
+                    z = Xp[j,2,0] # z
+                    
+                    # Displacements
+                    dx = v[j,0,i]
+                    dy = v[j,1,i]
+                    dz = v[j,2,i]
+                    
+                    file.write(f"{e:s}   {x:.15f} {y:.15f} {z:.15f} {dx:.15f} {dy:.15f} {dz:.15f} \n")
+        
+        return 
     # Done
     return 
 
