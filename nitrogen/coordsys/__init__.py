@@ -13,6 +13,7 @@ Coordinate systems
 :class:`CoordSys`              The coordinate system base class.
 :class:`ZMAT`                  Z-matrix coordinates.
 :class:`Valence3`              Triatomic valence coordinates.
+:class:`Valence4`              Tetratomic valence coordinates.
 :class:`CartesianN`            Simple :math:`n`-dimensional Cartesian.
 :class:`Polar`                 Polar coordinates.
 :class:`Cylindrical`           Cylindrical coordinates.
