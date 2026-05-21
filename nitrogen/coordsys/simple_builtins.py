@@ -323,7 +323,7 @@ class CartesianN(CoordSys):
     
     """
     
-    def __init__(self, N):
+    def __init__(self, N, isatomic = False):
         
         """
         Create a new CartesianN coordinate system object.
@@ -339,10 +339,14 @@ class CartesianN(CoordSys):
         Qstr = [f"X{i:d}" for i in range(N)]
         Xstr = [f"X{i:d}" for i in range(N)]
         
+        if isatomic:
+            if N % 3 != 0:
+                raise ValueError("N must be a multiple of 3 for atomic coord. sys.")
+        
         super().__init__(self._csCartN_q2x, nQ = N, 
                          nX = N, name = name, 
                          Qstr = Qstr, Xstr = Xstr,
-                         maxderiv = None, isatomic = False,
+                         maxderiv = None, isatomic = isatomic,
                          zlevel = 1) # zlevel = 1 -- linear function
         
     def _csCartN_q2x(self, Q, deriv = 0, out = None, var = None):
