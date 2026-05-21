@@ -740,6 +740,8 @@ class RealSphericalHBasis(NDBasis):
         
         self.m = basisfun.m  # The associated Legendre order
         self.l = basisfun.l  # The l-index list
+        self.Ntheta = Ntheta
+        self.Nphi = Nphi 
 
         return
     #
