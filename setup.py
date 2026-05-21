@@ -62,6 +62,7 @@ if use_cython:
                                                        "nitrogen/autodiff/cyad/cyad_core.pxd"]),
         Extension("nitrogen.pes.library.mal_mht2014.malpes", ["nitrogen/pes/library/mal_mht2014/malpes.pyx",
                                                               "nitrogen/pes/library/mal_mht2014/maldefs.pxi"]),
+        Extension("nitrogen.pes.library.carbonMM.cmm", ["nitrogen/pes/library/carbonMM/cmm.pyx"]),
         Extension("nitrogen.pes.fit.exppip", ["nitrogen/pes/fit/cython/exppip.pyx"]),
     ]
     
@@ -73,6 +74,7 @@ else:
         Extension("nitrogen.basis.ndbasis_c", [ "nitrogen/basis/cython/ndbasis_c.c" ]),
         Extension("nitrogen.autodiff.cyad.cyad_core", ["nitrogen/autodiff/cyad/cyad_core.c"]),
         Extension("nitrogen.pes.library.mal_mht2014.malpes", ["nitrogen/pes/library/mal_mht2014/malpes.c"]),
+        Extension("nitrogen.pes.library.carbonMM.cmm", ["nitrogen/pes/library/carbonMM/cmm.c"]),
         Extension("nitrogen.pes.fit.exppip", ["nitrogen/pes/fit/cython/exppip.c"]),
         
     ]
