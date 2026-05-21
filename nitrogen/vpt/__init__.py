@@ -97,6 +97,8 @@ def calc_rectilinear_modes(hes, mass, hbar = None, norm = 'dimensionless'):
 
     # Calculate the harmonic energies    
     w = hbar * np.sqrt(abs(lam))
+    # Return w with negative sign for imaginary frequencies 
+    w[lam < 0] *= -1 
 
     # Calculate the Cartesian displacements
     # for the dimensionless normal coordinates
@@ -683,7 +685,7 @@ def analyzeCD(Xe,omega,Lvib,mass, printing = True):
     ----------
     Xe : (3*n,) array_like
         The Cartesian reference geometry (in the
-        principal axis system)
+        principal axis system, abc)
     omega : (N,) array_like
         The harmonic frequencies 
     Lvib : (3*n,N) array_like
@@ -821,7 +823,11 @@ def printCD(Be,B0,CD):
 
 def analyzeAlpha(Xe,omega,Lvib,mass,f3, printing = True):
     """
-    Analyze and report VPT alpha constants.
+    Analyze and report VPT alpha constants. These are defined as 
+    
+    ..  math::
+        
+        B_k^a = B_e^a - \\sum_r \\alpha_r^a (v_r + \\frac{1}{2}) 
     
     Parameters
     ----------
@@ -839,6 +845,7 @@ def analyzeAlpha(Xe,omega,Lvib,mass,f3, printing = True):
         Only :math:`f_{kkk}` and :math:`f_{kks}` types terms
         are used.
         These derivatives are w.r.t. the :math:`q` dimensionless normal coordinates.
+        If None, the anharmonic contributions will be ignored.
     printing : bool, optional
         Print report
         
@@ -863,7 +870,11 @@ def analyzeAlpha(Xe,omega,Lvib,mass,f3, printing = True):
     # and Coriolis contributions to VPT2 
     # alpha's
     a_harm = calcAlpha_harm(Be, omega, aQ, Ie)
-    a_anh  = calcAlpha_anharm(Be, omega, aQ, f3)
+    if f3 is not None:
+        a_anh  = calcAlpha_anharm(Be, omega, aQ, f3)
+    else:
+        a_anh = 0 * a_harm
+        
     a_cor  = calcAlpha_cor(Be, omega, zeta)
     # Total alpha
     alpha = a_harm + a_anh + a_cor 
