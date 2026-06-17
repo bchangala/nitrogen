@@ -1708,6 +1708,51 @@ class AzimuthalLinear(LinearOperator):
         
         return az_m, az_U, az_UH, sing_val_mask, svm_1d, NH, bases_dp, ellipsis_idx
     
+    def _vector2quad(self, x):
+        """
+        
+
+        Parameters
+        ----------
+        x : (NH,) ndarray
+            A vector in the working representation.
+
+        Returns
+        -------
+        xq : (...) ndarray
+            The vector transformed to the quadrature grid.
+
+        """
+        
+        # These steps are based on the 
+        # first few lines of _matvec
+        #
+        # x ... (NH,)
+        # x_dp ... (NH, fbr_shape)
+        
+        J = self.J 
+        NJ = 2*J + 1 
+        eidx = self.ellipsis_idx
+        
+        
+        x_dp = np.zeros((self.NDP,), dtype = np.complex128) 
+        x_dp[self.svm_1d] = x 
+        x_dp = np.reshape(x_dp, (NJ,) + self.fbr_shape)         
+        x_fbr = nitrogen.basis.ops.opTensorO(x_dp, self.az_U) 
+        x_qe = self.bases_dp[eidx].basis2grid(x_fbr, axis = eidx + 1)
+        # Now transform the remaining factors 
+        xq = x_qe 
+        for i,b in enumerate(self.bases_dp):
+            if np.isscalar(b):
+                pass 
+            elif i != eidx:
+                xq = b.basis2grid(xq, axis = i + 1)
+            else:
+                pass # ellipsis factor is already transformed
+        
+        return xq
+        
+        
     def _matvec(self, x):
         
         J = self.J 
