@@ -711,7 +711,8 @@ def opt_path_bfgs(qpath, V, cs, masses, band_action = 1000.0,
                   kinetic_energy = 0.0,
                   Hinit = None, Vmin = 0.0,
                   alpha = 1.0, tol = 1e-6, maxiter = 100,
-                  disp = True, streak = None):
+                  disp = True, streak = None,
+                  ignore_g_deriv = False):
     """
     
     Optimize a least-action path using BFGS Hessian updates. 
@@ -740,6 +741,8 @@ def opt_path_bfgs(qpath, V, cs, masses, band_action = 1000.0,
         The maximum number of steps. The default is 100.
     disp : bool, optional
         Print detailed output. The default is True.
+    ignore_g_deriv : bool, optional
+        See calcPathAction. The default is False.
         
     Returns
     -------
@@ -795,7 +798,8 @@ def opt_path_bfgs(qpath, V, cs, masses, band_action = 1000.0,
                                         band_action = band_action,
                                         kinetic_energy=kinetic_energy,
                                         Vmin = Vmin,
-                                        deriv = 1)
+                                        deriv = 1,
+                                        ignore_g_deriv = ignore_g_deriv)
         
         # Calculate the net gradient and discard the first and last nodes
         g = (DI + DB)
